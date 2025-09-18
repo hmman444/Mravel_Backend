@@ -1,0 +1,105 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.mravel</groupId>
+  <artifactId>Mravel_Backend</artifactId>
+  <packaging>pom</packaging>
+  <version>1.0-SNAPSHOT</version>
+  
+  <name>Mravel_Backend</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <java.version>21</java.version>
+    <spring.boot.version>3.3.0</spring.boot.version>
+    <spring.cloud.version>2023.0.1</spring.cloud.version>
+  </properties>
+
+  <!-- Quản lý dependency version -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.10.2</version>
+        <scope>test</scope>
+    </dependency>
+
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring.boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring.cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <version>8.3.0</version>
+    </dependency>
+    </dependencies>
+  </dependencyManagement>
+  
+  <!-- Plugins chung -->
+  <build>
+    <pluginManagement>
+      <plugins>
+        <!-- Spring Boot Plugin -->
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring.boot.version}</version>
+        </plugin>
+
+        <!-- Compiler cho Java 21 -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.11.0</version>
+          <configuration>
+            <source>${java.version}</source>
+            <target>${java.version}</target>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <!-- Các module con -->
+  <modules>
+    <!-- Libs -->
+    <!-- <module>libs/common-utils</module> -->
+    <module>libs/security-jwt</module>
+    <module>libs/notification-core</module>
+
+    <!-- Services -->
+    <module>services/auth-service</module>
+    <!-- <module>services/user-service</module>
+    <module>services/schedule-service</module>
+    <module>services/booking-service</module>
+    <module>services/service-service</module>
+    <module>services/review-service</module>
+    <module>services/location-service</module>
+    <module>services/report-service</module> -->
+
+    <!-- Admin & Partner -->
+    <!-- <module>admin/admin-service</module>
+    <module>partner/partner-service</module> -->
+
+    <!-- Infrastructure -->
+    <!-- <module>gateway/api-gateway</module>
+    <module>config/config-service</module> -->
+  </modules>
+
+</project>
