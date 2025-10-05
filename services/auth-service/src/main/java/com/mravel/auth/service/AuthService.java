@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.mravel.notification.NotificationService;
+import com.mravel.auth.config.JwtUtil;
 
 @Service
 @RequiredArgsConstructor
