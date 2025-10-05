@@ -1,43 +1,46 @@
 package com.mravel.auth.controller;
 
+import com.mravel.common.response.ApiResponse;
 import com.mravel.auth.dto.*;
 import com.mravel.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
     private final AuthService authService;
 
     @PostMapping("/register")
-    public String register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<?>> register(@RequestBody RegisterRequest request) {
         authService.register(request);
-        return "Đăng ký thành công. Vui lòng kiểm tra email để lấy OTP.";
+        return ResponseEntity.ok(ApiResponse.success("Đăng ký thành công, vui lòng kiểm tra email.", null));
     }
 
     @PostMapping("/verify-otp")
-    public String verifyOtp(@RequestBody VerifyOtpRequest request) {
+    public ResponseEntity<ApiResponse<?>> verifyOtp(@RequestBody VerifyOtpRequest request) {
         authService.verifyOtpRegistration(request);
-        return "Xác thực thành công. Bạn có thể đăng nhập.";
+        return ResponseEntity.ok(ApiResponse.success("Xác thực thành công. Bạn có thể đăng nhập.", null));
     }
 
     @PostMapping("/login")
-    public JwtResponse login(@RequestBody LoginRequest request) {
-        return authService.login(request);
+    public ResponseEntity<ApiResponse<JwtResponse>> login(@RequestBody LoginRequest request) {
+        JwtResponse jwt = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", jwt));
     }
 
     @PostMapping("/forgot-password/request")
-    public String forgotPasswordRequest(@RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<ApiResponse<?>> forgotPasswordRequest(@RequestBody ForgotPasswordRequest request) {
         authService.sendForgotPasswordOtp(request.getEmail());
-        return "OTP đã được gửi tới email của bạn.";
+        return ResponseEntity.ok(ApiResponse.success("OTP đã được gửi tới email của bạn.", null));
     }
 
     @PostMapping("/forgot-password/reset")
-    public String resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<ApiResponse<?>> resetPassword(@RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
-        return "Đặt lại mật khẩu thành công.";
+        return ResponseEntity.ok(ApiResponse.success("Đặt lại mật khẩu thành công.", null));
     }
-
 }
