@@ -79,7 +79,7 @@
   <!-- Các module con -->
   <modules>
     <!-- Libs -->
-    <!-- <module>libs/common-utils</module> -->
+    <module>libs/common-utils</module>
     <module>libs/security-jwt</module>
     <module>libs/notification-core</module>
 
