@@ -1,4 +1,4 @@
-package com.mravel.auth.service;
+package com.mravel.auth.config;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
