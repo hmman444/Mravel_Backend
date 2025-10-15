@@ -14,7 +14,7 @@ spring:
           starttls:
             enable: true
   datasource:
-    url: jdbc:mysql://localhost:3306/db_auth?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/mravel_auth?useSSL=false&serverTimezone=UTC
     username: root
     password: your password
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -31,4 +31,5 @@ server:
 
 jwt:
   secret: my-super-secret-jwt-key-1234567890
-  expiration: 3600000
+  expiration: 7200000
+  refresh-expiration: 1209600000
