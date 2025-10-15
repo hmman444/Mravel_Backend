@@ -23,7 +23,10 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/verify-otp",
-                                "/api/auth/forgot-password/**")
+                                "/api/auth/forgot-password/**",
+                                "/api/auth/refresh",
+                                "/api/auth/logout",
+                                "/api/auth/social-login")
                         .permitAll()
                         .anyRequest().authenticated());
 

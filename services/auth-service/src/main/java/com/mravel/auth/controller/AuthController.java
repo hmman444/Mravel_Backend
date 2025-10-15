@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
-
     private final AuthService authService;
 
     @PostMapping("/register")
@@ -32,6 +31,18 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", jwt));
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<JwtResponse>> refresh(@RequestBody RefreshTokenRequest request) {
+        JwtResponse jwt = authService.refreshToken(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.success("Làm mới token thành công", jwt));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<?>> logout(@RequestBody RefreshTokenRequest request) {
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", null));
+    }
+
     @PostMapping("/forgot-password/request")
     public ResponseEntity<ApiResponse<?>> forgotPasswordRequest(@RequestBody ForgotPasswordRequest request) {
         authService.sendForgotPasswordOtp(request.getEmail());
@@ -42,5 +53,11 @@ public class AuthController {
     public ResponseEntity<ApiResponse<?>> resetPassword(@RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok(ApiResponse.success("Đặt lại mật khẩu thành công.", null));
+    }
+
+    @PostMapping("/social-login")
+    public ResponseEntity<ApiResponse<JwtResponse>> socialLogin(@RequestBody SocialLoginRequest request) {
+        JwtResponse jwt = authService.socialLogin(request);
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập mạng xã hội thành công", jwt));
     }
 }
