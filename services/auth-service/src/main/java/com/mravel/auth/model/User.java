@@ -14,9 +14,7 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String fullname;
-
     @Column(unique = true, nullable = false)
     private String email;
 
@@ -26,5 +24,4 @@ public class User {
 
     private String provider;
     private String providerId;
-    private String avatar;
 }
