@@ -20,13 +20,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // disable CSRF cho REST API
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/register",
-                                "/api/auth/login",
-                                "/api/auth/verify-otp",
-                                "/api/auth/forgot-password/**",
-                                "/api/auth/refresh",
-                                "/api/auth/logout",
-                                "/api/auth/social-login")
+                                "/api/auth/**")
                         .permitAll()
                         .anyRequest().authenticated());
 

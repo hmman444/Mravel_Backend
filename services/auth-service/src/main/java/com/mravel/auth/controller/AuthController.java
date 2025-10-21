@@ -1,9 +1,20 @@
 package com.mravel.auth.controller;
 
 import com.mravel.common.response.ApiResponse;
+import com.mravel.common.response.UserProfileResponse;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+import com.mravel.auth.config.JwtUtil;
 import com.mravel.auth.dto.*;
 import com.mravel.auth.service.AuthService;
+import com.mravel.auth.service.UserProfileClient;
+
 import lombok.RequiredArgsConstructor;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +23,29 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final JwtUtil jwtUtils;
+    private final UserProfileClient userProfileClient;
+
+    @GetMapping("/validate")
+    public ResponseEntity<Map<String, Object>> validateToken(@RequestHeader("Authorization") String header) {
+        String token = header.replace("Bearer ", "");
+        boolean valid = jwtUtils.validateToken(token);
+        Map<String, Object> body = new HashMap<>();
+        body.put("valid", valid);
+        if (valid)
+            body.put("email", jwtUtils.extractEmail(token));
+        return ResponseEntity.ok(body);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserProfileResponse> getCurrentUser(HttpServletRequest request) {
+        String token = jwtUtils.resolveToken(request);
+        String email = jwtUtils.extractEmail(token);
+
+        // Gọi sang user-service để lấy profile
+        UserProfileResponse profile = userProfileClient.getUserByEmail(email);
+        return ResponseEntity.ok(profile);
+    }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<?>> register(@RequestBody RegisterRequest request) {
