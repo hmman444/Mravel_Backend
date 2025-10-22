@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface PlanReactionRepository extends JpaRepository<PlanReaction, Long> {
     List<PlanReaction> findByPlanId(Long planId);
     Optional<PlanReaction> findByPlanIdAndUserId(Long planId, String userId);
+
+    void deleteByPlanIdAndUserId(Long planId, String userId);
 }

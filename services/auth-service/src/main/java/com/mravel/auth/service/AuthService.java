@@ -30,6 +30,7 @@ public class AuthService {
     private final GoogleAuthService googleAuthService;
     private final FacebookAuthService facebookAuthService;
     private final OutboxRepository outboxRepository;
+    String defaultAvatar = "https://static.vecteezy.com/system/resources/thumbnails/009/734/564/small/default-avatar-profile-icon-of-social-media-user-vector.jpg";
 
     @Transactional
     public void register(RegisterRequest request) {
@@ -50,6 +51,7 @@ public class AuthService {
                     .id(user.getId())
                     .email(user.getEmail())
                     .fullname(request.getFullname())
+                    .avatar(defaultAvatar)
                     .provider("local")
                     .build();
 

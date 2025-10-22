@@ -76,42 +76,52 @@ public class PlanService {
     }
 
     /** Reaction: toggle / update / add */
-    @Transactional
-    public PlanFeedItem react(Long planId, String key, String userId, String userName, String userAvatar) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+@Transactional
+public PlanFeedItem react(Long planId, String key, String userId, String userName, String userAvatar) {
+    System.out.println("🟢 [react] planId=" + planId + ", userId=" + userId + ", key=" + key);
 
-        Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
+    Plan plan = planRepository.findById(planId)
+            .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        if (existingOpt.isPresent()) {
-            PlanReaction existing = existingOpt.get();
-            // Nếu cùng loại => bỏ react
-            if (existing.getType().equals(key)) {
-                plan.getReactions().remove(existing);
-                reactionRepository.delete(existing);
-            } else {
-                // đổi loại react
-                existing.setType(key);
-                existing.setCreatedAt(Instant.now());
-                reactionRepository.save(existing);
-            }
-        } else {
-            // thêm mới
-            PlanReaction newReact = PlanReaction.builder()
-                    .plan(plan)
-                    .userId(userId)
-                    .userName(userName)
-                    .userAvatar(userAvatar)
-                    .type(key)
-                    .createdAt(Instant.now())
-                    .build();
-            plan.getReactions().add(newReact);
-            reactionRepository.save(newReact);
-        }
+    Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
 
-        planRepository.save(plan);
-        return planMapper.toFeedItem(plan);
+    if (existingOpt.isPresent()) {
+        PlanReaction existing = existingOpt.get();
+        System.out.println("🔹 Found existing reaction: id=" + existing.getId() + ", type=" + existing.getType());
+
+        // Nếu người dùng đã react → bỏ react (DELETE luôn)
+        System.out.println("❌ Removing reaction (DELETE) ...");
+        plan.getReactions().remove(existing);
+        reactionRepository.delete(existing);
+    } else {
+        // Nếu chưa có reaction → thêm mới
+        System.out.println("✨ Creating new reaction type=" + key);
+        PlanReaction newReact = PlanReaction.builder()
+                .plan(plan)
+                .userId(userId)
+                .userName(userName)
+                .userAvatar(userAvatar)
+                .type(key)
+                .createdAt(Instant.now())
+                .build();
+
+        plan.getReactions().add(newReact);
+        reactionRepository.save(newReact);
     }
+
+    // Lưu lại plan
+    planRepository.save(plan);
+
+    // Log kết quả sau khi cập nhật
+    List<PlanReaction> all = reactionRepository.findByPlanId(planId);
+    System.out.println("📊 [After Save] DB reactions for plan " + planId + ":");
+    for (PlanReaction r : all) {
+        System.out.println("   → id=" + r.getId() + ", type=" + r.getType() + ", user=" + r.getUserName());
+    }
+
+    return planMapper.toFeedItem(plan);
+}
+
 
     /** Tăng lượt xem */
     public void increaseView(Long planId) {
