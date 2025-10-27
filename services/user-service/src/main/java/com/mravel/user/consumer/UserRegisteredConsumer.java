@@ -34,7 +34,7 @@ public class UserRegisteredConsumer {
                     .provider(event.getProvider())
                     .build());
 
-            ack.acknowledge(); // ✅ manual commit sau khi DB OK
+            ack.acknowledge(); 
         } catch (DataAccessException ex) {
             log.error("❌ Database error, will retry later: {}", ex.getMessage());
             throw ex; // Kafka sẽ retry theo policy

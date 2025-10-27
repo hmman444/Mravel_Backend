@@ -19,7 +19,7 @@ public class OutboxEvent {
     private String eventType; // e.g. USER_REGISTERED
 
     @Lob
-    @Column(columnDefinition = "LONGTEXT") // ✅ bắt buộc Hibernate tạo LONGTEXT
+    @Column(columnDefinition = "LONGTEXT")
     private String payload;
 
     private String status; // PENDING, SENT, FAILED

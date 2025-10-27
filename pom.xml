@@ -88,9 +88,9 @@
 
     <!-- Services -->
     <module>services/auth-service</module>
-    <!-- <module>services/user-service</module>
-    <module>services/schedule-service</module>
-    <module>services/booking-service</module>
+    <module>services/user-service</module>
+    <module>services/plan-service</module>
+    <!-- <module>services/booking-service</module> 
     <module>services/service-service</module>
     <module>services/review-service</module>
     <module>services/location-service</module>

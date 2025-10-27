@@ -79,6 +79,5 @@ public class DataSeeder {
 
         planRepository.saveAll(List.of(dalat, hue));
 
-        System.out.println("✅ Seeded sample plans into database.");
     }
 }
