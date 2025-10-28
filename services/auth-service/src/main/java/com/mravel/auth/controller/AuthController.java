@@ -3,6 +3,7 @@ package com.mravel.auth.controller;
 import com.mravel.common.response.ApiResponse;
 import com.mravel.common.response.UserProfileResponse;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.mravel.auth.config.JwtUtil;
@@ -94,4 +95,12 @@ public class AuthController {
         JwtResponse jwt = authService.socialLogin(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập mạng xã hội thành công", jwt));
     }
+
+    @ExceptionHandler(ExpiredJwtException.class)
+    public ResponseEntity<ApiResponse<?>> handleExpiredJwt(ExpiredJwtException ex) {
+        return ResponseEntity
+                .status(401)
+                .body(ApiResponse.error("JWT expired"));
+    }
+
 }
