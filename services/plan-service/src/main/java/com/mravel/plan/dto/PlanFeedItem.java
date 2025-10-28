@@ -86,6 +86,8 @@ public class PlanFeedItem {
         private User user;
         private String text;
         private Instant createdAt;
+        private Long parentId; // nếu là reply
+        private List<Comment> replies; // danh sách phản hồi con
 
         @Data
         @Builder

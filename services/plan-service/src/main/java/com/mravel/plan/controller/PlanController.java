@@ -43,7 +43,16 @@ public class PlanController {
     // Bình luận: POST /api/plans/{id}/comments
     @PostMapping("/{id}/comments")
     public PlanFeedItem.Comment addComment(@PathVariable Long id, @RequestBody AddCommentRequest req) {
-        return planService.addComment(id, req.getUserId(), req.getUserName(), req.getUserAvatar(), req.getText());
+            System.out.println("===> Received AddCommentRequest: " + req);
+
+        return planService.addComment(
+                id,
+                req.getUserId(),
+                req.getUserName(),
+                req.getUserAvatar(),
+                req.getText(),
+                req.getParentId()
+        );
     }
 
     // Reaction: POST /api/plans/{id}/reactions
@@ -51,7 +60,7 @@ public class PlanController {
     public ResponseEntity<PlanFeedItem> react(
             @PathVariable Long planId,
             @RequestParam String key,
-            @RequestParam String userId,      // ✅ đổi Long → String
+            @RequestParam String userId,      
             @RequestParam String userName,
             @RequestParam String userAvatar
     ) {

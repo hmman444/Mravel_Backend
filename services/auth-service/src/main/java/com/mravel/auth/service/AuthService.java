@@ -154,10 +154,10 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
+        refreshTokenService.deleteByToken(refreshToken);
+
         String newAccessToken = jwtUtil.generateAccessToken(email);
         RefreshToken newRefreshToken = refreshTokenService.createToken(email);
-
-        refreshTokenService.deleteByToken(refreshToken);
 
         return new JwtResponse(newAccessToken, newRefreshToken.getToken());
     }

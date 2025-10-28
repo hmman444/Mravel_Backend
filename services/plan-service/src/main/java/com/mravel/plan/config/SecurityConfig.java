@@ -21,9 +21,8 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/plans/**").permitAll() // hoặc .authenticated() nếu cần token
-                        .anyRequest().permitAll()
-                )
+                        .requestMatchers("/api/**").permitAll() // hoặc .authenticated() nếu cần token
+                        .anyRequest().permitAll())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

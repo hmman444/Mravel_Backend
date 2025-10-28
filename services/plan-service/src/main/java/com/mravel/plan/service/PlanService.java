@@ -6,10 +6,13 @@ import com.mravel.plan.model.PlanComment;
 import com.mravel.plan.model.PlanReaction;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
+
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -21,6 +24,10 @@ public class PlanService {
     private final PlanRepository planRepository;
     private final PlanReactionRepository reactionRepository;
     private final PlanMapper planMapper;
+
+    // ✅ Thêm EntityManager để truy vấn trực tiếp
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /** Lấy danh sách feed (có phân trang) */
     public Page<PlanFeedItem> getFeed(int page, int size, String viewerId) {
@@ -43,85 +50,79 @@ public class PlanService {
     }
 
     /** Thêm bình luận vào kế hoạch */
-    public PlanFeedItem.Comment addComment(Long planId,
-                                           String userId,
-                                           String userName,
-                                           String userAvatar,
-                                           String text) {
+    @Transactional
+    public PlanFeedItem.Comment addComment(
+            Long planId,
+            String userId,
+            String userName,
+            String userAvatar,
+            String text,
+            Long parentId
+    ) {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
+        PlanComment parent = null;
+        if (parentId != null) {
+            parent = entityManager.find(PlanComment.class, parentId);
+            if (parent == null) throw new RuntimeException("Parent comment not found");
+        }
+
         PlanComment comment = PlanComment.builder()
+                .plan(plan)
+                .parent(parent)
                 .userId(userId)
                 .userName(userName)
                 .userAvatar(userAvatar)
                 .text(text)
                 .createdAt(Instant.now())
-                .plan(plan)
                 .build();
 
-        plan.getComments().add(comment);
-        planRepository.save(plan);
+        entityManager.persist(comment);
+        entityManager.flush(); 
 
         return PlanFeedItem.Comment.builder()
-                .id(comment.getId())
+                .id(comment.getId())                   
+                .parentId(parentId)                     
+                .text(comment.getText())
+                .createdAt(comment.getCreatedAt())
                 .user(PlanFeedItem.Comment.User.builder()
                         .id(userId)
                         .name(userName)
                         .avatar(userAvatar)
                         .build())
-                .text(text)
-                .createdAt(comment.getCreatedAt())
                 .build();
     }
 
     /** Reaction: toggle / update / add */
-@Transactional
-public PlanFeedItem react(Long planId, String key, String userId, String userName, String userAvatar) {
-    System.out.println("🟢 [react] planId=" + planId + ", userId=" + userId + ", key=" + key);
+    @Transactional
+    public PlanFeedItem react(Long planId, String key, String userId, String userName, String userAvatar) {
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-    Plan plan = planRepository.findById(planId)
-            .orElseThrow(() -> new RuntimeException("Plan not found"));
+        Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
 
-    Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
+        if (existingOpt.isPresent()) {
+            PlanReaction existing = existingOpt.get();
+            plan.getReactions().remove(existing);
+            reactionRepository.delete(existing);
+        } else {
+            PlanReaction newReact = PlanReaction.builder()
+                    .plan(plan)
+                    .userId(userId)
+                    .userName(userName)
+                    .userAvatar(userAvatar)
+                    .type(key)
+                    .createdAt(Instant.now())
+                    .build();
 
-    if (existingOpt.isPresent()) {
-        PlanReaction existing = existingOpt.get();
-        System.out.println("🔹 Found existing reaction: id=" + existing.getId() + ", type=" + existing.getType());
+            plan.getReactions().add(newReact);
+            reactionRepository.save(newReact);
+        }
 
-        // Nếu người dùng đã react → bỏ react (DELETE luôn)
-        System.out.println("❌ Removing reaction (DELETE) ...");
-        plan.getReactions().remove(existing);
-        reactionRepository.delete(existing);
-    } else {
-        // Nếu chưa có reaction → thêm mới
-        System.out.println("✨ Creating new reaction type=" + key);
-        PlanReaction newReact = PlanReaction.builder()
-                .plan(plan)
-                .userId(userId)
-                .userName(userName)
-                .userAvatar(userAvatar)
-                .type(key)
-                .createdAt(Instant.now())
-                .build();
-
-        plan.getReactions().add(newReact);
-        reactionRepository.save(newReact);
+        planRepository.save(plan);
+        return planMapper.toFeedItem(plan);
     }
-
-    // Lưu lại plan
-    planRepository.save(plan);
-
-    // Log kết quả sau khi cập nhật
-    List<PlanReaction> all = reactionRepository.findByPlanId(planId);
-    System.out.println("📊 [After Save] DB reactions for plan " + planId + ":");
-    for (PlanReaction r : all) {
-        System.out.println("   → id=" + r.getId() + ", type=" + r.getType() + ", user=" + r.getUserName());
-    }
-
-    return planMapper.toFeedItem(plan);
-}
-
 
     /** Tăng lượt xem */
     public void increaseView(Long planId) {
