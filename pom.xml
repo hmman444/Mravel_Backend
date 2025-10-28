@@ -6,7 +6,13 @@
   <groupId>com.mravel</groupId>
   <artifactId>Mravel_Backend</artifactId>
   <packaging>pom</packaging>
-  <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+    </dependencies>
+    <version>1.0-SNAPSHOT</version>
   
   <name>Mravel_Backend</name>
   <url>http://maven.apache.org</url>
@@ -85,10 +91,10 @@
 
     <!-- Services -->
     <module>services/auth-service</module>
+    <module>services/catalog-service</module>
     <!-- <module>services/user-service</module>
     <module>services/schedule-service</module>
     <module>services/booking-service</module>
-    <module>services/service-service</module>
     <module>services/review-service</module>
     <module>services/location-service</module>
     <module>services/report-service</module> -->

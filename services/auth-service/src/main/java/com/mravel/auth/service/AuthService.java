@@ -1,7 +1,6 @@
 package com.mravel.auth.service;
 
 import com.mravel.auth.dto.*;
-import com.mravel.auth.config.*;
 import com.mravel.auth.model.User;
 import com.mravel.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

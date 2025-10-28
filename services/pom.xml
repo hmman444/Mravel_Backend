@@ -1,6 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
@@ -16,14 +16,7 @@
 
   <modules>
     <module>auth-service</module>
-    <module>user-service</module>
-    <module>schedule-service</module>
-    <module>booking-service</module>
-    <module>service-service</module>
-    <module>review-service</module>
-    <module>location-service</module>
-    <module>report-service</module>
+    <module>catalog-service</module>
   </modules>
 
-  
 </project>
