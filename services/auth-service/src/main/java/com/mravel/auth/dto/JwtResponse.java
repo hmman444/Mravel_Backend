@@ -2,10 +2,10 @@ package com.mravel.auth.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.Getter;
 
-@Data @Getter
+@Data
 @AllArgsConstructor
 public class JwtResponse {
-    private String token;
+    private String accessToken;
+    private String refreshToken;
 }

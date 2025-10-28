@@ -1,8 +1,9 @@
 package com.mravel.auth.config;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -12,22 +13,63 @@ import java.util.Date;
 
 @Component
 public class JwtUtil {
-    private final long expiration;
     private final SecretKey key;
+    private final long accessTokenExpiration;
+    private final long refreshTokenExpiration;
 
     public JwtUtil(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration}") long expiration) {
+            @Value("${jwt.access-expiration}") long accessTokenExpiration,
+            @Value("${jwt.refresh-expiration}") long refreshTokenExpiration) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expiration = expiration;
+        this.accessTokenExpiration = accessTokenExpiration;
+        this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
-    public String generateToken(String subject) {
+    public String generateAccessToken(String email) {
+        return buildToken(email, accessTokenExpiration);
+    }
+
+    public String generateRefreshToken(String email) {
+        return buildToken(email, refreshTokenExpiration);
+    }
+
+    private String buildToken(String subject, long expirationTime) {
         return Jwts.builder()
                 .setSubject(subject)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public long getRefreshTokenExpiration() {
+        return refreshTokenExpiration;
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public String extractEmail(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
+    public String resolveToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
     }
 }

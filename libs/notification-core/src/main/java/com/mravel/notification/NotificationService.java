@@ -21,7 +21,6 @@ public class NotificationService {
             helper.setTo(toEmail);
             helper.setSubject("🔐 Mã xác thực OTP của bạn - Mravel");
 
-            // 🎨 Nội dung HTML cho email OTP
             String htmlContent = """
                         <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7fb; padding: 20px;">
                             <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
