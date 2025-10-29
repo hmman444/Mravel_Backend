@@ -6,7 +6,7 @@ import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import com.mravel.plan.service.PlanPermissionService;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -14,16 +14,19 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlanBoardService {
-
+    private final PlanPermissionService permissionService;
     private final PlanRepository planRepository;
     private final PlanListRepository listRepository;
     private final PlanCardRepository cardRepository;
     private final PlanLabelRepository labelRepository;
     private final PlanInviteRepository inviteRepository;
 
-    /* ========= Query board ========= */
+    // board
     @Transactional
-    public BoardResponse getBoard(Long planId) {
+    public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
+        if (!permissionService.canView(planId, userId, isFriend))
+            throw new RuntimeException("You don't have permission to view this board.");
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -75,9 +78,11 @@ public class PlanBoardService {
                 .build();
     }
 
-    /* ========= List CRUD ========= */
+    // crud list
     @Transactional
-    public ListDto createList(Long planId, CreateListRequest req) {
+    public ListDto createList(Long planId, Long userId, CreateListRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -100,14 +105,18 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public void renameList(Long planId, Long listId, RenameListRequest req) {
+    public void renameList(Long planId, Long listId, Long userId, RenameListRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanList list = mustLoadListInPlan(planId, listId);
         list.setTitle(req.getTitle());
         listRepository.save(list);
     }
 
     @Transactional
-    public void deleteList(Long planId, Long listId) {
+    public void deleteList(Long planId, Long userId, Long listId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanList list = mustLoadListInPlan(planId, listId);
         int removedPos = list.getPosition();
         listRepository.delete(list);
@@ -121,9 +130,11 @@ public class PlanBoardService {
         }
     }
 
-    /* ========= Card CRUD ========= */
+    // crud card
     @Transactional
-    public CardDto createCard(Long planId, Long listId, CreateCardRequest req) {
+    public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanList list = mustLoadListInPlan(planId, listId);
         int nextPos = (int) cardRepository.countByListId(listId);
 
@@ -143,7 +154,9 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public CardDto updateCard(Long planId, Long listId, Long cardId, UpdateCardRequest req) {
+    public CardDto updateCard(Long planId, Long listId, Long cardId, Long userId, UpdateCardRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanCard card = mustLoadCardInList(planId, listId, cardId);
 
         if (req.getText() != null)
@@ -167,7 +180,20 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public void deleteCard(Long planId, Long listId, Long cardId) {
+    public CardDto toggleDone(Long planId, Long listId, Long cardId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
+        PlanCard card = mustLoadCardInList(planId, listId, cardId);
+        card.setDone(!card.isDone());
+        cardRepository.save(card);
+
+        return toCardDto(card);
+    }
+
+    @Transactional
+    public void deleteCard(Long planId, Long listId, Long cardId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanCard card = mustLoadCardInList(planId, listId, cardId);
         int removedPos = card.getPosition();
         cardRepository.delete(card);
@@ -182,7 +208,9 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public CardDto duplicateCard(Long planId, Long listId, Long cardId) {
+    public CardDto duplicateCard(Long planId, Long listId, Long cardId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanCard original = mustLoadCardInList(planId, listId, cardId);
         int nextPos = (int) cardRepository.countByListId(listId);
 
@@ -202,9 +230,11 @@ public class PlanBoardService {
         return toCardDto(copy);
     }
 
-    /* ========= Drag & Drop ========= */
+    // drag drop
     @Transactional
-    public BoardResponse reorder(Long planId, ReorderRequest req) {
+    public BoardResponse reorder(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         if ("list".equalsIgnoreCase(req.getType())) {
             List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
             PlanList moved = lists.remove(req.getSourceIndex().intValue());
@@ -212,7 +242,7 @@ public class PlanBoardService {
             // reindex
             for (int i = 0; i < lists.size(); i++)
                 lists.get(i).setPosition(i);
-            return getBoard(planId);
+            return getBoard(planId, userId, isFriend);
         } else if ("card".equalsIgnoreCase(req.getType())) {
             PlanList source = mustLoadListInPlan(planId, req.getSourceListId());
             PlanList dest = mustLoadListInPlan(planId, req.getDestListId());
@@ -235,14 +265,16 @@ public class PlanBoardService {
                 for (int i = 0; i < destCards.size(); i++)
                     destCards.get(i).setPosition(i);
             }
-            return getBoard(planId);
+            return getBoard(planId, userId, isFriend);
         }
         throw new IllegalArgumentException("Unknown reorder type");
     }
 
-    /* ========= Labels ========= */
+    // label
     @Transactional
-    public LabelDto upsertLabel(Long planId, LabelUpsertRequest req) {
+    public LabelDto upsertLabel(Long planId, Long userId, LabelUpsertRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -264,7 +296,9 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public void deleteLabel(Long planId, Long labelId) {
+    public void deleteLabel(Long planId, Long labelId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanLabel label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new RuntimeException("Label not found"));
         if (!label.getPlan().getId().equals(planId))
@@ -272,12 +306,15 @@ public class PlanBoardService {
         labelRepository.delete(label);
     }
 
-    /* ========= Invites ========= */
+    // invites
     @Transactional
-    public List<InviteDto> invite(Long planId, InviteRequest req) {
+    public List<InviteDto> invite(Long planId, Long userId, InviteRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.OWNER);
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
-        String role = Optional.ofNullable(req.getRole()).orElse("viewer");
+        PlanRole role = Optional.ofNullable(req.getRole())
+                .orElse(PlanRole.VIEWER);
 
         List<InviteDto> result = new ArrayList<>();
         for (String email : req.getEmails()) {
@@ -292,7 +329,7 @@ public class PlanBoardService {
         return result;
     }
 
-    /* ========= Helpers ========= */
+    // helpers
     private PlanList mustLoadListInPlan(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
                 .orElseThrow(() -> new RuntimeException("List not found"));

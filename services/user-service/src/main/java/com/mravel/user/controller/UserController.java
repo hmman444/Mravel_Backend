@@ -25,4 +25,17 @@ public class UserController {
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
+    @GetMapping("/{id}")
+    public UserProfileResponse getUserById(@PathVariable Long id) {
+        return userRepository.findById(id)
+                .map(user -> UserProfileResponse.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .fullname(user.getFullname())
+                        .avatar(user.getAvatar())
+                        .provider(user.getProvider())
+                        .build())
+                .orElseThrow(() -> new RuntimeException("User not found: " + id));
+    }
+
 }

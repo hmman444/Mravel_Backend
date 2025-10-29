@@ -32,9 +32,13 @@ public class AuthController {
         String token = header.replace("Bearer ", "");
         boolean valid = jwtUtils.validateToken(token);
         Map<String, Object> body = new HashMap<>();
+
         body.put("valid", valid);
-        if (valid)
+        if (valid) {
+            body.put("id", jwtUtils.extractUserId(token));
             body.put("email", jwtUtils.extractEmail(token));
+            body.put("role", jwtUtils.extractRole(token));
+        }
         return ResponseEntity.ok(body);
     }
 

@@ -24,4 +24,8 @@ public class User {
 
     private String provider;
     private String providerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role = Role.USER;
 }

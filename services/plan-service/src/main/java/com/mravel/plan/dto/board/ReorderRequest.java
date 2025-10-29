@@ -8,17 +8,17 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class ReorderRequest {
-    /** "list" | "card" */
+    // list / card
     private String type;
 
-    /** vị trí nguồn */
+    // nguồn
     private Long sourceListId; // bắt buộc khi type == "card"
     private Integer sourceIndex; // index trong list
 
-    /** vị trí đích */
+    // đích
     private Long destListId; // bắt buộc khi type == "card"
     private Integer destIndex;
 
-    /** id thẻ khi kéo thả card */
+    // id thẻ (card) được di chuyển
     private Long cardId; // bắt buộc khi type == "card"
 }
