@@ -6,7 +6,13 @@
   <groupId>com.mravel</groupId>
   <artifactId>Mravel_Backend</artifactId>
   <packaging>pom</packaging>
-  <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+    </dependencies>
+    <version>1.0-SNAPSHOT</version>
   
   <name>Mravel_Backend</name>
   <url>http://maven.apache.org</url>
@@ -44,7 +50,7 @@
       </dependency>
 
       <dependency>
-        <groupId>mysql</groupId>
+        <groupId>com.mysql</groupId>
         <artifactId>mysql-connector-j</artifactId>
         <version>8.3.0</version>
     </dependency>
@@ -88,11 +94,10 @@
 
     <!-- Services -->
     <module>services/auth-service</module>
-    <module>services/user-service</module>
-    <module>services/plan-service</module>
-    <!-- <module>services/booking-service</module> 
-    <module>services/service-service</module>
-    <module>services/review-service</module>
+	  <module>services/catalog-service</module>
+	  <module>services/user-service</module>
+	  <module>services/plan-service</module>
+    <!--<module>services/review-service</module>
     <module>services/location-service</module>
     <module>services/report-service</module> -->
 
