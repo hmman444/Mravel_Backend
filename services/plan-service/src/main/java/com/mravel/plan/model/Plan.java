@@ -3,6 +3,7 @@ package com.mravel.plan.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 @Entity
@@ -11,6 +12,7 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(name = "plans")
 public class Plan {
 
     @Id
@@ -22,12 +24,12 @@ public class Plan {
     @Column(length = 4000)
     private String description;
 
-    private String startDate;
-    private String endDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private Integer days;
 
     @Enumerated(EnumType.STRING)
-    private Visibility visibility;
+    private Visibility visibility; // PUBLIC, PRIVATE, FRIENDS
 
     private Long views;
 
@@ -36,7 +38,9 @@ public class Plan {
 
     private Instant createdAt;
 
-    // collections
+    @ElementCollection
+    @CollectionTable(name = "plan_invites", joinColumns = @JoinColumn(name = "plan_id"))
+    private List<Invite> inviteList = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "plan_images", joinColumns = @JoinColumn(name = "plan_id"))
@@ -48,8 +52,6 @@ public class Plan {
     @CollectionTable(name = "plan_destinations", joinColumns = @JoinColumn(name = "plan_id"))
     @Builder.Default
     private List<Destination> destinations = new ArrayList<>();
-
-    // relations
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -76,4 +78,15 @@ public class Plan {
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PlanMember> members = new ArrayList<>();
+
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class Invite {
+        private String email;
+        private String role; // editor / viewer
+    }
 }
