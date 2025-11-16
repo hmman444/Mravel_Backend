@@ -30,7 +30,7 @@ public class AuthService {
     private final GoogleAuthService googleAuthService;
     private final FacebookAuthService facebookAuthService;
     private final OutboxRepository outboxRepository;
-    String defaultAvatar = "https://static.vecteezy.com/system/resources/thumbnails/009/734/564/small/default-avatar-profile-icon-of-social-media-user-vector.jpg";
+    String defaultAvatar = "https://res.cloudinary.com/dqp7k8d4r/image/upload/v1757608869/avatars/y1kuegnpvey9ukpcv5iu.jpg";
 
     @Transactional
     public void register(RegisterRequest request) {
