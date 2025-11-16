@@ -102,5 +102,4 @@ public class AuthController {
                 .status(401)
                 .body(ApiResponse.error("JWT expired"));
     }
-
 }
