@@ -7,6 +7,9 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.mravel.plan.service.PlanPermissionService;
+
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,6 +23,9 @@ public class PlanBoardService {
     private final PlanCardRepository cardRepository;
     private final PlanLabelRepository labelRepository;
     private final PlanInviteRepository inviteRepository;
+    private final PlanInviteTokenRepository inviteTokenRepo;
+    private final PlanMemberRepository memberRepository;
+    private final MailService mailService;
 
     // board
     @Transactional
@@ -313,20 +319,77 @@ public class PlanBoardService {
 
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
+
         PlanRole role = Optional.ofNullable(req.getRole())
                 .orElse(PlanRole.VIEWER);
 
         List<InviteDto> result = new ArrayList<>();
+
         for (String email : req.getEmails()) {
-            PlanInvite inv = PlanInvite.builder()
+            if (inviteTokenRepo.existsByEmailAndPlanId(email, plan.getId())) {
+                throw new RuntimeException("Email " + email + " is already invited.");
+            }
+
+            // 1. Tạo token
+            String token = UUID.randomUUID().toString();
+
+            PlanInviteToken tokenEntity = PlanInviteToken.builder()
                     .plan(plan)
                     .email(email)
                     .role(role)
+                    .token(token)
+                    .expiredAt(Instant.now().plus(Duration.ofDays(3)))
+                    .used(false)
                     .build();
-            inviteRepository.save(inv);
-            result.add(InviteDto.builder().id(inv.getId()).email(inv.getEmail()).role(inv.getRole()).build());
+
+            inviteTokenRepo.save(tokenEntity);
+
+            // 2. Gửi email
+            mailService.sendInviteEmail(email,
+                    plan.getTitle(),
+                    "http://localhost:5173/plans/join?token=" + token);
+
+            // 3. Trả về invite DTO
+            result.add(InviteDto.builder()
+                    .id(tokenEntity.getId())
+                    .email(email)
+                    .role(role)
+                    .build());
         }
+
         return result;
+    }
+
+    @Transactional
+    public Long joinPlan(String token, Long userId) {
+
+        PlanInviteToken inv = inviteTokenRepo.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+
+        Long planId = inv.getPlan().getId();
+
+        if (inv.isUsed())
+            return planId;
+        if (inv.getExpiredAt().isBefore(Instant.now()))
+            throw new RuntimeException("Invite expired");
+
+        boolean exists = memberRepository.existsByPlanIdAndUserId(planId, userId);
+        if (exists) {
+            inv.setUsed(true);
+            return planId;
+        }
+
+        // tạo member
+        PlanMember member = PlanMember.builder()
+                .plan(inv.getPlan())
+                .userId(userId)
+                .role(inv.getRole())
+                .build();
+        memberRepository.save(member);
+
+        inv.setUsed(true);
+
+        return planId;
     }
 
     // helpers
