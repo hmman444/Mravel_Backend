@@ -192,7 +192,7 @@ public class PlanService {
                 Plan plan = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-                // 🔹 Gọi sang user-service lấy thông tin user
+                // Gọi sang user-service lấy thông tin user
                 UserProfileResponse user = userProfileClient.getUserById(userId);
                 if (user == null)
                         throw new RuntimeException("User not found: " + userId);

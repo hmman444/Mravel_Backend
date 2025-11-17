@@ -1,9 +1,15 @@
 package com.mravel.plan.controller;
 
 import com.mravel.plan.dto.board.*;
+import com.mravel.plan.model.PlanRole;
 import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.service.PlanBoardService;
+import com.mravel.plan.service.PlanPermissionService;
+
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +20,7 @@ public class PlanBoardController {
 
     private final PlanBoardService service;
     private final CurrentUserService currentUser;
+    private final PlanPermissionService permissionService;
 
     // board
     // Viewer, Editor, Owner
@@ -127,4 +134,59 @@ public class PlanBoardController {
         Long userId = currentUser.getId();
         return service.invite(planId, userId, req);
     }
+
+    @GetMapping("/share")
+    public ShareResponse getShareInfo(@PathVariable Long planId) {
+        Long userId = currentUser.getId();
+        return service.getShareInfo(planId, userId);
+    }
+
+    @PatchMapping("/members/role")
+    public ResponseEntity<Void> updateRole(
+            @PathVariable Long planId,
+            @RequestBody UpdateMemberRoleRequest req) {
+
+        Long ownerId = currentUser.getId();
+        service.updateMemberRole(planId, ownerId, req);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/members")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable Long planId,
+            @RequestBody RemoveMemberRequest req) {
+
+        Long ownerId = currentUser.getId();
+        service.removeMember(planId, ownerId, req.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/requests")
+    public PlanRequestDto requestAccess(
+            @PathVariable Long planId,
+            @RequestBody PlanRequestCreate req) {
+        Long userId = currentUser.getId();
+        return service.requestAccess(planId, userId, req);
+    }
+
+    @GetMapping("/requests")
+    public List<PlanRequestDto> getRequests(@PathVariable Long planId) {
+        Long ownerId = currentUser.getId();
+        permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
+        return service.getRequests(planId);
+    }
+
+    @PatchMapping("/requests/{reqId}")
+    public ResponseEntity<?> handleRequest(
+            @PathVariable Long planId,
+            @PathVariable Long reqId,
+            @RequestBody PlanRequestAction req) {
+        Long ownerId = currentUser.getId();
+        permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
+
+        service.handleRequest(planId, reqId, req);
+
+        return ResponseEntity.noContent().build();
+    }
+
 }

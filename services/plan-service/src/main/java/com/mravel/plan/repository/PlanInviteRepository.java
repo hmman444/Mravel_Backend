@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface PlanInviteRepository extends JpaRepository<PlanInvite, Long> {
     List<PlanInvite> findByPlanId(Long planId);
+
+    void deleteByEmailAndPlanId(String email, Long planId);
 }
