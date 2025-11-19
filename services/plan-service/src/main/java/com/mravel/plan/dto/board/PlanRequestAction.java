@@ -4,5 +4,6 @@ import lombok.Data;
 
 @Data
 public class PlanRequestAction {
-    private String action; // APPROVE or REJECT
+    private String action;
+    private String role;
 }

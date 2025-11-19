@@ -11,6 +11,7 @@ import java.util.List;
 public class BoardResponse {
     private Long planId;
     private String planTitle;
+    private String myRole;
     private List<ListDto> lists;
     private List<LabelDto> labels;
     private List<InviteDto> invites;

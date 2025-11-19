@@ -11,4 +11,5 @@ public class MemberDto {
     private String fullname;
     private String avatar;
     private String role; // OWNER / EDITOR / VIEWER
+    private boolean isCurrentUser;
 }

@@ -40,9 +40,12 @@ public class PlanBoardService {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
+        PlanRole myRole = permissionService.getUserRole(planId, userId);
+
         return BoardResponse.builder()
                 .planId(plan.getId())
                 .planTitle(plan.getTitle())
+                .myRole(myRole != null ? myRole.name() : null)
                 .lists(
                         listRepository.findByPlanIdOrderByPositionAsc(planId).stream()
                                 .map(l -> ListDto.builder()
@@ -440,6 +443,7 @@ public class PlanBoardService {
                             .fullname(profile.getFullname())
                             .avatar(profile.getAvatar())
                             .role(m.getRole().name()) // OWNER / EDITOR / VIEWER
+                            .isCurrentUser(userId != null && userId.equals(m.getUserId()))
                             .build();
                 })
                 .toList();
@@ -511,17 +515,31 @@ public class PlanBoardService {
     @Transactional
     public PlanRequestDto requestAccess(Long planId, Long userId, PlanRequestCreate req) {
 
-        // 1. Không cho gửi khi đã là member
-        if (memberRepository.existsByPlanIdAndUserId(planId, userId)) {
-            throw new RuntimeException("Bạn đã có quyền truy cập.");
+        // không cho gửi khi đã là member
+        PlanMember member = memberRepository.findByPlanIdAndUserId(planId, userId).orElse(null);
+
+        // nếu đã là member
+        if (member != null) {
+            // Owner và Editor không cần xin quyền
+            if (member.getRole() == PlanRole.OWNER || member.getRole() == PlanRole.EDITOR) {
+                throw new RuntimeException("Bạn đã có quyền truy cập.");
+            }
+
+            // Viewer được phép gửi request EDIT
+            if (member.getRole() == PlanRole.VIEWER) {
+                if (req.getType() != PlanRequestType.EDIT) {
+                    throw new RuntimeException("Bạn đã có quyền xem.");
+                }
+            }
         }
 
-        // 2. Không cho spam pending request
+        // không cho gửi nhiều lần khi vẫn còn pending
         if (requestRepo.existsByPlanIdAndUserIdAndStatus(
                 planId, userId, PlanRequestStatus.PENDING)) {
-            throw new RuntimeException("Bạn đã gửi yêu cầu trước đó.");
+            throw new IllegalArgumentException("Bạn đã gửi yêu cầu trước đó.");
         }
 
+        // tạo request
         PlanRequest entity = PlanRequest.builder()
                 .planId(planId)
                 .userId(userId)
@@ -532,45 +550,129 @@ public class PlanBoardService {
 
         requestRepo.save(entity);
 
-        return new PlanRequestDto(entity);
+        // lấy thông tin để gửi mail
+        Plan plan = planRepository.getReferenceById(planId);
+        UserProfileResponse requester = userProfileClient.getUserById(userId);
+        UserProfileResponse owner = userProfileClient.getUserById(plan.getAuthor().getId());
+
+        // gửi mail thông báo cho owner
+        mailService.sendRequestEmailToOwner(
+                owner.getEmail(),
+                plan.getTitle(),
+                requester.getFullname(),
+                requester.getEmail(),
+                req.getType().name());
+
+        // trả DTO enriched
+        return PlanRequestDto.builder()
+                .id(entity.getId())
+                .userId(userId)
+                .fullname(requester.getFullname())
+                .email(requester.getEmail())
+                .avatar(requester.getAvatar())
+                .type(entity.getType())
+                .status(entity.getStatus())
+                .createdAt(entity.getCreatedAt())
+                .build();
     }
 
     public List<PlanRequestDto> getRequests(Long planId) {
         return requestRepo.findByPlanIdAndStatus(planId, PlanRequestStatus.PENDING)
                 .stream()
-                .map(PlanRequestDto::new)
+                .map(r -> {
+
+                    UserProfileResponse profile = userProfileClient.getUserById(r.getUserId());
+
+                    return PlanRequestDto.builder()
+                            .id(r.getId())
+                            .userId(r.getUserId())
+                            .fullname(profile.getFullname())
+                            .email(profile.getEmail())
+                            .avatar(profile.getAvatar())
+                            .type(r.getType())
+                            .status(r.getStatus())
+                            .createdAt(r.getCreatedAt())
+                            .build();
+                })
                 .toList();
     }
 
     @Transactional
     public void handleRequest(Long planId, Long reqId, PlanRequestAction action) {
-        PlanRequest r = requestRepo.findById(reqId)
+
+        PlanRequest req = requestRepo.findById(reqId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
-        if (!r.getPlanId().equals(planId))
+        if (!req.getPlanId().equals(planId))
             throw new RuntimeException("Invalid plan");
 
-        if (action.getAction().equals("REJECT")) {
-            r.setStatus(PlanRequestStatus.REJECTED);
+        Plan plan = planRepository.getReferenceById(planId);
+        UserProfileResponse targetUser = userProfileClient.getUserById(req.getUserId());
+
+        // reject
+        if (action.getAction().equalsIgnoreCase("REJECT")) {
+
+            req.setStatus(PlanRequestStatus.REJECTED);
+
+            // gửi mail
+            mailService.sendRejectEmail(
+                    targetUser.getEmail(),
+                    plan.getTitle());
+
             return;
         }
 
-        // APPROVE → tạo member
-        PlanRole role = (r.getType() == PlanRequestType.EDIT)
-                ? PlanRole.EDITOR
-                : PlanRole.VIEWER;
+        // approve
+        if (action.getAction().equalsIgnoreCase("APPROVE")) {
 
-        boolean exists = memberRepository.existsByPlanIdAndUserId(planId, r.getUserId());
-        if (!exists) {
-            PlanMember m = PlanMember.builder()
-                    .plan(planRepository.getReferenceById(planId))
-                    .userId(r.getUserId())
-                    .role(role)
-                    .build();
-            memberRepository.save(m);
+            // parse role được owner chọn
+            PlanRole assignedRole = PlanRole.VIEWER; // default
+
+            if (action.getRole() != null) {
+                try {
+                    assignedRole = PlanRole.valueOf(action.getRole().toUpperCase());
+                } catch (Exception ignored) {
+                }
+            }
+
+            // nếu user chưa là member → tạo member
+            boolean exists = memberRepository.existsByPlanIdAndUserId(planId, req.getUserId());
+
+            if (!exists) {
+                // chưa là member → tạo mới
+                memberRepository.save(
+                        PlanMember.builder()
+                                .plan(plan)
+                                .userId(req.getUserId())
+                                .role(assignedRole)
+                                .build());
+            } else {
+                // đã là viewer → phải UPDATE role
+                PlanMember member = memberRepository.findByPlanIdAndUserId(planId, req.getUserId())
+                        .orElseThrow(() -> new RuntimeException("Member not found"));
+
+                // Không cho nâng Owner
+                if (member.getRole() == PlanRole.OWNER) {
+                    throw new RuntimeException("Cannot change role of the owner.");
+                }
+
+                member.setRole(assignedRole);
+                memberRepository.save(member);
+            }
+
+            // cập nhật trạng thái request
+            req.setStatus(PlanRequestStatus.APPROVED);
+
+            // gửi mail thông báo
+            mailService.sendApproveEmail(
+                    targetUser.getEmail(),
+                    plan.getTitle(),
+                    assignedRole.name());
+
+            return;
         }
 
-        r.setStatus(PlanRequestStatus.APPROVED);
+        throw new RuntimeException("Invalid action: " + action.getAction());
     }
 
 }

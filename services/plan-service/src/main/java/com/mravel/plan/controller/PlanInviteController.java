@@ -1,10 +1,12 @@
 package com.mravel.plan.controller;
 
+import com.mravel.common.response.ApiResponse;
 import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.service.PlanBoardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 
 @RestController
@@ -16,10 +18,14 @@ public class PlanInviteController {
     private final CurrentUserService currentUser;
 
     @PostMapping("/join")
-    public ResponseEntity<Map<String, Long>> joinPlan(@RequestParam String token) {
+    public ResponseEntity<ApiResponse<Map<String, Long>>> joinPlan(
+            @RequestParam String token) {
         Long userId = currentUser.getId();
         Long planId = service.joinPlan(token, userId);
 
-        return ResponseEntity.ok(Map.of("planId", planId));
+        Map<String, Long> data = Map.of("planId", planId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Tham gia plan thành công", data));
     }
 }

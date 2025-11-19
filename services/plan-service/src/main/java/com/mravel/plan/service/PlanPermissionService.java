@@ -72,4 +72,19 @@ public class PlanPermissionService {
         }
     }
 
+    public PlanRole getUserRole(Long planId, Long userId) {
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+        // owner
+        if (plan.getAuthor() != null && userId != null && userId.equals(plan.getAuthor().getId())) {
+            return PlanRole.OWNER;
+        }
+
+        // member
+        return memberRepository.findByPlanIdAndUserId(planId, userId)
+                .map(PlanMember::getRole)
+                .orElse(null); // null = không phải member
+    }
+
 }

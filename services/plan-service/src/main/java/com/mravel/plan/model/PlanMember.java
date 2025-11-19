@@ -17,11 +17,11 @@ public class PlanMember {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** ID người dùng trong hệ thống Auth (được lấy từ JWT) */
+    // id ngdung lấy từ jwt
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    /** Quyền hạn: owner | editor | viewer */
+    // quyền
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
     private PlanRole role;
