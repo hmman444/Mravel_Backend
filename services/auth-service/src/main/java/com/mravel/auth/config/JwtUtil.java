@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Map;
 
 @Component
 public class JwtUtil {
@@ -26,25 +27,25 @@ public class JwtUtil {
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
-    public String generateAccessToken(String email) {
-        return buildToken(email, accessTokenExpiration);
-    }
-
-    public String generateRefreshToken(String email) {
-        return buildToken(email, refreshTokenExpiration);
-    }
-
-    private String buildToken(String subject, long expirationTime) {
+    public String generateAccessToken(Long id, String email, String role) {
         return Jwts.builder()
-                .setSubject(subject)
+                .setSubject(email)
+                .addClaims(Map.of(
+                        "id", id,
+                        "role", role))
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public long getRefreshTokenExpiration() {
-        return refreshTokenExpiration;
+    public String generateRefreshToken(String email) {
+        return Jwts.builder()
+                .setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
 
     public boolean validateToken(String token) {
@@ -65,11 +66,34 @@ public class JwtUtil {
                 .getSubject();
     }
 
+    public String extractRole(String token) {
+        return (String) Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role");
+    }
+
+    public Long extractUserId(String token) {
+        Object id = Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("id");
+        return id != null ? Long.valueOf(id.toString()) : null;
+    }
+
     public String resolveToken(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             return header.substring(7);
         }
         return null;
+    }
+
+    public long getRefreshTokenExpiration() {
+        return refreshTokenExpiration;
     }
 }

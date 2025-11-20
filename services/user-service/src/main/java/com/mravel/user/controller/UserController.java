@@ -30,9 +30,22 @@ public class UserController {
         return toResponse(user);
     }
 
+    @GetMapping("/{id}")
+    public UserProfileResponse getUserById(@PathVariable Long id) {
+        return userRepository.findById(id)
+                .map(user -> UserProfileResponse.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .fullname(user.getFullname())
+                        .avatar(user.getAvatar())
+                        .provider(user.getProvider())
+                        .build())
+                .orElseThrow(() -> new RuntimeException("User not found: " + id));
+    }
+
     @PutMapping("/by-email")
     public UserProfileResponse updateUserByEmail(@RequestParam("email") String email,
-                                                 @RequestBody UpdateUserProfileRequest request) {
+            @RequestBody UpdateUserProfileRequest request) {
         UserProfile user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
@@ -75,8 +88,10 @@ public class UserController {
 
     // ====== Hàm dùng chung để update field ======
     private void applyUpdates(UserProfile user, UpdateUserProfileRequest request) {
-        if (request.getFullname() != null) user.setFullname(request.getFullname());
-        if (request.getAvatar() != null) user.setAvatar(request.getAvatar());
+        if (request.getFullname() != null)
+            user.setFullname(request.getFullname());
+        if (request.getAvatar() != null)
+            user.setAvatar(request.getAvatar());
 
         if (request.getGender() != null) {
             try {
@@ -86,17 +101,26 @@ public class UserController {
             }
         }
 
-        if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
-        if (request.getCity() != null) user.setCity(request.getCity());
-        if (request.getCountry() != null) user.setCountry(request.getCountry());
-        if (request.getAddressLine() != null) user.setAddressLine(request.getAddressLine());
+        if (request.getDateOfBirth() != null)
+            user.setDateOfBirth(request.getDateOfBirth());
+        if (request.getCity() != null)
+            user.setCity(request.getCity());
+        if (request.getCountry() != null)
+            user.setCountry(request.getCountry());
+        if (request.getAddressLine() != null)
+            user.setAddressLine(request.getAddressLine());
 
-        if (request.getSecondaryEmail() != null) user.setSecondaryEmail(request.getSecondaryEmail());
-        if (request.getTertiaryEmail() != null) user.setTertiaryEmail(request.getTertiaryEmail());
+        if (request.getSecondaryEmail() != null)
+            user.setSecondaryEmail(request.getSecondaryEmail());
+        if (request.getTertiaryEmail() != null)
+            user.setTertiaryEmail(request.getTertiaryEmail());
 
-        if (request.getPhone1() != null) user.setPhone1(request.getPhone1());
-        if (request.getPhone2() != null) user.setPhone2(request.getPhone2());
-        if (request.getPhone3() != null) user.setPhone3(request.getPhone3());
+        if (request.getPhone1() != null)
+            user.setPhone1(request.getPhone1());
+        if (request.getPhone2() != null)
+            user.setPhone2(request.getPhone2());
+        if (request.getPhone3() != null)
+            user.setPhone3(request.getPhone3());
     }
 
     private UserProfileResponse toResponse(UserProfile user) {

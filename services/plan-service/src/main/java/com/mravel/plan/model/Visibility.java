@@ -1,5 +1,5 @@
 package com.mravel.plan.model;
 
 public enum Visibility {
-    public_, friends, private_
+    PRIVATE, FRIENDS, PUBLIC
 }

@@ -1,15 +1,15 @@
 package com.mravel.plan.dto.board;
 
-import lombok.*;
+import com.mravel.plan.model.PlanRole;
 
+import jakarta.persistence.*;
+import lombok.Data;
 import java.util.List;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Data
 public class InviteRequest {
     private List<String> emails;
-    private String role; // "editor" | "viewer"
+
+    @Enumerated(EnumType.STRING)
+    private PlanRole role;
 }

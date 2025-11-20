@@ -120,7 +120,7 @@ public class AuthService {
         refreshTokenService.deleteByEmail(user.getEmail());
 
         // Sinh JWT mới
-        String accessToken = jwtUtil.generateAccessToken(user.getEmail());
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
 
         return new JwtResponse(accessToken, refreshToken.getToken());
@@ -139,7 +139,7 @@ public class AuthService {
 
         refreshTokenService.deleteByEmail(user.getEmail());
 
-        String accessToken = jwtUtil.generateAccessToken(user.getEmail());
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
 
         return new JwtResponse(accessToken, refreshToken.getToken());
@@ -156,7 +156,7 @@ public class AuthService {
 
         refreshTokenService.deleteByToken(refreshToken);
 
-        String newAccessToken = jwtUtil.generateAccessToken(email);
+        String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken newRefreshToken = refreshTokenService.createToken(email);
 
         return new JwtResponse(newAccessToken, newRefreshToken.getToken());

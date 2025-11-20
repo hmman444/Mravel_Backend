@@ -21,18 +21,18 @@ public class PlanList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Ví dụ: "Ngày 1" */
+    // vd ngày 1
     @Column(nullable = false)
     private String title;
 
-    /** Dùng để sort list theo thứ tự kéo thả */
+    // dùng để sort list kéo thả
     @Column(nullable = false)
     private Integer position;
 
-    /** Ngày thực tế (optional, để hiển thị/ thống kê) */
+    // ngày thực tế
     private LocalDate dayDate;
 
-    /* Quan hệ */
+    // quan hệ
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id", nullable = false)
     private Plan plan;

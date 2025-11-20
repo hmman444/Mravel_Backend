@@ -2,32 +2,34 @@ package com.mravel.plan.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.Instant;
 
-/**
- * Đại diện cho lời mời tham gia kế hoạch (Plan).
- * Ví dụ: { email: "lan@example.com", role: "editor" }
- */
 @Entity
-@Table(name = "plan_invites")
+@Table(name = "plan_invite_tokens")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PlanInvite {
+public class PlanInviteToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // email ng đc mời
-    @Column(nullable = false)
     private String email;
 
     @Enumerated(EnumType.STRING)
     private PlanRole role;
 
+    @Column(nullable = false, unique = true)
+    private String token;
+
+    private Instant expiredAt;
+
+    private boolean used;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id", nullable = false)
+    @JoinColumn(name = "plan_id")
     private Plan plan;
 }

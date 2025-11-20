@@ -11,8 +11,8 @@ import lombok.*;
 @Builder
 public class AuthorSummary {
 
-    @Column(name = "author_id") 
-    private String id;
+    @Column(name = "author_id")
+    private Long id;
 
     @Column(name = "author_name")
     private String name;

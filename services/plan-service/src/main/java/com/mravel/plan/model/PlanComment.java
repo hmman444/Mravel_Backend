@@ -17,7 +17,7 @@ public class PlanComment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String userId;
+    private Long userId;
     private String userName;
     private String userAvatar;
     private String text;
