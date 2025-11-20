@@ -17,7 +17,8 @@ public class MailService {
             SimpleMailMessage msg = new SimpleMailMessage();
             msg.setTo(email);
             msg.setSubject("Mravel - Lời mời tham gia kế hoạch: " + planTitle);
-            msg.setText("...");
+            msg.setText("Bạn được mời tham gia vào kế hoạch: " + planTitle + "\n\n" + "Nhấn vào link để tham gia:\n"
+                    + joinUrl + "\n\n" + "Link này sẽ hết hạn sau 3 ngày.\n" + "Mravel Team");
 
             mailSender.send(msg);
         } catch (Exception ex) {
