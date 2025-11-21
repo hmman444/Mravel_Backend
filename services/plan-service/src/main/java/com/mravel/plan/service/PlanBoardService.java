@@ -45,6 +45,13 @@ public class PlanBoardService {
         return BoardResponse.builder()
                 .planId(plan.getId())
                 .planTitle(plan.getTitle())
+                .description(plan.getDescription())
+                .startDate(plan.getStartDate())
+                .endDate(plan.getEndDate())
+                .totalCost(plan.getTotalCost())
+                .status(plan.getStatus().name())
+                .thumbnail(plan.getThumbnail())
+                .images(plan.getImages())
                 .myRole(myRole != null ? myRole.name() : null)
                 .lists(
                         listRepository.findByPlanIdOrderByPositionAsc(planId).stream()

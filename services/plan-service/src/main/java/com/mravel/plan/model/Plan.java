@@ -89,4 +89,20 @@ public class Plan {
         private String email;
         private String role; // editor / viewer
     }
+
+    @Builder.Default
+    private Long totalCost = Long.valueOf(0);
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private PlanStatus status = PlanStatus.DRAFT;
+
+    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<PlanExpense> expenses = new ArrayList<>();
+
+    @Column(name = "thumbnail_url")
+    private String thumbnail;
+
 }

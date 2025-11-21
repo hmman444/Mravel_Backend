@@ -11,6 +11,7 @@ import com.mravel.plan.model.PlanReaction;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRepository;
+import com.mravel.plan.repository.PlanExpenseRepository;
 import com.mravel.plan.repository.PlanMemberRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -32,6 +33,7 @@ public class PlanService {
         private final PlanMapper planMapper;
         private final PlanPermissionService permissionService;
         private final UserProfileClient userProfileClient;
+        private final PlanExpenseRepository expenseRepo;
 
         // EntityManager để truy vấn trực tiếp
         @PersistenceContext
@@ -229,4 +231,15 @@ public class PlanService {
                 plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
                 planRepository.save(plan);
         }
+
+        @Transactional
+        public Long updateTotalCost(Long planId) {
+                Long total = expenseRepo.sumAmountByPlanId(planId);
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                plan.setTotalCost(total);
+                return total;
+        }
+
 }
