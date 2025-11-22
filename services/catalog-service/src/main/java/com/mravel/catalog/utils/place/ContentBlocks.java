@@ -1,4 +1,4 @@
-package com.mravel.catalog.utils;
+package com.mravel.catalog.utils.place;
 
 import com.mravel.catalog.model.doc.PlaceDoc.ContentBlock;
 import com.mravel.catalog.model.doc.PlaceDoc.Image;

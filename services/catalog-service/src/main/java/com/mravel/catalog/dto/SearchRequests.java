@@ -1,15 +1,16 @@
-package com.mravel.catalog.dto.place;
+package com.mravel.catalog.dto;
 
 import java.util.Set;
 
 public class SearchRequests {
 
-    // Dịch vụ → Khách sạn (4 field)
+    // Dịch vụ → Khách sạn (search)
     public record HotelSearchRequest(
-            String location,
-            String checkIn,
-            String checkOut,
+            String location,   // destination slug hoặc tên TP
+            String checkIn,    // YYYY-MM-DD (để sau dùng với booking/inventory)
+            String checkOut,   // YYYY-MM-DD
             Integer adults,
+            Integer children,  // NEW: số trẻ em
             Integer rooms
     ) {}
 
