@@ -1,12 +1,17 @@
 package com.mravel.plan.service;
 
+import com.mravel.common.response.UserProfileResponse;
+import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.board.*;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.mravel.plan.service.PlanPermissionService;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -14,22 +19,33 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlanBoardService {
-
+    private final PlanPermissionService permissionService;
     private final PlanRepository planRepository;
     private final PlanListRepository listRepository;
     private final PlanCardRepository cardRepository;
     private final PlanLabelRepository labelRepository;
     private final PlanInviteRepository inviteRepository;
+    private final PlanInviteTokenRepository inviteTokenRepo;
+    private final PlanMemberRepository memberRepository;
+    private final MailService mailService;
+    private final UserProfileClient userProfileClient;
+    private final PlanRequestRepository requestRepo;
 
-    /* ========= Query board ========= */
+    // board
     @Transactional
-    public BoardResponse getBoard(Long planId) {
+    public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
+        if (!permissionService.canView(planId, userId, isFriend))
+            throw new RuntimeException("You don't have permission to view this board.");
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+        PlanRole myRole = permissionService.getUserRole(planId, userId);
 
         return BoardResponse.builder()
                 .planId(plan.getId())
                 .planTitle(plan.getTitle())
+                .myRole(myRole != null ? myRole.name() : null)
                 .lists(
                         listRepository.findByPlanIdOrderByPositionAsc(planId).stream()
                                 .map(l -> ListDto.builder()
@@ -75,9 +91,11 @@ public class PlanBoardService {
                 .build();
     }
 
-    /* ========= List CRUD ========= */
+    // crud list
     @Transactional
-    public ListDto createList(Long planId, CreateListRequest req) {
+    public ListDto createList(Long planId, Long userId, CreateListRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -100,14 +118,18 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public void renameList(Long planId, Long listId, RenameListRequest req) {
+    public void renameList(Long planId, Long listId, Long userId, RenameListRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanList list = mustLoadListInPlan(planId, listId);
         list.setTitle(req.getTitle());
         listRepository.save(list);
     }
 
     @Transactional
-    public void deleteList(Long planId, Long listId) {
+    public void deleteList(Long planId, Long userId, Long listId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanList list = mustLoadListInPlan(planId, listId);
         int removedPos = list.getPosition();
         listRepository.delete(list);
@@ -121,9 +143,11 @@ public class PlanBoardService {
         }
     }
 
-    /* ========= Card CRUD ========= */
+    // crud card
     @Transactional
-    public CardDto createCard(Long planId, Long listId, CreateCardRequest req) {
+    public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanList list = mustLoadListInPlan(planId, listId);
         int nextPos = (int) cardRepository.countByListId(listId);
 
@@ -143,7 +167,9 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public CardDto updateCard(Long planId, Long listId, Long cardId, UpdateCardRequest req) {
+    public CardDto updateCard(Long planId, Long listId, Long cardId, Long userId, UpdateCardRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanCard card = mustLoadCardInList(planId, listId, cardId);
 
         if (req.getText() != null)
@@ -167,7 +193,20 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public void deleteCard(Long planId, Long listId, Long cardId) {
+    public CardDto toggleDone(Long planId, Long listId, Long cardId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
+        PlanCard card = mustLoadCardInList(planId, listId, cardId);
+        card.setDone(!card.isDone());
+        cardRepository.save(card);
+
+        return toCardDto(card);
+    }
+
+    @Transactional
+    public void deleteCard(Long planId, Long listId, Long cardId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanCard card = mustLoadCardInList(planId, listId, cardId);
         int removedPos = card.getPosition();
         cardRepository.delete(card);
@@ -182,7 +221,9 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public CardDto duplicateCard(Long planId, Long listId, Long cardId) {
+    public CardDto duplicateCard(Long planId, Long listId, Long cardId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanCard original = mustLoadCardInList(planId, listId, cardId);
         int nextPos = (int) cardRepository.countByListId(listId);
 
@@ -202,9 +243,11 @@ public class PlanBoardService {
         return toCardDto(copy);
     }
 
-    /* ========= Drag & Drop ========= */
+    // drag drop
     @Transactional
-    public BoardResponse reorder(Long planId, ReorderRequest req) {
+    public BoardResponse reorder(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         if ("list".equalsIgnoreCase(req.getType())) {
             List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
             PlanList moved = lists.remove(req.getSourceIndex().intValue());
@@ -212,7 +255,7 @@ public class PlanBoardService {
             // reindex
             for (int i = 0; i < lists.size(); i++)
                 lists.get(i).setPosition(i);
-            return getBoard(planId);
+            return getBoard(planId, userId, isFriend);
         } else if ("card".equalsIgnoreCase(req.getType())) {
             PlanList source = mustLoadListInPlan(planId, req.getSourceListId());
             PlanList dest = mustLoadListInPlan(planId, req.getDestListId());
@@ -235,14 +278,16 @@ public class PlanBoardService {
                 for (int i = 0; i < destCards.size(); i++)
                     destCards.get(i).setPosition(i);
             }
-            return getBoard(planId);
+            return getBoard(planId, userId, isFriend);
         }
         throw new IllegalArgumentException("Unknown reorder type");
     }
 
-    /* ========= Labels ========= */
+    // label
     @Transactional
-    public LabelDto upsertLabel(Long planId, LabelUpsertRequest req) {
+    public LabelDto upsertLabel(Long planId, Long userId, LabelUpsertRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -264,7 +309,9 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public void deleteLabel(Long planId, Long labelId) {
+    public void deleteLabel(Long planId, Long labelId, Long userId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
         PlanLabel label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new RuntimeException("Label not found"));
         if (!label.getPlan().getId().equals(planId))
@@ -272,27 +319,87 @@ public class PlanBoardService {
         labelRepository.delete(label);
     }
 
-    /* ========= Invites ========= */
+    // invites
     @Transactional
-    public List<InviteDto> invite(Long planId, InviteRequest req) {
+    public List<InviteDto> invite(Long planId, Long userId, InviteRequest req) {
+        permissionService.checkPermission(planId, userId, PlanRole.OWNER);
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
-        String role = Optional.ofNullable(req.getRole()).orElse("viewer");
+
+        PlanRole role = Optional.ofNullable(req.getRole())
+                .orElse(PlanRole.VIEWER);
 
         List<InviteDto> result = new ArrayList<>();
+
         for (String email : req.getEmails()) {
-            PlanInvite inv = PlanInvite.builder()
+
+            // xóa cũ
+            inviteTokenRepo.deleteByEmailAndPlanId(email, plan.getId());
+
+            // token mới
+            String token = UUID.randomUUID().toString();
+
+            PlanInviteToken tokenEntity = PlanInviteToken.builder()
                     .plan(plan)
                     .email(email)
                     .role(role)
+                    .token(token)
+                    .expiredAt(Instant.now().plus(Duration.ofDays(3)))
+                    .used(false)
                     .build();
-            inviteRepository.save(inv);
-            result.add(InviteDto.builder().id(inv.getId()).email(inv.getEmail()).role(inv.getRole()).build());
+
+            inviteTokenRepo.save(tokenEntity);
+
+            // mail
+            mailService.sendInviteEmail(
+                    email,
+                    plan.getTitle(),
+                    "http://localhost:5173/plans/join?token=" + token);
+
+            result.add(InviteDto.builder()
+                    .id(tokenEntity.getId())
+                    .email(email)
+                    .role(role)
+                    .build());
         }
+
         return result;
     }
 
-    /* ========= Helpers ========= */
+    @Transactional
+    public Long joinPlan(String token, Long userId) {
+
+        PlanInviteToken inv = inviteTokenRepo.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+
+        Long planId = inv.getPlan().getId();
+
+        if (inv.isUsed())
+            return planId;
+        if (inv.getExpiredAt().isBefore(Instant.now()))
+            throw new RuntimeException("Invite expired");
+
+        boolean exists = memberRepository.existsByPlanIdAndUserId(planId, userId);
+        if (exists) {
+            inv.setUsed(true);
+            return planId;
+        }
+
+        // tạo member
+        PlanMember member = PlanMember.builder()
+                .plan(inv.getPlan())
+                .userId(userId)
+                .role(inv.getRole())
+                .build();
+        memberRepository.save(member);
+
+        inv.setUsed(true);
+
+        return planId;
+    }
+
+    // helpers
     private PlanList mustLoadListInPlan(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
                 .orElseThrow(() -> new RuntimeException("List not found"));
@@ -315,4 +422,257 @@ public class PlanBoardService {
             return null;
         return LocalTime.parse(hhmm); // "HH:mm"
     }
+
+    @Transactional
+    public ShareResponse getShareInfo(Long planId, Long userId) {
+        // Kiểm tra quyền
+        if (!permissionService.canView(planId, userId, false)) {
+            throw new RuntimeException("You don't have permission to view share info.");
+        }
+
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+        List<MemberDto> members = memberRepository.findByPlanId(planId).stream()
+                .map(m -> {
+                    UserProfileResponse profile = userProfileClient.getUserById(m.getUserId());
+
+                    return MemberDto.builder()
+                            .userId(m.getUserId())
+                            .email(profile.getEmail())
+                            .fullname(profile.getFullname())
+                            .avatar(profile.getAvatar())
+                            .role(m.getRole().name()) // OWNER / EDITOR / VIEWER
+                            .isCurrentUser(userId != null && userId.equals(m.getUserId()))
+                            .build();
+                })
+                .toList();
+
+        List<InviteDto> invites = inviteTokenRepo.findByPlanId(planId).stream()
+                .filter(token -> !token.isUsed() &&
+                        token.getExpiredAt().isAfter(Instant.now()))
+                .map(token -> InviteDto.builder()
+                        .id(token.getId())
+                        .email(token.getEmail())
+                        .role(token.getRole())
+                        .build())
+                .toList();
+
+        return ShareResponse.builder()
+                .visibility(plan.getVisibility().name())
+                .members(members)
+                .invites(invites)
+                .build();
+    }
+
+    @Transactional
+    public void updateMemberRole(Long planId, Long ownerId, UpdateMemberRoleRequest req) {
+        permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
+
+        PlanMember member = memberRepository.findByPlanIdAndUserId(planId, req.getUserId())
+                .orElseThrow(() -> new RuntimeException("Member not found"));
+
+        if (member.getRole() == PlanRole.OWNER) {
+            throw new RuntimeException("Cannot change role of the owner.");
+        }
+
+        PlanRole newRole;
+        try {
+            newRole = PlanRole.valueOf(req.getRole().toUpperCase());
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid role: " + req.getRole());
+        }
+
+        member.setRole(newRole);
+        memberRepository.save(member);
+    }
+
+    @Transactional
+    public void removeMember(Long planId, Long ownerId, Long targetUserId) {
+
+        permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
+
+        if (Objects.equals(ownerId, targetUserId)) {
+            throw new RuntimeException("Owner cannot remove themselves.");
+        }
+
+        PlanMember member = memberRepository.findByPlanIdAndUserId(planId, targetUserId)
+                .orElseThrow(() -> new RuntimeException("Member not found"));
+
+        if (member.getRole() == PlanRole.OWNER) {
+            throw new RuntimeException("Cannot remove the owner.");
+        }
+
+        memberRepository.delete(member);
+
+        UserProfileResponse profile = userProfileClient.getUserById(targetUserId);
+        String email = profile.getEmail();
+
+        // xóa invite nếu có
+        inviteTokenRepo.deleteByEmailAndPlanId(email, planId);
+    }
+
+    @Transactional
+    public PlanRequestDto requestAccess(Long planId, Long userId, PlanRequestCreate req) {
+
+        // không cho gửi khi đã là member
+        PlanMember member = memberRepository.findByPlanIdAndUserId(planId, userId).orElse(null);
+
+        // nếu đã là member
+        if (member != null) {
+            // Owner và Editor không cần xin quyền
+            if (member.getRole() == PlanRole.OWNER || member.getRole() == PlanRole.EDITOR) {
+                throw new RuntimeException("Bạn đã có quyền truy cập.");
+            }
+
+            // Viewer được phép gửi request EDIT
+            if (member.getRole() == PlanRole.VIEWER) {
+                if (req.getType() != PlanRequestType.EDIT) {
+                    throw new RuntimeException("Bạn đã có quyền xem.");
+                }
+            }
+        }
+
+        // không cho gửi nhiều lần khi vẫn còn pending
+        if (requestRepo.existsByPlanIdAndUserIdAndStatus(
+                planId, userId, PlanRequestStatus.PENDING)) {
+            throw new IllegalArgumentException("Bạn đã gửi yêu cầu trước đó.");
+        }
+
+        // tạo request
+        PlanRequest entity = PlanRequest.builder()
+                .planId(planId)
+                .userId(userId)
+                .type(req.getType())
+                .status(PlanRequestStatus.PENDING)
+                .createdAt(Instant.now())
+                .build();
+
+        requestRepo.save(entity);
+
+        // lấy thông tin để gửi mail
+        Plan plan = planRepository.getReferenceById(planId);
+        UserProfileResponse requester = userProfileClient.getUserById(userId);
+        UserProfileResponse owner = userProfileClient.getUserById(plan.getAuthor().getId());
+
+        // gửi mail thông báo cho owner
+        mailService.sendRequestEmailToOwner(
+                owner.getEmail(),
+                plan.getTitle(),
+                requester.getFullname(),
+                requester.getEmail(),
+                req.getType().name());
+
+        // trả DTO enriched
+        return PlanRequestDto.builder()
+                .id(entity.getId())
+                .userId(userId)
+                .fullname(requester.getFullname())
+                .email(requester.getEmail())
+                .avatar(requester.getAvatar())
+                .type(entity.getType())
+                .status(entity.getStatus())
+                .createdAt(entity.getCreatedAt())
+                .build();
+    }
+
+    public List<PlanRequestDto> getRequests(Long planId) {
+        return requestRepo.findByPlanIdAndStatus(planId, PlanRequestStatus.PENDING)
+                .stream()
+                .map(r -> {
+
+                    UserProfileResponse profile = userProfileClient.getUserById(r.getUserId());
+
+                    return PlanRequestDto.builder()
+                            .id(r.getId())
+                            .userId(r.getUserId())
+                            .fullname(profile.getFullname())
+                            .email(profile.getEmail())
+                            .avatar(profile.getAvatar())
+                            .type(r.getType())
+                            .status(r.getStatus())
+                            .createdAt(r.getCreatedAt())
+                            .build();
+                })
+                .toList();
+    }
+
+    @Transactional
+    public void handleRequest(Long planId, Long reqId, PlanRequestAction action) {
+
+        PlanRequest req = requestRepo.findById(reqId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        if (!req.getPlanId().equals(planId))
+            throw new RuntimeException("Invalid plan");
+
+        Plan plan = planRepository.getReferenceById(planId);
+        UserProfileResponse targetUser = userProfileClient.getUserById(req.getUserId());
+
+        // reject
+        if (action.getAction().equalsIgnoreCase("REJECT")) {
+
+            req.setStatus(PlanRequestStatus.REJECTED);
+
+            // gửi mail
+            mailService.sendRejectEmail(
+                    targetUser.getEmail(),
+                    plan.getTitle());
+
+            return;
+        }
+
+        // approve
+        if (action.getAction().equalsIgnoreCase("APPROVE")) {
+
+            // parse role được owner chọn
+            PlanRole assignedRole = PlanRole.VIEWER; // default
+
+            if (action.getRole() != null) {
+                try {
+                    assignedRole = PlanRole.valueOf(action.getRole().toUpperCase());
+                } catch (Exception ignored) {
+                }
+            }
+
+            // nếu user chưa là member → tạo member
+            boolean exists = memberRepository.existsByPlanIdAndUserId(planId, req.getUserId());
+
+            if (!exists) {
+                // chưa là member → tạo mới
+                memberRepository.save(
+                        PlanMember.builder()
+                                .plan(plan)
+                                .userId(req.getUserId())
+                                .role(assignedRole)
+                                .build());
+            } else {
+                // đã là viewer → phải UPDATE role
+                PlanMember member = memberRepository.findByPlanIdAndUserId(planId, req.getUserId())
+                        .orElseThrow(() -> new RuntimeException("Member not found"));
+
+                // Không cho nâng Owner
+                if (member.getRole() == PlanRole.OWNER) {
+                    throw new RuntimeException("Cannot change role of the owner.");
+                }
+
+                member.setRole(assignedRole);
+                memberRepository.save(member);
+            }
+
+            // cập nhật trạng thái request
+            req.setStatus(PlanRequestStatus.APPROVED);
+
+            // gửi mail thông báo
+            mailService.sendApproveEmail(
+                    targetUser.getEmail(),
+                    plan.getTitle(),
+                    assignedRole.name());
+
+            return;
+        }
+
+        throw new RuntimeException("Invalid action: " + action.getAction());
+    }
+
 }

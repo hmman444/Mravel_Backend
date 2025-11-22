@@ -1,11 +1,17 @@
 package com.mravel.plan.service;
 
+import com.mravel.common.response.UserProfileResponse;
+import com.mravel.plan.client.UserProfileClient;
+import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
+import com.mravel.plan.model.AuthorSummary;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanComment;
 import com.mravel.plan.model.PlanReaction;
+import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRepository;
+import com.mravel.plan.repository.PlanMemberRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
@@ -21,115 +27,206 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PlanService {
 
-    private final PlanRepository planRepository;
-    private final PlanReactionRepository reactionRepository;
-    private final PlanMapper planMapper;
+        private final PlanRepository planRepository;
+        private final PlanReactionRepository reactionRepository;
+        private final PlanMapper planMapper;
+        private final PlanPermissionService permissionService;
+        private final UserProfileClient userProfileClient;
 
-    // ✅ Thêm EntityManager để truy vấn trực tiếp
-    @PersistenceContext
-    private EntityManager entityManager;
+        // EntityManager để truy vấn trực tiếp
+        @PersistenceContext
+        private EntityManager entityManager;
+        private final PlanMemberRepository memberRepository;
 
-    /** Lấy danh sách feed (có phân trang) */
-    public Page<PlanFeedItem> getFeed(int page, int size, String viewerId) {
-        PageRequest pageable = PageRequest.of(page - 1, size);
-        Page<Plan> data = planRepository.findAll(pageable);
+        // get feed
+        public Page<PlanFeedItem> getFeed(int page, int size, Long viewerId) {
+                PageRequest pageable = PageRequest.of(page - 1, size);
 
-        List<PlanFeedItem> mapped = data.getContent()
-                .stream()
-                .map(planMapper::toFeedItem)
-                .collect(Collectors.toList());
+                List<Plan> visiblePlans;
 
-        return new PageImpl<>(mapped, pageable, data.getTotalElements());
-    }
+                if (viewerId == null) {
+                        // Khách chỉ thấy public
+                        visiblePlans = planRepository.findByVisibility(Visibility.PUBLIC, pageable).getContent();
+                } else {
+                        // Người dùng đăng nhập
+                        List<Plan> publicPlans = planRepository.findByVisibility(Visibility.PUBLIC, pageable)
+                                        .getContent();
+                        List<Plan> myPlans = planRepository.findByAuthor_Id(viewerId, pageable).getContent();
 
-    /** Lấy plan theo ID (có thể ghi log view theo viewerId) */
-    public PlanFeedItem getById(Long id, String viewerId) {
-        Plan plan = planRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
-        return planMapper.toFeedItem(plan);
-    }
+                        // Các plan mà user là thành viên (được mời)
+                        List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
+                        List<Plan> memberPlans = memberPlanIds.isEmpty()
+                                        ? Collections.emptyList()
+                                        : planRepository.findByIdIn(memberPlanIds);
 
-    /** Thêm bình luận vào kế hoạch */
-    @Transactional
-    public PlanFeedItem.Comment addComment(
-            Long planId,
-            String userId,
-            String userName,
-            String userAvatar,
-            String text,
-            Long parentId
-    ) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                        Set<Plan> merged = new LinkedHashSet<>();
+                        merged.addAll(publicPlans);
+                        merged.addAll(myPlans);
+                        merged.addAll(memberPlans);
 
-        PlanComment parent = null;
-        if (parentId != null) {
-            parent = entityManager.find(PlanComment.class, parentId);
-            if (parent == null) throw new RuntimeException("Parent comment not found");
+                        visiblePlans = new ArrayList<>(merged);
+                }
+
+                List<PlanFeedItem> mapped = visiblePlans.stream()
+                                .sorted(Comparator.comparing(Plan::getCreatedAt).reversed())
+                                .map(planMapper::toFeedItem)
+                                .collect(Collectors.toList());
+
+                return new PageImpl<>(mapped, pageable, mapped.size());
         }
 
-        PlanComment comment = PlanComment.builder()
-                .plan(plan)
-                .parent(parent)
-                .userId(userId)
-                .userName(userName)
-                .userAvatar(userAvatar)
-                .text(text)
-                .createdAt(Instant.now())
-                .build();
+        // get plan theo id
+        public PlanFeedItem getById(Long id, Long viewerId, boolean isFriend) {
+                Plan plan = planRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        entityManager.persist(comment);
-        entityManager.flush(); 
+                if (!permissionService.canView(id, viewerId, isFriend))
+                        throw new RuntimeException("You don't have permission to view this plan.");
 
-        return PlanFeedItem.Comment.builder()
-                .id(comment.getId())                   
-                .parentId(parentId)                     
-                .text(comment.getText())
-                .createdAt(comment.getCreatedAt())
-                .user(PlanFeedItem.Comment.User.builder()
-                        .id(userId)
-                        .name(userName)
-                        .avatar(userAvatar)
-                        .build())
-                .build();
-    }
-
-    /** Reaction: toggle / update / add */
-    @Transactional
-    public PlanFeedItem react(Long planId, String key, String userId, String userName, String userAvatar) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
-
-        Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
-
-        if (existingOpt.isPresent()) {
-            PlanReaction existing = existingOpt.get();
-            plan.getReactions().remove(existing);
-            reactionRepository.delete(existing);
-        } else {
-            PlanReaction newReact = PlanReaction.builder()
-                    .plan(plan)
-                    .userId(userId)
-                    .userName(userName)
-                    .userAvatar(userAvatar)
-                    .type(key)
-                    .createdAt(Instant.now())
-                    .build();
-
-            plan.getReactions().add(newReact);
-            reactionRepository.save(newReact);
+                return planMapper.toFeedItem(plan);
         }
 
-        planRepository.save(plan);
-        return planMapper.toFeedItem(plan);
-    }
+        @Transactional
+        public PlanFeedItem createPlan(CreatePlanRequest req, Long userId) {
+                Plan plan = Plan.builder()
+                                .title(req.getTitle())
+                                .description(req.getDescription())
+                                .visibility(req.getVisibility() != null ? req.getVisibility() : Visibility.PRIVATE)
+                                .author(new AuthorSummary(userId, req.getAuthorName(), req.getAuthorAvatar()))
+                                .createdAt(Instant.now())
+                                .views(0L)
+                                .build();
 
-    /** Tăng lượt xem */
-    public void increaseView(Long planId) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                planRepository.save(plan);
+                permissionService.ensureOwner(plan.getId(), userId);
 
-        plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
-        planRepository.save(plan);
-    }
+                return planMapper.toFeedItem(plan);
+        }
+
+        @Transactional
+        public PlanFeedItem updateVisibility(Long planId, Long userId, Visibility visibility) {
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                if (!userId.equals(plan.getAuthor().getId()))
+                        throw new RuntimeException("Only the owner can change visibility.");
+
+                plan.setVisibility(visibility);
+                planRepository.save(plan);
+                return planMapper.toFeedItem(plan);
+        }
+
+        @Transactional
+        public PlanFeedItem copyPublicPlan(Long planId, Long userId) {
+                Plan source = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                if (source.getVisibility() != Visibility.PUBLIC)
+                        throw new RuntimeException("Only public plans can be copied.");
+
+                Plan copy = Plan.builder()
+                                .title(source.getTitle() + " (Copy)")
+                                .description(source.getDescription())
+                                .visibility(Visibility.PRIVATE)
+                                .author(new AuthorSummary(userId, null, null))
+                                .createdAt(Instant.now())
+                                .views(0L)
+                                .images(new ArrayList<>(source.getImages()))
+                                .destinations(new ArrayList<>(source.getDestinations()))
+                                .build();
+
+                planRepository.save(copy);
+                permissionService.ensureOwner(copy.getId(), userId);
+
+                return planMapper.toFeedItem(copy);
+        }
+
+        // comment
+        @Transactional
+        public PlanFeedItem.Comment addComment(
+                        Long planId,
+                        Long userId,
+                        String userName,
+                        String userAvatar,
+                        String text,
+                        Long parentId) {
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                PlanComment parent = null;
+                if (parentId != null) {
+                        parent = entityManager.find(PlanComment.class, parentId);
+                        if (parent == null)
+                                throw new RuntimeException("Parent comment not found");
+                }
+
+                PlanComment comment = PlanComment.builder()
+                                .plan(plan)
+                                .parent(parent)
+                                .userId(userId)
+                                .userName(userName)
+                                .userAvatar(userAvatar)
+                                .text(text)
+                                .createdAt(Instant.now())
+                                .build();
+
+                entityManager.persist(comment);
+                entityManager.flush();
+
+                return PlanFeedItem.Comment.builder()
+                                .id(comment.getId())
+                                .parentId(parentId)
+                                .text(comment.getText())
+                                .createdAt(comment.getCreatedAt())
+                                .user(PlanFeedItem.Comment.User.builder()
+                                                .id(userId)
+                                                .name(userName)
+                                                .avatar(userAvatar)
+                                                .build())
+                                .build();
+        }
+
+        // react
+        @Transactional
+        public PlanFeedItem react(Long planId, String key, Long userId) {
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                // Gọi sang user-service lấy thông tin user
+                UserProfileResponse user = userProfileClient.getUserById(userId);
+                if (user == null)
+                        throw new RuntimeException("User not found: " + userId);
+
+                Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
+
+                if (existingOpt.isPresent()) {
+                        PlanReaction existing = existingOpt.get();
+                        plan.getReactions().remove(existing);
+                        reactionRepository.delete(existing);
+                } else {
+                        PlanReaction newReact = PlanReaction.builder()
+                                        .plan(plan)
+                                        .userId(userId)
+                                        .userName(user.getFullname())
+                                        .userAvatar(user.getAvatar())
+                                        .type(key)
+                                        .createdAt(Instant.now())
+                                        .build();
+
+                        plan.getReactions().add(newReact);
+                        reactionRepository.save(newReact);
+                }
+
+                planRepository.save(plan);
+                return planMapper.toFeedItem(plan);
+        }
+
+        // tăng lượt xem
+        public void increaseView(Long planId) {
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
+                planRepository.save(plan);
+        }
 }

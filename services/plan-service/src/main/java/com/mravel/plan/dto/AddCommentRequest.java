@@ -1,10 +1,11 @@
 package com.mravel.plan.dto;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
 public class AddCommentRequest {
-    private String userId;
+    private Long userId;
     private String userName;
     private String userAvatar;
     private String text;

@@ -22,61 +22,54 @@ public class PlanFeedItem {
     private Author author;
     private List<String> images;
     private List<Destination> destinations;
-
-    // Tổng hợp số lượng từng loại reaction (like, love, haha...)
     private Map<String, Long> reactions;
-
-    // Danh sách chi tiết từng người đã react
     private List<ReactionUser> reactionUsers;
-
     private List<Comment> comments;
 
-    // Thêm lớp ReactionUser
+    // Người đã react
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ReactionUser {
-        private String userId;
+        private Long userId;
         private String userName;
         private String userAvatar;
-        private String type; // like, love, haha, ...
+        private String type;
     }
 
-    // Destination nested class
+    // ✅ FIX: Double lat/lng
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Destination {
         private String name;
-        private String lat;
-        private String lng;
+        private Double lat;
+        private Double lng;
     }
 
-    // Enum visibility -> text
     public static String toUiVisibility(Enum<?> v) {
-        if (v == null) return "public";
+        if (v == null)
+            return "Public";
         return switch (v.name()) {
-            case "public_" -> "Public";
-            case "friends" -> "Friends";
-            case "private_" -> "Private";
+            case "PUBLIC" -> "Public";
+            case "FRIENDS" -> "Friends";
+            case "PRIVATE" -> "Private";
             default -> v.name();
         };
     }
 
-    // Author info
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Author {
-        private String id;
+        private Long id;
         private String name;
         private String avatar;
     }
 
-    // Comment info
     @Data
     @Builder
     @NoArgsConstructor
@@ -86,15 +79,15 @@ public class PlanFeedItem {
         private User user;
         private String text;
         private Instant createdAt;
-        private Long parentId; // nếu là reply
-        private List<Comment> replies; // danh sách phản hồi con
+        private Long parentId;
+        private List<Comment> replies;
 
         @Data
         @Builder
         @NoArgsConstructor
         @AllArgsConstructor
         public static class User {
-            private String id;
+            private Long id;
             private String name;
             private String avatar;
         }

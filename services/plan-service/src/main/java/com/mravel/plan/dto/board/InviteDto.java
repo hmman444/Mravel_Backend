@@ -1,5 +1,7 @@
 package com.mravel.plan.dto.board;
 
+import com.mravel.plan.model.PlanRole;
+import jakarta.persistence.*;
 import lombok.*;
 
 /**
@@ -13,5 +15,7 @@ import lombok.*;
 public class InviteDto {
     private Long id;
     private String email;
-    private String role; // viewer | editor
+
+    @Enumerated(EnumType.STRING)
+    private PlanRole role;
 }
