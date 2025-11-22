@@ -1,26 +1,41 @@
 package com.mravel.plan.dto.board;
 
+import com.mravel.plan.model.PlanActivityType;
+import com.mravel.plan.model.SplitType;
 import lombok.*;
 
 import java.time.LocalTime;
 import java.util.Set;
 
-/**
- * DTO biểu diễn một thẻ (card) trong PlanList.
- */
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class CardDto {
+
     private Long id;
     private String text;
     private String description;
-    private String priority; // high | medium | low
-    private LocalTime start;
-    private LocalTime end;
+
+    private LocalTime startTime;
+    private LocalTime endTime;
+
     private boolean done;
     private Integer position;
-    private Set<LabelDto> labels;
+
+    // Activity info
+    private PlanActivityType activityType;
+    private String activityDataJson;
+
+    // Cost
+    private Long estimatedCost;
+    private Long actualCost;
+
+    // Payment
+    private Long payerId;
+    private SplitType splitType;
+    private Set<Long> splitMembers;
+
+    private String splitResultJson;
 }

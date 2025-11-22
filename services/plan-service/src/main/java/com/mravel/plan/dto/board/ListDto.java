@@ -19,4 +19,5 @@ public class ListDto {
     private Integer position;
     private LocalDate dayDate;
     private List<CardDto> cards;
+    private String type;
 }

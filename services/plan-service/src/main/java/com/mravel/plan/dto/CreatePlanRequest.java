@@ -4,6 +4,7 @@ import com.mravel.plan.model.Destination;
 import com.mravel.plan.model.Visibility;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Getter
@@ -16,8 +17,8 @@ public class CreatePlanRequest {
     private String title;
     private String description;
 
-    private String startDate; // yyyy-MM-dd
-    private String endDate; // yyyy-MM-dd
+    private LocalDate startDate; // yyyy-MM-dd
+    private LocalDate endDate; // yyyy-MM-dd
 
     private List<String> images;
     private List<Destination> destinations;

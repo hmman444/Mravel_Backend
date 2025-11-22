@@ -69,10 +69,6 @@ public class Plan {
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<PlanLabel> labels = new ArrayList<>();
-
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<PlanInvite> invites = new ArrayList<>();
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -97,10 +93,6 @@ public class Plan {
     @Column(nullable = false)
     @Builder.Default
     private PlanStatus status = PlanStatus.DRAFT;
-
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<PlanExpense> expenses = new ArrayList<>();
 
     @Column(name = "thumbnail_url")
     private String thumbnail;

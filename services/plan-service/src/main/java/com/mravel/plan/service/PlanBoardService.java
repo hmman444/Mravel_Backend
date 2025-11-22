@@ -8,13 +8,14 @@ import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com.mravel.plan.service.PlanPermissionService;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +24,6 @@ public class PlanBoardService {
     private final PlanRepository planRepository;
     private final PlanListRepository listRepository;
     private final PlanCardRepository cardRepository;
-    private final PlanLabelRepository labelRepository;
     private final PlanInviteRepository inviteRepository;
     private final PlanInviteTokenRepository inviteTokenRepo;
     private final PlanMemberRepository memberRepository;
@@ -31,9 +31,58 @@ public class PlanBoardService {
     private final UserProfileClient userProfileClient;
     private final PlanRequestRepository requestRepo;
 
+    private PlanList mustLoadList(Long planId, Long listId) {
+        PlanList list = listRepository.findById(listId)
+                .orElseThrow(() -> new RuntimeException("List not found"));
+        if (!list.getPlan().getId().equals(planId))
+            throw new RuntimeException("List not part of this plan");
+        return list;
+    }
+
+    private PlanCard mustLoadCard(Long planId, Long listId, Long cardId) {
+        PlanList list = mustLoadList(planId, listId);
+        PlanCard card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new RuntimeException("Card not found"));
+        if (!card.getList().getId().equals(list.getId()))
+            throw new RuntimeException("Card not in this list");
+        return card;
+    }
+
+    private PlanList findTrash(Long planId) {
+        return listRepository.findByPlanIdOrderByPositionAsc(planId)
+                .stream()
+                .filter(l -> l.getType() == PlanListType.TRASH)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Trash missing"));
+    }
+
+    private List<PlanList> findDayLists(Long planId) {
+        return listRepository.findByPlanIdOrderByPositionAsc(planId)
+                .stream()
+                .filter(l -> l.getType() == PlanListType.DAY)
+                .toList();
+    }
+
+    public void syncDayLists(Plan plan) {
+        List<PlanList> dayLists = findDayLists(plan.getId());
+        LocalDate start = plan.getStartDate();
+
+        for (int i = 0; i < dayLists.size(); i++) {
+            PlanList l = dayLists.get(i);
+            l.setPosition(i);
+            l.setDayDate(start.plusDays(i));
+        }
+
+        plan.setEndDate(start.plusDays(dayLists.size() - 1));
+
+        PlanList trash = findTrash(plan.getId());
+        trash.setPosition(dayLists.size());
+    }
+
     // board
     @Transactional
     public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
+
         if (!permissionService.canView(planId, userId, isFriend))
             throw new RuntimeException("You don't have permission to view this board.");
 
@@ -59,23 +108,23 @@ public class PlanBoardService {
                                         .id(l.getId())
                                         .title(l.getTitle())
                                         .position(l.getPosition())
+                                        .type(l.getType().name())
                                         .dayDate(l.getDayDate())
-                                        .cards(l.getCards().stream()
-                                                .sorted(Comparator.comparingInt(PlanCard::getPosition))
-                                                .map(this::toCardDto)
-                                                .toList())
+                                        .cards(
+                                                l.getCards().stream()
+                                                        .sorted(Comparator.comparingInt(PlanCard::getPosition))
+                                                        .map(this::toCardDto)
+                                                        .toList())
                                         .build())
                                 .toList())
-                .labels(labelRepository.findByPlanId(planId).stream()
-                        .map(lb -> LabelDto.builder()
-                                .id(lb.getId()).text(lb.getText()).color(lb.getColor())
-                                .build())
-                        .toList())
-                .invites(inviteRepository.findByPlanId(planId).stream()
-                        .map(inv -> InviteDto.builder()
-                                .id(inv.getId()).email(inv.getEmail()).role(inv.getRole())
-                                .build())
-                        .toList())
+                .invites(
+                        inviteRepository.findByPlanId(planId).stream()
+                                .map(inv -> InviteDto.builder()
+                                        .id(inv.getId())
+                                        .email(inv.getEmail())
+                                        .role(inv.getRole())
+                                        .build())
+                                .toList())
                 .build();
     }
 
@@ -84,17 +133,18 @@ public class PlanBoardService {
                 .id(c.getId())
                 .text(c.getText())
                 .description(c.getDescription())
-                .priority(c.getPriority())
-                .start(c.getStartTime())
-                .end(c.getEndTime())
+                .startTime(c.getStartTime())
+                .endTime(c.getEndTime())
                 .done(c.isDone())
                 .position(c.getPosition())
-                .labels(
-                        c.getLabels().stream()
-                                .map(l -> LabelDto.builder()
-                                        .id(l.getId()).text(l.getText()).color(l.getColor())
-                                        .build())
-                                .collect(Collectors.toSet()))
+                .activityType(c.getActivityType())
+                .activityDataJson(c.getActivityDataJson())
+                .estimatedCost(c.getEstimatedCost())
+                .actualCost(c.getActualCost())
+                .payerId(c.getPayerId())
+                .splitType(c.getSplitType())
+                .splitMembers(c.getSplitMembers())
+                .splitResultJson(c.getSplitResultJson())
                 .build();
     }
 
@@ -106,19 +156,35 @@ public class PlanBoardService {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        int nextPos = (int) listRepository.countByPlanId(planId);
+        List<PlanList> dayLists = findDayLists(planId);
+        PlanList trash = findTrash(planId);
+
+        LocalDate date = plan.getEndDate().plusDays(1);
+        int index = dayLists.size();
+
+        String title = (req.getTitle() != null && !req.getTitle().isBlank())
+                ? req.getTitle()
+                : "Danh sách hoạt động";
+
         PlanList list = PlanList.builder()
-                .title(req.getTitle() == null ? ("Ngày " + (nextPos + 1)) : req.getTitle())
-                .position(nextPos)
-                .dayDate(req.getDayDate())
                 .plan(plan)
+                .type(PlanListType.DAY)
+                .position(index)
+                .title(title)
+                .dayDate(date)
                 .build();
+
         listRepository.save(list);
+
+        trash.setPosition(index + 1);
+
+        plan.setEndDate(date);
 
         return ListDto.builder()
                 .id(list.getId())
                 .title(list.getTitle())
                 .position(list.getPosition())
+                .type("DAY")
                 .dayDate(list.getDayDate())
                 .cards(List.of())
                 .build();
@@ -128,26 +194,42 @@ public class PlanBoardService {
     public void renameList(Long planId, Long listId, Long userId, RenameListRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
-        PlanList list = mustLoadListInPlan(planId, listId);
+        PlanList list = mustLoadList(planId, listId);
+
+        if (list.getType() == PlanListType.TRASH)
+            throw new RuntimeException("Cannot rename trash");
+
         list.setTitle(req.getTitle());
-        listRepository.save(list);
     }
 
     @Transactional
     public void deleteList(Long planId, Long userId, Long listId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
-        PlanList list = mustLoadListInPlan(planId, listId);
-        int removedPos = list.getPosition();
-        listRepository.delete(list);
+        PlanList target = mustLoadList(planId, listId);
+        if (target.getType() == PlanListType.TRASH)
+            throw new RuntimeException("Cannot delete trash list");
 
-        // dồn lại position
-        List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
-        for (PlanList l : lists) {
-            if (l.getPosition() > removedPos) {
-                l.setPosition(l.getPosition() - 1);
-            }
+        List<PlanList> dayLists = findDayLists(planId);
+        if (dayLists.size() == 1)
+            throw new RuntimeException("Cannot delete the last day");
+
+        PlanList trash = findTrash(planId);
+
+        // move cards → trash
+        List<PlanCard> cards = cardRepository.findByListIdOrderByPositionAsc(target.getId());
+        int basePos = (int) cardRepository.countByListId(trash.getId());
+
+        for (int i = 0; i < cards.size(); i++) {
+            PlanCard c = cards.get(i);
+            c.setList(trash);
+            c.setPosition(basePos + i);
         }
+
+        listRepository.delete(target);
+
+        // sync
+        syncDayLists(target.getPlan());
     }
 
     // crud card
@@ -155,18 +237,28 @@ public class PlanBoardService {
     public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
-        PlanList list = mustLoadListInPlan(planId, listId);
+        PlanList list = mustLoadList(planId, listId);
+
+        if (list.getType() == PlanListType.TRASH)
+            throw new RuntimeException("Cannot create card in trash");
+
         int nextPos = (int) cardRepository.countByListId(listId);
 
         PlanCard card = PlanCard.builder()
                 .list(list)
-                .text(Objects.requireNonNullElse(req.getText(), "New card"))
+                .text(req.getText() != null ? req.getText() : "New card")
                 .description(req.getDescription())
-                .priority(req.getPriority())
                 .startTime(parseTime(req.getStart()))
                 .endTime(parseTime(req.getEnd()))
                 .done(false)
                 .position(nextPos)
+                .activityType(req.getActivityType())
+                .activityDataJson(req.getActivityDataJson())
+                .estimatedCost(req.getEstimatedCost())
+                .actualCost(req.getActualCost())
+                .payerId(req.getPayerId())
+                .splitType(req.getSplitType())
+                .splitMembers(req.getSplitMembers() != null ? new HashSet<>(req.getSplitMembers()) : new HashSet<>())
                 .build();
 
         cardRepository.save(card);
@@ -183,19 +275,38 @@ public class PlanBoardService {
             card.setText(req.getText());
         if (req.getDescription() != null)
             card.setDescription(req.getDescription());
-        if (req.getPriority() != null)
-            card.setPriority(req.getPriority());
+
         if (req.getStart() != null)
             card.setStartTime(parseTime(req.getStart()));
         if (req.getEnd() != null)
             card.setEndTime(parseTime(req.getEnd()));
+
         if (req.getDone() != null)
             card.setDone(req.getDone());
 
-        if (req.getLabelIds() != null) {
-            Set<PlanLabel> labels = new HashSet<>(labelRepository.findAllById(req.getLabelIds()));
-            card.setLabels(labels);
-        }
+        // activity
+        if (req.getActivityType() != null)
+            card.setActivityType(req.getActivityType());
+        if (req.getActivityDataJson() != null)
+            card.setActivityDataJson(req.getActivityDataJson());
+
+        // cost
+        if (req.getEstimatedCost() != null)
+            card.setEstimatedCost(req.getEstimatedCost());
+        if (req.getActualCost() != null)
+            card.setActualCost(req.getActualCost());
+
+        // payment
+        if (req.getPayerId() != null)
+            card.setPayerId(req.getPayerId());
+        if (req.getSplitType() != null)
+            card.setSplitType(req.getSplitType());
+        if (req.getSplitMembers() != null)
+            card.setSplitMembers(new HashSet<>(req.getSplitMembers()));
+        if (req.getSplitResultJson() != null)
+            card.setSplitResultJson(req.getSplitResultJson());
+
+        // JPA dirty checking sẽ tự save vì @Transactional
         return toCardDto(card);
     }
 
@@ -214,16 +325,14 @@ public class PlanBoardService {
     public void deleteCard(Long planId, Long listId, Long cardId, Long userId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
-        PlanCard card = mustLoadCardInList(planId, listId, cardId);
+        PlanCard card = mustLoadCard(planId, listId, cardId);
         int removedPos = card.getPosition();
+
         cardRepository.delete(card);
 
-        // dồn lại position
         List<PlanCard> cards = cardRepository.findByListIdOrderByPositionAsc(listId);
-        for (PlanCard c : cards) {
-            if (c.getPosition() > removedPos) {
-                c.setPosition(c.getPosition() - 1);
-            }
+        for (int i = 0; i < cards.size(); i++) {
+            cards.get(i).setPosition(i);
         }
     }
 
@@ -238,12 +347,23 @@ public class PlanBoardService {
                 .list(original.getList())
                 .text(original.getText() + " (Copy)")
                 .description(original.getDescription())
-                .priority(original.getPriority())
                 .startTime(original.getStartTime())
                 .endTime(original.getEndTime())
                 .done(false)
                 .position(nextPos)
-                .labels(new HashSet<>(original.getLabels())) // copy nhãn
+
+                .activityType(original.getActivityType())
+                .activityDataJson(original.getActivityDataJson())
+                .estimatedCost(original.getEstimatedCost())
+                .actualCost(original.getActualCost())
+                .payerId(original.getPayerId())
+                .splitType(original.getSplitType())
+                .splitMembers(
+                        original.getSplitMembers() != null
+                                ? new HashSet<>(original.getSplitMembers())
+                                : new HashSet<>())
+                .splitResultJson(original.getSplitResultJson())
+
                 .build();
 
         cardRepository.save(copy);
@@ -256,74 +376,70 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         if ("list".equalsIgnoreCase(req.getType())) {
-            List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
-            PlanList moved = lists.remove(req.getSourceIndex().intValue());
-            lists.add(req.getDestIndex(), moved);
-            // reindex
-            for (int i = 0; i < lists.size(); i++)
-                lists.get(i).setPosition(i);
-            return getBoard(planId, userId, isFriend);
+            return reorderLists(planId, userId, isFriend, req);
+
         } else if ("card".equalsIgnoreCase(req.getType())) {
-            PlanList source = mustLoadListInPlan(planId, req.getSourceListId());
-            PlanList dest = mustLoadListInPlan(planId, req.getDestListId());
-
-            List<PlanCard> sourceCards = cardRepository.findByListIdOrderByPositionAsc(source.getId());
-            PlanCard moved = sourceCards.remove(req.getSourceIndex().intValue());
-
-            List<PlanCard> destCards = source.getId().equals(dest.getId())
-                    ? sourceCards
-                    : cardRepository.findByListIdOrderByPositionAsc(dest.getId());
-
-            // gán lại list nếu di chuyển cross-list
-            moved.setList(dest);
-            destCards.add(req.getDestIndex(), moved);
-
-            // reindex 2 list
-            for (int i = 0; i < sourceCards.size(); i++)
-                sourceCards.get(i).setPosition(i);
-            if (!source.getId().equals(dest.getId())) {
-                for (int i = 0; i < destCards.size(); i++)
-                    destCards.get(i).setPosition(i);
-            }
-            return getBoard(planId, userId, isFriend);
+            return reorderCards(planId, userId, isFriend, req);
         }
-        throw new IllegalArgumentException("Unknown reorder type");
+
+        throw new RuntimeException("Unknown reorder type");
     }
 
-    // label
+    // ---------- LIST REORDER ----------
     @Transactional
-    public LabelDto upsertLabel(Long planId, Long userId, LabelUpsertRequest req) {
-        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+    private BoardResponse reorderLists(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
 
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+        List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
 
-        PlanLabel label = labelRepository.findByPlanIdAndText(planId, req.getText())
-                .orElseGet(() -> PlanLabel.builder()
-                        .plan(plan)
-                        .text(req.getText())
-                        .color(req.getColor())
-                        .build());
+        int trashIndex = -1;
+        for (int i = 0; i < lists.size(); i++) {
+            if (lists.get(i).getType() == PlanListType.TRASH) {
+                trashIndex = i;
+                break;
+            }
+        }
 
-        label.setColor(req.getColor());
-        labelRepository.save(label);
+        if (req.getSourceIndex() == trashIndex || req.getDestIndex() == trashIndex)
+            throw new RuntimeException("Cannot move trash");
 
-        return LabelDto.builder()
-                .id(label.getId())
-                .text(label.getText())
-                .color(label.getColor())
-                .build();
+        PlanList moved = lists.remove(req.getSourceIndex().intValue());
+        lists.add(req.getDestIndex().intValue(), moved);
+
+        for (int i = 0; i < lists.size(); i++) {
+            lists.get(i).setPosition(i);
+        }
+
+        Plan plan = planRepository.findById(planId).orElseThrow();
+        syncDayLists(plan);
+
+        return getBoard(planId, userId, isFriend);
     }
 
     @Transactional
-    public void deleteLabel(Long planId, Long labelId, Long userId) {
-        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+    private BoardResponse reorderCards(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
 
-        PlanLabel label = labelRepository.findById(labelId)
-                .orElseThrow(() -> new RuntimeException("Label not found"));
-        if (!label.getPlan().getId().equals(planId))
-            throw new RuntimeException("Label not in plan");
-        labelRepository.delete(label);
+        PlanList source = mustLoadList(planId, req.getSourceListId());
+        PlanList dest = mustLoadList(planId, req.getDestListId());
+
+        List<PlanCard> sourceCards = cardRepository.findByListIdOrderByPositionAsc(source.getId());
+        PlanCard moved = sourceCards.remove(req.getSourceIndex().intValue());
+
+        List<PlanCard> destCards = source.getId().equals(dest.getId())
+                ? sourceCards
+                : cardRepository.findByListIdOrderByPositionAsc(dest.getId());
+
+        moved.setList(dest);
+        destCards.add(req.getDestIndex().intValue(), moved);
+
+        for (int i = 0; i < sourceCards.size(); i++)
+            sourceCards.get(i).setPosition(i);
+
+        if (!source.getId().equals(dest.getId())) {
+            for (int i = 0; i < destCards.size(); i++)
+                destCards.get(i).setPosition(i);
+        }
+
+        return getBoard(planId, userId, isFriend);
     }
 
     // invites
@@ -427,7 +543,7 @@ public class PlanBoardService {
     private LocalTime parseTime(String hhmm) {
         if (hhmm == null || hhmm.isBlank())
             return null;
-        return LocalTime.parse(hhmm); // "HH:mm"
+        return LocalTime.parse(hhmm);
     }
 
     @Transactional

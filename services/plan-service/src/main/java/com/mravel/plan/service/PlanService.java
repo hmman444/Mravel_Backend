@@ -6,12 +6,16 @@ import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
 import com.mravel.plan.model.AuthorSummary;
 import com.mravel.plan.model.Plan;
+import com.mravel.plan.model.PlanCard;
 import com.mravel.plan.model.PlanComment;
+import com.mravel.plan.model.PlanList;
+import com.mravel.plan.model.PlanListType;
 import com.mravel.plan.model.PlanReaction;
 import com.mravel.plan.model.Visibility;
+import com.mravel.plan.repository.PlanCardRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRepository;
-import com.mravel.plan.repository.PlanExpenseRepository;
+import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanMemberRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -21,6 +25,9 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,14 +40,14 @@ public class PlanService {
         private final PlanMapper planMapper;
         private final PlanPermissionService permissionService;
         private final UserProfileClient userProfileClient;
-        private final PlanExpenseRepository expenseRepo;
-
-        // EntityManager để truy vấn trực tiếp
-        @PersistenceContext
-        private EntityManager entityManager;
+        private final PlanListRepository listRepository;
+        private final PlanCardRepository cardRepository;
         private final PlanMemberRepository memberRepository;
 
-        // get feed
+        // EntityManager để truy vấn trực tiếp cho comment
+        @PersistenceContext
+        private EntityManager entityManager;
+
         public Page<PlanFeedItem> getFeed(int page, int size, Long viewerId) {
                 PageRequest pageable = PageRequest.of(page - 1, size);
 
@@ -53,7 +60,9 @@ public class PlanService {
                         // Người dùng đăng nhập
                         List<Plan> publicPlans = planRepository.findByVisibility(Visibility.PUBLIC, pageable)
                                         .getContent();
-                        List<Plan> myPlans = planRepository.findByAuthor_Id(viewerId, pageable).getContent();
+
+                        List<Plan> myPlans = planRepository.findByAuthor_Id(viewerId, pageable)
+                                        .getContent();
 
                         // Các plan mà user là thành viên (được mời)
                         List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
@@ -77,7 +86,6 @@ public class PlanService {
                 return new PageImpl<>(mapped, pageable, mapped.size());
         }
 
-        // get plan theo id
         public PlanFeedItem getById(Long id, Long viewerId, boolean isFriend) {
                 Plan plan = planRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
@@ -90,16 +98,54 @@ public class PlanService {
 
         @Transactional
         public PlanFeedItem createPlan(CreatePlanRequest req, Long userId) {
+
+                if (req.getStartDate() == null || req.getEndDate() == null)
+                        throw new RuntimeException("Start and end date are required");
+
+                if (req.getEndDate().isBefore(req.getStartDate()))
+                        throw new RuntimeException("endDate must be >= startDate");
+
+                int days = (int) (req.getEndDate().toEpochDay() - req.getStartDate().toEpochDay() + 1);
+
                 Plan plan = Plan.builder()
                                 .title(req.getTitle())
                                 .description(req.getDescription())
                                 .visibility(req.getVisibility() != null ? req.getVisibility() : Visibility.PRIVATE)
                                 .author(new AuthorSummary(userId, req.getAuthorName(), req.getAuthorAvatar()))
+                                .startDate(req.getStartDate())
+                                .endDate(req.getEndDate())
+                                .days(days)
                                 .createdAt(Instant.now())
                                 .views(0L)
                                 .build();
 
                 planRepository.save(plan);
+
+                String defaultTitle = "Danh sách hoạt động";
+
+                for (int i = 0; i < days; i++) {
+                        LocalDate date = req.getStartDate().plusDays(i);
+
+                        listRepository.save(
+                                        PlanList.builder()
+                                                        .plan(plan)
+                                                        .type(PlanListType.DAY)
+                                                        .position(i)
+                                                        .title(defaultTitle)
+                                                        .dayDate(date)
+                                                        .build());
+                }
+
+                // trash
+                listRepository.save(
+                                PlanList.builder()
+                                                .plan(plan)
+                                                .type(PlanListType.TRASH)
+                                                .position(days)
+                                                .title("Trash")
+                                                .dayDate(null)
+                                                .build());
+
                 permissionService.ensureOwner(plan.getId(), userId);
 
                 return planMapper.toFeedItem(plan);
@@ -126,11 +172,15 @@ public class PlanService {
                 if (source.getVisibility() != Visibility.PUBLIC)
                         throw new RuntimeException("Only public plans can be copied.");
 
+                // Tạo plan mới
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
                                 .visibility(Visibility.PRIVATE)
                                 .author(new AuthorSummary(userId, null, null))
+                                .startDate(source.getStartDate())
+                                .endDate(source.getEndDate())
+                                .days(source.getDays())
                                 .createdAt(Instant.now())
                                 .views(0L)
                                 .images(new ArrayList<>(source.getImages()))
@@ -140,10 +190,74 @@ public class PlanService {
                 planRepository.save(copy);
                 permissionService.ensureOwner(copy.getId(), userId);
 
+                // Copy dayLists + cards, tạo trash mới rỗng
+                List<PlanList> sourceLists = listRepository.findByPlanIdOrderByPositionAsc(source.getId());
+
+                // day lists của source, sort lại cho chắc
+                List<PlanList> sourceDays = sourceLists.stream()
+                                .filter(l -> l.getType() == PlanListType.DAY)
+                                .sorted(Comparator.comparingInt(PlanList::getPosition))
+                                .toList();
+
+                // tạo day list cho copy, map id cũ -> id mới để copy card
+                Map<Long, PlanList> oldToNewList = new HashMap<>();
+
+                for (int i = 0; i < sourceDays.size(); i++) {
+                        PlanList srcList = sourceDays.get(i);
+
+                        PlanList newList = PlanList.builder()
+                                        .plan(copy)
+                                        .type(PlanListType.DAY)
+                                        .position(i)
+                                        .title(srcList.getTitle())
+                                        .dayDate(copy.getStartDate() != null ? copy.getStartDate().plusDays(i)
+                                                        : srcList.getDayDate())
+                                        .build();
+
+                        listRepository.save(newList);
+                        oldToNewList.put(srcList.getId(), newList);
+
+                        // copy cards thuộc list này
+                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(srcList.getId());
+                        for (int c = 0; c < srcCards.size(); c++) {
+                                PlanCard oc = srcCards.get(c);
+                                PlanCard nc = PlanCard.builder()
+                                                .list(newList)
+                                                .text(oc.getText())
+                                                .description(oc.getDescription())
+                                                .startTime(oc.getStartTime())
+                                                .endTime(oc.getEndTime())
+                                                .done(false) // khi copy thì reset done
+                                                .position(c)
+                                                .activityType(oc.getActivityType())
+                                                .activityDataJson(oc.getActivityDataJson())
+                                                .estimatedCost(oc.getEstimatedCost())
+                                                .actualCost(oc.getActualCost())
+                                                .payerId(oc.getPayerId())
+                                                .splitType(oc.getSplitType())
+                                                .splitMembers(oc.getSplitMembers() != null
+                                                                ? new HashSet<>(oc.getSplitMembers())
+                                                                : new HashSet<>())
+                                                .splitResultJson(oc.getSplitResultJson())
+                                                .build();
+                                cardRepository.save(nc);
+                        }
+                }
+
+                // tạo trash mới, rỗng
+                int dayCount = sourceDays.size();
+                listRepository.save(
+                                PlanList.builder()
+                                                .plan(copy)
+                                                .type(PlanListType.TRASH)
+                                                .position(dayCount)
+                                                .title("Trash")
+                                                .dayDate(null)
+                                                .build());
+
                 return planMapper.toFeedItem(copy);
         }
 
-        // comment
         @Transactional
         public PlanFeedItem.Comment addComment(
                         Long planId,
@@ -152,6 +266,7 @@ public class PlanService {
                         String userAvatar,
                         String text,
                         Long parentId) {
+
                 Plan plan = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -188,7 +303,6 @@ public class PlanService {
                                 .build();
         }
 
-        // react
         @Transactional
         public PlanFeedItem react(Long planId, String key, Long userId) {
                 Plan plan = planRepository.findById(planId)
@@ -223,7 +337,6 @@ public class PlanService {
                 return planMapper.toFeedItem(plan);
         }
 
-        // tăng lượt xem
         public void increaseView(Long planId) {
                 Plan plan = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
@@ -231,15 +344,4 @@ public class PlanService {
                 plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
                 planRepository.save(plan);
         }
-
-        @Transactional
-        public Long updateTotalCost(Long planId) {
-                Long total = expenseRepo.sumAmountByPlanId(planId);
-                Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
-
-                plan.setTotalCost(total);
-                return total;
-        }
-
 }
