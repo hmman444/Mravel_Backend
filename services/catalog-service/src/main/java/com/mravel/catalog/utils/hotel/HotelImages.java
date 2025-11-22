@@ -1,13 +1,15 @@
-package com.mravel.catalog.utils;
+// src/main/java/com/mravel/catalog/utils/HotelImages.java
+package com.mravel.catalog.utils.hotel;
 
-import com.mravel.catalog.model.doc.PlaceDoc.Image;
+import com.mravel.catalog.model.doc.HotelDoc.Image;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public final class Images {
-  private Images() {}
+public final class HotelImages {
+
+  private HotelImages() {}
 
   public static Image img(String url, String caption, boolean cover, Integer sortOrder) {
     return Image.builder()

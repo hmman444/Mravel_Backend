@@ -1,4 +1,7 @@
-package com.mravel.catalog.bootstrap;
+package com.mravel.catalog.bootstrap.place;
+
+import static com.mravel.catalog.utils.place.ContentBlocks.*;
+import static com.mravel.catalog.utils.place.Images.*;
 
 import java.util.List;
 
@@ -9,9 +12,6 @@ import org.springframework.context.annotation.Configuration;
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.repository.PlaceDocRepository;
-
-import static com.mravel.catalog.utils.ContentBlocks.*;
-import static com.mravel.catalog.utils.Images.*;
 
 @Configuration
 public class SeedSaPaPois {
