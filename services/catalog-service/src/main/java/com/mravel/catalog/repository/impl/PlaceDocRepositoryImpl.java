@@ -4,7 +4,6 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Repository;
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.model.enums.VenueType;
-import com.mravel.catalog.model.enums.TagType;
 import com.mravel.catalog.repository.PlaceDocRepositoryCustom;
 
 @Repository
@@ -23,39 +21,6 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
 
   @Autowired
   MongoTemplate mongo;
-
-  @Override
-  public Page<PlaceDoc> searchHotels(String location, String checkIn, String checkOut,
-                                     Integer adults, Integer rooms, Pageable pageable) {
-    Query q = new Query().with(pageable);
-    List<Criteria> cs = baseActiveVenue(VenueType.HOTEL);   // kind=VENUE & venueType=HOTEL
-    if (has(location)) cs.add(locationCrit(location));
-    q.addCriteria(and(cs));
-    long total = mongo.count(q, PlaceDoc.class);
-    List<PlaceDoc> data = mongo.find(q, PlaceDoc.class);
-    return new PageImpl<>(data, pageable, total);
-  }
-
-  @Override
-  public Page<PlaceDoc> searchRestaurants(String location, Set<String> cuisineSlugs, Pageable pageable) {
-    Query q = new Query().with(pageable);
-    List<Criteria> cs = baseActiveVenue(VenueType.RESTAURANT); // kind=VENUE & venueType=RESTAURANT
-    if (has(location)) cs.add(locationCrit(location));
-    if (cuisineSlugs != null && !cuisineSlugs.isEmpty()) {
-      cs.add(
-          where("tags").elemMatch(
-            new Criteria().andOperator(
-              where("type").is(TagType.CUISINE),
-              where("slug").in(cuisineSlugs)
-            )
-          )
-        );
-    }
-    q.addCriteria(and(cs));
-    long total = mongo.count(q, PlaceDoc.class);
-    List<PlaceDoc> data = mongo.find(q, PlaceDoc.class);
-    return new PageImpl<>(data, pageable, total);
-  }
 
   @Override
   public Page<PlaceDoc> searchPlaces(String qtext, Pageable pageable) {
