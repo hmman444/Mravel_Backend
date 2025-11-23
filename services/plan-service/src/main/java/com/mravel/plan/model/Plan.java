@@ -69,10 +69,6 @@ public class Plan {
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<PlanLabel> labels = new ArrayList<>();
-
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<PlanInvite> invites = new ArrayList<>();
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -89,4 +85,24 @@ public class Plan {
         private String email;
         private String role; // editor / viewer
     }
+
+    @Builder.Default
+    private String budgetCurrency = "VND"; // default "VND"
+
+    private Long budgetTotal; // tổng ngân sách
+
+    private Long budgetPerPerson; // tổng ngân sách/ người
+
+    private Long totalEstimatedCost;
+
+    private Long totalActualCost;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private PlanStatus status = PlanStatus.DRAFT;
+
+    @Column(name = "thumbnail_url")
+    private String thumbnail;
+
 }

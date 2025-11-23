@@ -1,20 +1,27 @@
 package com.mravel.plan.dto.board;
 
+import com.mravel.plan.model.PlanActivityType;
 import lombok.*;
-
-import java.util.Set;
 
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class UpdateCardRequest {
+
     private String text;
     private String description;
-    private String priority; // "high" | "medium" | "low" | null
-    private String start; // "HH:mm" | null
-    private String end; // "HH:mm" | null
-    private Boolean done; // true/false
-    private Set<Long> labelIds; // các label gán cho card
+
+    private String start; // HH:mm
+    private String end; // HH:mm
+    private Integer durationMinutes;
+
+    private Boolean done;
+
+    private PlanActivityType activityType;
+    private String activityDataJson;
+
+    private PlanCardCostDto cost;
+    private PlanCardSplitConfigDto split;
 }

@@ -14,5 +14,7 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
 
     Page<Plan> findByAuthor_Id(Long authorId, Pageable pageable);
 
+    List<Plan> findByAuthor_Id(Long authorId);
+
     List<Plan> findByIdIn(List<Long> ids);
 }

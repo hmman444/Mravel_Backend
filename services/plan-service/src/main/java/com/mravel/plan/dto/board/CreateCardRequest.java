@@ -1,16 +1,26 @@
 package com.mravel.plan.dto.board;
 
+import com.mravel.plan.model.PlanActivityType;
 import lombok.*;
 
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class CreateCardRequest {
-    private String text; // tiêu đề thẻ
-    private String description; // mô tả chi tiết
-    private String priority; // "high" | "medium" | "low" | null
-    private String start; // "HH:mm" | null
-    private String end; // "HH:mm" | null
+
+    private String text;
+    private String description;
+
+    private String start;
+    private String end;
+
+    private Integer durationMinutes;
+
+    private PlanActivityType activityType;
+    private String activityDataJson;
+
+    private PlanCardCostDto cost;
+    private PlanCardSplitConfigDto split;
 }

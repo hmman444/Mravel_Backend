@@ -14,6 +14,8 @@ public interface PlanMemberRepository extends JpaRepository<PlanMember, Long> {
 
     List<PlanMember> findByPlanId(Long planId);
 
+    List<PlanMember> findByUserId(Long userId);
+
     boolean existsByPlanIdAndUserIdAndRole(Long planId, Long userId, PlanRole role);
 
     boolean existsByPlanIdAndUserId(Long planId, Long userId);
