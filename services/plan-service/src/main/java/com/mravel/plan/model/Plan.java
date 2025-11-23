@@ -87,7 +87,15 @@ public class Plan {
     }
 
     @Builder.Default
-    private Long totalCost = Long.valueOf(0);
+    private String budgetCurrency = "VND"; // default "VND"
+
+    private Long budgetTotal; // tổng ngân sách
+
+    private Long budgetPerPerson; // tổng ngân sách/ người
+
+    private Long totalEstimatedCost;
+
+    private Long totalActualCost;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

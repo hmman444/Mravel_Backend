@@ -6,7 +6,6 @@ import lombok.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.time.Instant;
 
 @Entity
 @Table(name = "plan_lists")
@@ -37,7 +36,7 @@ public class PlanList {
     @JoinColumn(name = "plan_id", nullable = false)
     private Plan plan;
 
-    @OneToMany(mappedBy = "list", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "list")
     @OrderBy("position ASC")
     private List<PlanCard> cards = new ArrayList<>();
 

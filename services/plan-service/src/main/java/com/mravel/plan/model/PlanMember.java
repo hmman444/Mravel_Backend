@@ -2,7 +2,6 @@ package com.mravel.plan.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
 
 @Entity
 @Table(name = "plan_members", uniqueConstraints = @UniqueConstraint(columnNames = { "plan_id", "user_id" }))

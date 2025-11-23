@@ -27,47 +27,52 @@ public class PlanListService {
 
         List<MyPlanDto> result = new ArrayList<>();
 
+        // owner plans
         for (Plan p : owned) {
             result.add(toDto(p, PlanRole.OWNER, userCache));
         }
 
+        // plans user joined
         for (PlanMember m : joined) {
             Plan p = m.getPlan();
             if (!Objects.equals(p.getAuthor().getId(), userId)) {
-                PlanRole role = m.getRole(); // giả sử thuộc kiểu enum PlanRole
-                result.add(toDto(p, role, userCache));
+                result.add(toDto(p, m.getRole(), userCache));
             }
         }
 
         return result;
     }
 
-    private MyPlanDto toDto(Plan p, PlanRole myRole, Map<Long, UserProfileResponse> userCache) {
+    private MyPlanDto toDto(Plan p, PlanRole myRole, Map<Long, UserProfileResponse> cache) {
 
         Long ownerId = p.getAuthor().getId();
 
-        UserProfileResponse ownerProfile = userCache.computeIfAbsent(
-                ownerId,
-                id -> userClient.getUserById(id));
+        UserProfileResponse ownerProfile = cache.computeIfAbsent(
+                ownerId, id -> userClient.getUserById(id));
 
         int memberCount = p.getMembers() != null ? p.getMembers().size() : 1;
 
         return MyPlanDto.builder()
                 .id(p.getId())
-                .name(p.getTitle())
+                .title(p.getTitle())
                 .description(p.getDescription())
                 .owner(ownerProfile.getFullname())
                 .members(memberCount)
-                .cost(estimateCost(p))
+
+                .totalEstimatedCost(
+                        p.getTotalEstimatedCost() != null ? p.getTotalEstimatedCost() : 0L)
+                .totalActualCost(
+                        p.getTotalActualCost() != null ? p.getTotalActualCost() : 0L)
+                .budgetCurrency(p.getBudgetCurrency())
+                .budgetTotal(p.getBudgetTotal())
+
                 .startDate(p.getStartDate())
                 .endDate(p.getEndDate())
-                .thumbnail(p.getImages().isEmpty() ? null : p.getImages().get(0))
+
+                .thumbnail(p.getThumbnail())
+
                 .status(p.getStatus())
                 .myRole(myRole)
                 .build();
-    }
-
-    private Long estimateCost(Plan p) {
-        return p.getTotalCost() != null ? p.getTotalCost() : 0L;
     }
 }

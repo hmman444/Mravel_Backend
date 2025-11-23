@@ -1,6 +1,7 @@
 package com.mravel.plan.controller;
 
 import com.mravel.common.response.ApiResponse;
+import com.mravel.plan.dto.board.UpdateBudgetRequest;
 import com.mravel.plan.dto.general.*;
 import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.service.PlanGeneralService;
@@ -71,6 +72,15 @@ public class PlanGeneralController {
 
         service.removeImage(planId, currentUser.getId(), req.getUrl());
         return ResponseEntity.ok(ApiResponse.success("Xóa ảnh thành công", null));
+    }
+
+    @PutMapping("/budget")
+    public ResponseEntity<Void> updateBudget(
+            @PathVariable Long planId,
+            @RequestBody UpdateBudgetRequest req) {
+
+        service.updateBudget(planId, currentUser.getId(), req);
+        return ResponseEntity.ok().build();
     }
 
 }

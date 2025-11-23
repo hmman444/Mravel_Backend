@@ -26,8 +26,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -117,10 +115,19 @@ public class PlanService {
                                 .days(days)
                                 .createdAt(Instant.now())
                                 .views(0L)
+
+                                .budgetCurrency(req.getBudgetCurrency() != null ? req.getBudgetCurrency() : "VND")
+                                .budgetTotal(req.getBudgetTotal())
+                                .budgetPerPerson(req.getBudgetPerPerson())
+
+                                .totalEstimatedCost(0L)
+                                .totalActualCost(0L)
+
                                 .build();
 
                 planRepository.save(plan);
 
+                // tạo danh sách ngày
                 String defaultTitle = "Danh sách hoạt động";
 
                 for (int i = 0; i < days; i++) {
@@ -136,7 +143,7 @@ public class PlanService {
                                                         .build());
                 }
 
-                // trash
+                // trash list
                 listRepository.save(
                                 PlanList.builder()
                                                 .plan(plan)
@@ -166,13 +173,13 @@ public class PlanService {
 
         @Transactional
         public PlanFeedItem copyPublicPlan(Long planId, Long userId) {
+
                 Plan source = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
                 if (source.getVisibility() != Visibility.PUBLIC)
                         throw new RuntimeException("Only public plans can be copied.");
 
-                // Tạo plan mới
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
@@ -181,6 +188,8 @@ public class PlanService {
                                 .startDate(source.getStartDate())
                                 .endDate(source.getEndDate())
                                 .days(source.getDays())
+                                .budgetCurrency(source.getBudgetCurrency())
+                                .budgetTotal(source.getBudgetTotal())
                                 .createdAt(Instant.now())
                                 .views(0L)
                                 .images(new ArrayList<>(source.getImages()))
@@ -190,69 +199,80 @@ public class PlanService {
                 planRepository.save(copy);
                 permissionService.ensureOwner(copy.getId(), userId);
 
-                // Copy dayLists + cards, tạo trash mới rỗng
                 List<PlanList> sourceLists = listRepository.findByPlanIdOrderByPositionAsc(source.getId());
 
-                // day lists của source, sort lại cho chắc
                 List<PlanList> sourceDays = sourceLists.stream()
                                 .filter(l -> l.getType() == PlanListType.DAY)
                                 .sorted(Comparator.comparingInt(PlanList::getPosition))
                                 .toList();
 
-                // tạo day list cho copy, map id cũ -> id mới để copy card
+                // mapping list IDs
                 Map<Long, PlanList> oldToNewList = new HashMap<>();
 
                 for (int i = 0; i < sourceDays.size(); i++) {
-                        PlanList srcList = sourceDays.get(i);
+                        PlanList src = sourceDays.get(i);
 
-                        PlanList newList = PlanList.builder()
+                        PlanList dst = PlanList.builder()
                                         .plan(copy)
                                         .type(PlanListType.DAY)
                                         .position(i)
-                                        .title(srcList.getTitle())
-                                        .dayDate(copy.getStartDate() != null ? copy.getStartDate().plusDays(i)
-                                                        : srcList.getDayDate())
+                                        .title(src.getTitle())
+                                        .dayDate(copy.getStartDate().plusDays(i))
                                         .build();
 
-                        listRepository.save(newList);
-                        oldToNewList.put(srcList.getId(), newList);
+                        listRepository.save(dst);
+                        oldToNewList.put(src.getId(), dst);
 
-                        // copy cards thuộc list này
-                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(srcList.getId());
+                        // copy cards
+                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(src.getId());
                         for (int c = 0; c < srcCards.size(); c++) {
+
                                 PlanCard oc = srcCards.get(c);
+
                                 PlanCard nc = PlanCard.builder()
-                                                .list(newList)
+                                                .list(dst)
                                                 .text(oc.getText())
                                                 .description(oc.getDescription())
                                                 .startTime(oc.getStartTime())
                                                 .endTime(oc.getEndTime())
-                                                .done(false) // khi copy thì reset done
+                                                .durationMinutes(oc.getDurationMinutes())
+                                                .done(false)
                                                 .position(c)
+
                                                 .activityType(oc.getActivityType())
                                                 .activityDataJson(oc.getActivityDataJson())
+
+                                                .currencyCode(oc.getCurrencyCode())
+                                                .baseEstimatedCost(oc.getBaseEstimatedCost())
+                                                .baseActualCost(oc.getBaseActualCost())
                                                 .estimatedCost(oc.getEstimatedCost())
                                                 .actualCost(oc.getActualCost())
-                                                .payerId(oc.getPayerId())
+
+                                                .extraCosts(new HashSet<>(oc.getExtraCosts()))
+
+                                                .participants(new HashSet<>(oc.getParticipants()))
+                                                .participantCount(oc.getParticipantCount())
+
                                                 .splitType(oc.getSplitType())
-                                                .splitMembers(oc.getSplitMembers() != null
-                                                                ? new HashSet<>(oc.getSplitMembers())
-                                                                : new HashSet<>())
-                                                .splitResultJson(oc.getSplitResultJson())
+                                                .includePayerInSplit(oc.isIncludePayerInSplit())
+                                                .splitMembers(new HashSet<>(oc.getSplitMembers()))
+                                                .splitDetails(new HashSet<>(oc.getSplitDetails()))
+
+                                                .payments(Collections.emptySet()) // không copy payment
+                                                .payerId(null) // reset người trả
                                                 .build();
+
                                 cardRepository.save(nc);
                         }
                 }
 
-                // tạo trash mới, rỗng
-                int dayCount = sourceDays.size();
+                // trash mới
                 listRepository.save(
                                 PlanList.builder()
                                                 .plan(copy)
                                                 .type(PlanListType.TRASH)
-                                                .position(dayCount)
+                                                .position(sourceDays.size())
                                                 .title("Trash")
-                                                .dayDate(null)
                                                 .build());
 
                 return planMapper.toFeedItem(copy);

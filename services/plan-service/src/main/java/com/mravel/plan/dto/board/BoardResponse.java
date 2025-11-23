@@ -14,15 +14,22 @@ public class BoardResponse {
     private Long planId;
     private String planTitle;
     private String myRole;
+
     private List<ListDto> lists;
     private List<LabelDto> labels;
     private List<InviteDto> invites;
+
     private String thumbnail;
     private List<String> images;
     private String description;
+
     private LocalDate startDate;
     private LocalDate endDate;
-    private Long totalCost;
-    private String status;
 
+    private String budgetCurrency;
+    private Long budgetTotal;
+    private Long totalEstimatedCost;
+    private Long totalActualCost;
+
+    private String status;
 }

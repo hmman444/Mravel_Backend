@@ -112,6 +112,17 @@ public class PlanBoardController {
                                 ApiResponse.success("Xoá thẻ thành công", null));
         }
 
+        @DeleteMapping("/trash/cards")
+        public ResponseEntity<ApiResponse<?>> clearTrash(
+                        @PathVariable Long planId) {
+
+                Long userId = currentUser.getId();
+                service.clearTrash(planId, userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.success("Đã xoá toàn bộ thẻ trong thùng rác", null));
+        }
+
         @PostMapping("/lists/{listId}/cards/{cardId}/duplicate")
         public ResponseEntity<ApiResponse<CardDto>> duplicateCard(
                         @PathVariable Long planId,
@@ -133,6 +144,16 @@ public class PlanBoardController {
                 BoardResponse board = service.reorder(planId, userId, isFriend, req);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Cập nhật thứ tự thành công", board));
+        }
+
+        @GetMapping("/stats/cost")
+        public ResponseEntity<ApiResponse<PlanCostSummaryDto>> getCostSummary(
+                        @PathVariable Long planId,
+                        @RequestParam(defaultValue = "false") boolean isFriend) {
+                Long userId = currentUser.getId();
+                PlanCostSummaryDto dto = service.getCostSummary(planId, userId, isFriend);
+                return ResponseEntity.ok(
+                                ApiResponse.success("Lấy thống kê chi phí thành công", dto));
         }
 
         // Owner

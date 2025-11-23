@@ -1,5 +1,6 @@
 package com.mravel.plan.service;
 
+import com.mravel.plan.dto.board.UpdateBudgetRequest;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -89,7 +90,6 @@ public class PlanGeneralService {
 
         Plan plan = loadPlan(planId);
         LocalDate startOld = plan.getStartDate();
-        LocalDate endOld = plan.getEndDate();
 
         List<PlanList> dayLists = loadDayLists(planId);
         PlanList trash = loadTrash(planId);
@@ -212,6 +212,19 @@ public class PlanGeneralService {
 
             return;
         }
+    }
+
+    @Transactional
+    public void updateBudget(Long planId, Long userId, UpdateBudgetRequest req) {
+        permission.checkPermission(planId, userId, PlanRole.EDITOR);
+
+        Plan plan = loadPlan(planId);
+
+        if (req.getBudgetCurrency() != null)
+            plan.setBudgetCurrency(req.getBudgetCurrency());
+
+        plan.setBudgetTotal(req.getBudgetTotal());
+        plan.setBudgetPerPerson(req.getBudgetPerPerson());
     }
 
 }
