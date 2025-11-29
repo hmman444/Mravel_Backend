@@ -47,41 +47,25 @@ public class PlanService {
         private EntityManager entityManager;
 
         public Page<PlanFeedItem> getFeed(int page, int size, Long viewerId) {
-                PageRequest pageable = PageRequest.of(page - 1, size);
+                PageRequest pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-                List<Plan> visiblePlans;
+                Page<Plan> pageResult;
 
                 if (viewerId == null) {
-                        // Khách chỉ thấy public
-                        visiblePlans = planRepository.findByVisibility(Visibility.PUBLIC, pageable).getContent();
+                        pageResult = planRepository.findByVisibility(Visibility.PUBLIC, pageable);
                 } else {
-                        // Người dùng đăng nhập
-                        List<Plan> publicPlans = planRepository.findByVisibility(Visibility.PUBLIC, pageable)
-                                        .getContent();
-
-                        List<Plan> myPlans = planRepository.findByAuthor_Id(viewerId, pageable)
-                                        .getContent();
-
-                        // Các plan mà user là thành viên (được mời)
                         List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
-                        List<Plan> memberPlans = memberPlanIds.isEmpty()
-                                        ? Collections.emptyList()
-                                        : planRepository.findByIdIn(memberPlanIds);
-
-                        Set<Plan> merged = new LinkedHashSet<>();
-                        merged.addAll(publicPlans);
-                        merged.addAll(myPlans);
-                        merged.addAll(memberPlans);
-
-                        visiblePlans = new ArrayList<>(merged);
+                        if (memberPlanIds.isEmpty()) {
+                                memberPlanIds = Collections.singletonList(-1L); // tránh IN ()
+                        }
+                        pageResult = planRepository.findVisibleForUser(viewerId, memberPlanIds, pageable);
                 }
 
-                List<PlanFeedItem> mapped = visiblePlans.stream()
-                                .sorted(Comparator.comparing(Plan::getCreatedAt).reversed())
+                List<PlanFeedItem> content = pageResult.getContent().stream()
                                 .map(planMapper::toFeedItem)
-                                .collect(Collectors.toList());
+                                .toList();
 
-                return new PageImpl<>(mapped, pageable, mapped.size());
+                return new PageImpl<>(content, pageable, pageResult.getTotalElements());
         }
 
         public PlanFeedItem getById(Long id, Long viewerId, boolean isFriend) {
@@ -243,8 +227,6 @@ public class PlanService {
                                                 .activityDataJson(oc.getActivityDataJson())
 
                                                 .currencyCode(oc.getCurrencyCode())
-                                                .baseEstimatedCost(oc.getBaseEstimatedCost())
-                                                .baseActualCost(oc.getBaseActualCost())
                                                 .estimatedCost(oc.getEstimatedCost())
                                                 .actualCost(oc.getActualCost())
 

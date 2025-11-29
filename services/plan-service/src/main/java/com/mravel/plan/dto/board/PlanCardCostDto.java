@@ -12,8 +12,7 @@ import lombok.*;
 public class PlanCardCostDto {
     private String currencyCode;
 
-    private Long baseEstimatedCost;
-    private Long baseActualCost;
+    private Long budgetAmount;
 
     private Long estimatedCost;
     private Long actualCost;

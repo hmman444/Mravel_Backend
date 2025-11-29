@@ -18,6 +18,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class PlanBoardService {
+
     private final PlanPermissionService permissionService;
     private final PlanRepository planRepository;
     private final PlanListRepository listRepository;
@@ -29,11 +30,14 @@ public class PlanBoardService {
     private final UserProfileClient userProfileClient;
     private final PlanRequestRepository requestRepo;
 
+    // ================== HELPER: LOAD LIST / CARD ==================
+
     private PlanList mustLoadList(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
                 .orElseThrow(() -> new RuntimeException("List not found"));
-        if (!list.getPlan().getId().equals(planId))
+        if (!list.getPlan().getId().equals(planId)) {
             throw new RuntimeException("List not part of this plan");
+        }
         return list;
     }
 
@@ -41,8 +45,9 @@ public class PlanBoardService {
         PlanList list = mustLoadList(planId, listId);
         PlanCard card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new RuntimeException("Card not found"));
-        if (!card.getList().getId().equals(list.getId()))
+        if (!card.getList().getId().equals(list.getId())) {
             throw new RuntimeException("Card not in this list");
+        }
         return card;
     }
 
@@ -61,6 +66,10 @@ public class PlanBoardService {
                 .toList();
     }
 
+    /**
+     * Đồng bộ lại position + dayDate của các list DAY,
+     * cập nhật endDate của Plan và vị trí Trash.
+     */
     public void syncDayLists(Plan plan) {
         List<PlanList> dayLists = findDayLists(plan.getId());
         LocalDate start = plan.getStartDate();
@@ -77,12 +86,14 @@ public class PlanBoardService {
         trash.setPosition(dayLists.size());
     }
 
-    // board
+    // ================== BOARD ==================
+
     @Transactional
     public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
 
-        if (!permissionService.canView(planId, userId, isFriend))
+        if (!permissionService.canView(planId, userId, isFriend)) {
             throw new RuntimeException("You don't have permission to view this board.");
+        }
 
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
@@ -127,8 +138,9 @@ public class PlanBoardService {
                                         .build())
                                 .toList())
                 .build();
-
     }
+
+    // ================== MAPPING: ENTITY -> DTO ==================
 
     private CardPersonRefDto toPersonDto(CardPersonRef ref) {
         if (ref == null)
@@ -176,14 +188,12 @@ public class PlanBoardService {
                 .position(c.getPosition())
                 .activityType(c.getActivityType())
                 .activityDataJson(c.getActivityDataJson())
-
                 .cost(
                         PlanCardCostDto.builder()
                                 .currencyCode(c.getCurrencyCode())
-                                .baseEstimatedCost(c.getBaseEstimatedCost())
-                                .baseActualCost(c.getBaseActualCost())
-                                .estimatedCost(c.getEstimatedCost())
-                                .actualCost(c.getActualCost())
+                                .estimatedCost(c.getEstimatedCost()) // chi phí ước lượng
+                                .actualCost(c.getActualCost()) // BE đã tính
+                                .budgetAmount(c.getBudgetAmount()) // ngân sách activity
                                 .participantCount(c.getParticipantCount())
                                 .participants(
                                         c.getParticipants().stream()
@@ -215,6 +225,8 @@ public class PlanBoardService {
                 .build();
     }
 
+    // ================== MAPPING: DTO -> ENTITY ==================
+
     private CardPersonRef fromPersonDto(CardPersonRefDto dto) {
         if (dto == null)
             return null;
@@ -225,25 +237,34 @@ public class PlanBoardService {
                 .build();
     }
 
+    /**
+     * Áp dụng cost DTO vào entity Card:
+     * - estimatedCost: chi phí ước lượng
+     * - budgetAmount: ngân sách cho activity
+     * - actualCost: KHÔNG lấy từ DTO, sẽ được BE tự tính lại
+     * - extraCosts / participants / participantCount: gán thẳng
+     */
     private void applyCost(PlanCard card, PlanCardCostDto dto) {
         if (dto == null)
             return;
 
-        if (dto.getCurrencyCode() != null) {
+        // Currency
+        if (dto.getCurrencyCode() != null && !dto.getCurrencyCode().isBlank()) {
             card.setCurrencyCode(dto.getCurrencyCode());
         }
 
-        card.setBaseEstimatedCost(dto.getBaseEstimatedCost());
-        card.setBaseActualCost(dto.getBaseActualCost());
+        // Estimated & Budget
+        card.setEstimatedCost(dto.getEstimatedCost());
+        card.setBudgetAmount(dto.getBudgetAmount());
         card.setParticipantCount(dto.getParticipantCount());
 
-        // participants
+        // Participants
         card.getParticipants().clear();
         if (dto.getParticipants() != null) {
             dto.getParticipants().forEach(p -> card.getParticipants().add(fromPersonDto(p)));
         }
 
-        // extra costs
+        // Extra costs
         card.getExtraCosts().clear();
         if (dto.getExtraCosts() != null) {
             dto.getExtraCosts().forEach(e -> card.getExtraCosts().add(
@@ -254,6 +275,11 @@ public class PlanBoardService {
                             .actualAmount(e.getActualAmount())
                             .build()));
         }
+
+        // Nếu participantCount null nhưng có participants → auto sync
+        if (card.getParticipantCount() == null && card.getParticipants() != null) {
+            card.setParticipantCount(card.getParticipants().size());
+        }
     }
 
     private void applySplit(PlanCard card, PlanCardSplitConfigDto dto) {
@@ -261,12 +287,13 @@ public class PlanBoardService {
             return;
 
         card.setSplitType(dto.getSplitType());
+        card.setIncludePayerInSplit(dto.isIncludePayerInSplit());
+
         if (dto.getPayerId() != null) {
             card.setPayerId(dto.getPayerId());
         }
-        card.setIncludePayerInSplit(dto.isIncludePayerInSplit());
 
-        // split members
+        // splitMembers
         card.getSplitMembers().clear();
         if (dto.getSplitMembers() != null) {
             dto.getSplitMembers().forEach(p -> card.getSplitMembers().add(fromPersonDto(p)));
@@ -286,8 +313,9 @@ public class PlanBoardService {
             });
         }
 
-        // nếu splitType = EXACT và FE gửi sẵn splitDetails thì lưu, còn
-        // EVEN/PERCENT/SHARES sẽ tự tính
+        // splitDetails:
+        // - EXACT: FE có thể gửi sẵn; ta lưu luôn
+        // - EVEN: sẽ tính lại trong recalculateSplitDetails
         if (dto.getSplitDetails() != null && dto.getSplitType() == SplitType.EXACT) {
             card.getSplitDetails().clear();
             dto.getSplitDetails().forEach(d -> card.getSplitDetails().add(
@@ -298,21 +326,25 @@ public class PlanBoardService {
         }
     }
 
-    private void recalculateCardCosts(PlanCard card) {
-        long baseEst = card.getBaseEstimatedCost() != null ? card.getBaseEstimatedCost() : 0L;
-        long baseAct = card.getBaseActualCost() != null ? card.getBaseActualCost() : 0L;
+    // ================== COST & SPLIT RE-CALC ==================
 
-        long extraEst = card.getExtraCosts().stream()
-                .mapToLong(e -> e.getEstimatedAmount() != null ? e.getEstimatedAmount() : 0L)
-                .sum();
-        long extraAct = card.getExtraCosts().stream()
+    /**
+     * Tính lại actualCost cho card:
+     * actualCost = estimatedCost + sum(extra.actualAmount)
+     */
+    private void recalculateCardCosts(PlanCard card) {
+        long est = card.getEstimatedCost() != null ? card.getEstimatedCost() : 0L;
+
+        long extraActual = card.getExtraCosts().stream()
                 .mapToLong(e -> e.getActualAmount() != null ? e.getActualAmount() : 0L)
                 .sum();
 
-        card.setEstimatedCost(baseEst + extraEst);
-        card.setActualCost(baseAct + extraAct);
+        card.setActualCost(est + extraActual);
     }
 
+    /**
+     * Tính lại tổng estimated / actual cho Plan (bỏ qua TRASH).
+     */
     private void recalculatePlanTotals(Plan plan) {
         long totalEst = 0L;
         long totalAct = 0L;
@@ -322,10 +354,12 @@ public class PlanBoardService {
                 continue;
 
             for (PlanCard c : l.getCards()) {
-                if (c.getEstimatedCost() != null)
+                if (c.getEstimatedCost() != null) {
                     totalEst += c.getEstimatedCost();
-                if (c.getActualCost() != null)
+                }
+                if (c.getActualCost() != null) {
                     totalAct += c.getActualCost();
+                }
             }
         }
 
@@ -333,10 +367,18 @@ public class PlanBoardService {
         plan.setTotalActualCost(totalAct);
     }
 
+    /**
+     * Tính lại splitDetails dựa trên actualCost (ưu tiên) hoặc estimatedCost.
+     */
     private void recalculateSplitDetails(PlanCard card) {
         SplitType type = card.getSplitType();
         if (type == null || type == SplitType.NONE) {
             card.getSplitDetails().clear();
+            return;
+        }
+
+        // Với EXACT: giữ nguyên những gì applySplit đã set, không đụng vào
+        if (type == SplitType.EXACT) {
             return;
         }
 
@@ -359,10 +401,7 @@ public class PlanBoardService {
 
         switch (type) {
             case EVEN -> splitEven(card, members, total);
-            case EXACT -> {
-                // đã set sẵn trong applySplit
-            }
-            // PERCENT, SHARES có thể implement sau
+            // các kiểu khác (PERCENT, SHARES...) bổ sung thêm tại đây
             default -> {
             }
         }
@@ -385,6 +424,8 @@ public class PlanBoardService {
         }
     }
 
+    // ================== COST SUMMARY ==================
+
     @Transactional
     public PlanCostSummaryDto getCostSummary(Long planId, Long userId, boolean isFriend) {
         if (!permissionService.canView(planId, userId, isFriend)) {
@@ -394,9 +435,7 @@ public class PlanBoardService {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        // by activity type
         Map<PlanActivityType, long[]> byType = new EnumMap<>(PlanActivityType.class);
-        // by day
         Map<LocalDate, long[]> byDay = new HashMap<>();
 
         for (PlanList list : plan.getLists()) {
@@ -451,7 +490,8 @@ public class PlanBoardService {
                 .build();
     }
 
-    // crud list
+    // ================== CRUD LIST ==================
+
     @Transactional
     public ListDto createList(Long planId, Long userId, CreateListRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
@@ -480,7 +520,6 @@ public class PlanBoardService {
         listRepository.save(list);
 
         trash.setPosition(index + 1);
-
         plan.setEndDate(date);
 
         return ListDto.builder()
@@ -499,8 +538,9 @@ public class PlanBoardService {
 
         PlanList list = mustLoadList(planId, listId);
 
-        if (list.getType() == PlanListType.TRASH)
+        if (list.getType() == PlanListType.TRASH) {
             throw new RuntimeException("Cannot rename trash");
+        }
 
         list.setTitle(req.getTitle());
     }
@@ -510,16 +550,17 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         PlanList target = mustLoadList(planId, listId);
-        if (target.getType() == PlanListType.TRASH)
+        if (target.getType() == PlanListType.TRASH) {
             throw new RuntimeException("Cannot delete trash list");
+        }
 
         List<PlanList> dayLists = findDayLists(planId);
-        if (dayLists.size() == 1)
+        if (dayLists.size() == 1) {
             throw new RuntimeException("Cannot delete the last day");
+        }
 
         PlanList trash = findTrash(planId);
 
-        // move cards → trash
         List<PlanCard> cards = cardRepository.findByListIdOrderByPositionAsc(target.getId());
         int basePos = (int) cardRepository.countByListId(trash.getId());
 
@@ -532,11 +573,11 @@ public class PlanBoardService {
 
         listRepository.delete(target);
 
-        // sync
         syncDayLists(target.getPlan());
     }
 
-    // crud card
+    // ================== CRUD CARD ==================
+
     @Transactional
     public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
@@ -546,8 +587,9 @@ public class PlanBoardService {
 
         PlanList list = mustLoadList(planId, listId);
 
-        if (list.getType() == PlanListType.TRASH)
+        if (list.getType() == PlanListType.TRASH) {
             throw new RuntimeException("Cannot create card in trash");
+        }
 
         int nextPos = (int) cardRepository.countByListId(listId);
 
@@ -555,8 +597,8 @@ public class PlanBoardService {
                 .list(list)
                 .text(req.getText() != null ? req.getText() : "New card")
                 .description(req.getDescription())
-                .startTime(parseTime(req.getStart()))
-                .endTime(parseTime(req.getEnd()))
+                .startTime(req.getStartTime())
+                .endTime(req.getEndTime())
                 .durationMinutes(req.getDurationMinutes())
                 .done(false)
                 .position(nextPos)
@@ -572,8 +614,6 @@ public class PlanBoardService {
 
         cardRepository.save(card);
 
-        // vì plan.getLists() có relationship với list/card, nên sau khi save card
-        // ta recalc totals
         recalculatePlanTotals(plan);
 
         return toCardDto(card);
@@ -593,10 +633,10 @@ public class PlanBoardService {
         if (req.getDescription() != null)
             card.setDescription(req.getDescription());
 
-        if (req.getStart() != null)
-            card.setStartTime(parseTime(req.getStart()));
-        if (req.getEnd() != null)
-            card.setEndTime(parseTime(req.getEnd()));
+        if (req.getStartTime() != null)
+            card.setStartTime(req.getStartTime());
+        if (req.getEndTime() != null)
+            card.setEndTime(req.getEndTime());
         if (req.getDurationMinutes() != null)
             card.setDurationMinutes(req.getDurationMinutes());
 
@@ -687,8 +727,9 @@ public class PlanBoardService {
                 .activityType(original.getActivityType())
                 .activityDataJson(original.getActivityDataJson())
                 .currencyCode(original.getCurrencyCode())
-                .baseEstimatedCost(original.getBaseEstimatedCost())
-                .baseActualCost(original.getBaseActualCost())
+                .estimatedCost(original.getEstimatedCost())
+                .actualCost(original.getActualCost())
+                .budgetAmount(original.getBudgetAmount())
                 .participantCount(original.getParticipantCount())
                 .includePayerInSplit(original.isIncludePayerInSplit())
                 .splitType(original.getSplitType())
@@ -712,7 +753,7 @@ public class PlanBoardService {
                         .actualAmount(e.getActualAmount())
                         .build()));
 
-        // copy split members (không copy splitDetails & payments)
+        // copy split members (không copy payments)
         original.getSplitMembers().forEach(p -> copy.getSplitMembers().add(
                 CardPersonRef.builder()
                         .memberId(p.getMemberId())
@@ -720,6 +761,7 @@ public class PlanBoardService {
                         .external(p.getExternal())
                         .build()));
 
+        // tính lại để đảm bảo logic mới
         recalculateCardCosts(copy);
         recalculateSplitDetails(copy);
 
@@ -729,14 +771,14 @@ public class PlanBoardService {
         return toCardDto(copy);
     }
 
-    // drag drop
+    // ================== REORDER (DRAG & DROP) ==================
+
     @Transactional
     public BoardResponse reorder(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         if ("list".equalsIgnoreCase(req.getType())) {
             return reorderLists(planId, userId, isFriend, req);
-
         } else if ("card".equalsIgnoreCase(req.getType())) {
             return reorderCards(planId, userId, isFriend, req);
         }
@@ -744,10 +786,8 @@ public class PlanBoardService {
         throw new RuntimeException("Unknown reorder type");
     }
 
-    // ---------- LIST REORDER ----------
     @Transactional
     private BoardResponse reorderLists(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
-
         List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
 
         int trashIndex = -1;
@@ -758,8 +798,9 @@ public class PlanBoardService {
             }
         }
 
-        if (req.getSourceIndex() == trashIndex || req.getDestIndex() == trashIndex)
+        if (req.getSourceIndex() == trashIndex || req.getDestIndex() == trashIndex) {
             throw new RuntimeException("Cannot move trash");
+        }
 
         PlanList moved = lists.remove(req.getSourceIndex().intValue());
         lists.add(req.getDestIndex().intValue(), moved);
@@ -790,18 +831,21 @@ public class PlanBoardService {
         moved.setList(dest);
         destCards.add(req.getDestIndex().intValue(), moved);
 
-        for (int i = 0; i < sourceCards.size(); i++)
+        for (int i = 0; i < sourceCards.size(); i++) {
             sourceCards.get(i).setPosition(i);
+        }
 
         if (!source.getId().equals(dest.getId())) {
-            for (int i = 0; i < destCards.size(); i++)
+            for (int i = 0; i < destCards.size(); i++) {
                 destCards.get(i).setPosition(i);
+            }
         }
 
         return getBoard(planId, userId, isFriend);
     }
 
-    // invites
+    // ================== INVITES ==================
+
     @Transactional
     public List<InviteDto> invite(Long planId, Long userId, InviteRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.OWNER);
@@ -816,10 +860,8 @@ public class PlanBoardService {
 
         for (String email : req.getEmails()) {
 
-            // xóa cũ
             inviteTokenRepo.deleteByEmailAndPlanId(email, plan.getId());
 
-            // token mới
             String token = UUID.randomUUID().toString();
 
             PlanInviteToken tokenEntity = PlanInviteToken.builder()
@@ -833,7 +875,6 @@ public class PlanBoardService {
 
             inviteTokenRepo.save(tokenEntity);
 
-            // mail
             mailService.sendInviteEmail(
                     email,
                     plan.getTitle(),
@@ -859,8 +900,9 @@ public class PlanBoardService {
 
         if (inv.isUsed())
             return planId;
-        if (inv.getExpiredAt().isBefore(Instant.now()))
+        if (inv.getExpiredAt().isBefore(Instant.now())) {
             throw new RuntimeException("Invite expired");
+        }
 
         boolean exists = memberRepository.existsByPlanIdAndUserId(planId, userId);
         if (exists) {
@@ -868,7 +910,6 @@ public class PlanBoardService {
             return planId;
         }
 
-        // tạo member
         PlanMember member = PlanMember.builder()
                 .plan(inv.getPlan())
                 .userId(userId)
@@ -881,33 +922,10 @@ public class PlanBoardService {
         return planId;
     }
 
-    // helpers
-    private PlanList mustLoadListInPlan(Long planId, Long listId) {
-        PlanList list = listRepository.findById(listId)
-                .orElseThrow(() -> new RuntimeException("List not found"));
-        if (!list.getPlan().getId().equals(planId))
-            throw new RuntimeException("List not in plan");
-        return list;
-    }
-
-    private PlanCard mustLoadCardInList(Long planId, Long listId, Long cardId) {
-        PlanList list = mustLoadListInPlan(planId, listId);
-        PlanCard card = cardRepository.findById(cardId)
-                .orElseThrow(() -> new RuntimeException("Card not found"));
-        if (!card.getList().getId().equals(list.getId()))
-            throw new RuntimeException("Card not in list");
-        return card;
-    }
-
-    private LocalTime parseTime(String hhmm) {
-        if (hhmm == null || hhmm.isBlank())
-            return null;
-        return LocalTime.parse(hhmm);
-    }
+    // ================== SHARE / MEMBERS ==================
 
     @Transactional
     public ShareResponse getShareInfo(Long planId, Long userId) {
-        // Kiểm tra quyền
         if (!permissionService.canView(planId, userId, false)) {
             throw new RuntimeException("You don't have permission to view share info.");
         }
@@ -924,15 +942,14 @@ public class PlanBoardService {
                             .email(profile.getEmail())
                             .fullname(profile.getFullname())
                             .avatar(profile.getAvatar())
-                            .role(m.getRole().name()) // OWNER / EDITOR / VIEWER
+                            .role(m.getRole().name())
                             .isCurrentUser(userId != null && userId.equals(m.getUserId()))
                             .build();
                 })
                 .toList();
 
         List<InviteDto> invites = inviteTokenRepo.findByPlanId(planId).stream()
-                .filter(token -> !token.isUsed() &&
-                        token.getExpiredAt().isAfter(Instant.now()))
+                .filter(token -> !token.isUsed() && token.getExpiredAt().isAfter(Instant.now()))
                 .map(token -> InviteDto.builder()
                         .id(token.getId())
                         .email(token.getEmail())
@@ -971,7 +988,6 @@ public class PlanBoardService {
 
     @Transactional
     public void removeMember(Long planId, Long ownerId, Long targetUserId) {
-
         permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
 
         if (Objects.equals(ownerId, targetUserId)) {
@@ -990,24 +1006,21 @@ public class PlanBoardService {
         UserProfileResponse profile = userProfileClient.getUserById(targetUserId);
         String email = profile.getEmail();
 
-        // xóa invite nếu có
         inviteTokenRepo.deleteByEmailAndPlanId(email, planId);
     }
+
+    // ================== REQUEST ACCESS ==================
 
     @Transactional
     public PlanRequestDto requestAccess(Long planId, Long userId, PlanRequestCreate req) {
 
-        // không cho gửi khi đã là member
         PlanMember member = memberRepository.findByPlanIdAndUserId(planId, userId).orElse(null);
 
-        // nếu đã là member
         if (member != null) {
-            // Owner và Editor không cần xin quyền
             if (member.getRole() == PlanRole.OWNER || member.getRole() == PlanRole.EDITOR) {
                 throw new RuntimeException("Bạn đã có quyền truy cập.");
             }
 
-            // Viewer được phép gửi request EDIT
             if (member.getRole() == PlanRole.VIEWER) {
                 if (req.getType() != PlanRequestType.EDIT) {
                     throw new RuntimeException("Bạn đã có quyền xem.");
@@ -1015,13 +1028,11 @@ public class PlanBoardService {
             }
         }
 
-        // không cho gửi nhiều lần khi vẫn còn pending
         if (requestRepo.existsByPlanIdAndUserIdAndStatus(
                 planId, userId, PlanRequestStatus.PENDING)) {
             throw new IllegalArgumentException("Bạn đã gửi yêu cầu trước đó.");
         }
 
-        // tạo request
         PlanRequest entity = PlanRequest.builder()
                 .planId(planId)
                 .userId(userId)
@@ -1032,12 +1043,10 @@ public class PlanBoardService {
 
         requestRepo.save(entity);
 
-        // lấy thông tin để gửi mail
         Plan plan = planRepository.getReferenceById(planId);
         UserProfileResponse requester = userProfileClient.getUserById(userId);
         UserProfileResponse owner = userProfileClient.getUserById(plan.getAuthor().getId());
 
-        // gửi mail thông báo cho owner
         mailService.sendRequestEmailToOwner(
                 owner.getEmail(),
                 plan.getTitle(),
@@ -1045,7 +1054,6 @@ public class PlanBoardService {
                 requester.getEmail(),
                 req.getType().name());
 
-        // trả DTO enriched
         return PlanRequestDto.builder()
                 .id(entity.getId())
                 .userId(userId)
@@ -1062,7 +1070,6 @@ public class PlanBoardService {
         return requestRepo.findByPlanIdAndStatus(planId, PlanRequestStatus.PENDING)
                 .stream()
                 .map(r -> {
-
                     UserProfileResponse profile = userProfileClient.getUserById(r.getUserId());
 
                     return PlanRequestDto.builder()
@@ -1085,18 +1092,17 @@ public class PlanBoardService {
         PlanRequest req = requestRepo.findById(reqId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
-        if (!req.getPlanId().equals(planId))
+        if (!req.getPlanId().equals(planId)) {
             throw new RuntimeException("Invalid plan");
+        }
 
         Plan plan = planRepository.getReferenceById(planId);
         UserProfileResponse targetUser = userProfileClient.getUserById(req.getUserId());
 
-        // reject
         if (action.getAction().equalsIgnoreCase("REJECT")) {
 
             req.setStatus(PlanRequestStatus.REJECTED);
 
-            // gửi mail
             mailService.sendRejectEmail(
                     targetUser.getEmail(),
                     plan.getTitle());
@@ -1104,11 +1110,9 @@ public class PlanBoardService {
             return;
         }
 
-        // approve
         if (action.getAction().equalsIgnoreCase("APPROVE")) {
 
-            // parse role được owner chọn
-            PlanRole assignedRole = PlanRole.VIEWER; // default
+            PlanRole assignedRole = PlanRole.VIEWER;
 
             if (action.getRole() != null) {
                 try {
@@ -1117,11 +1121,9 @@ public class PlanBoardService {
                 }
             }
 
-            // nếu user chưa là member → tạo member
             boolean exists = memberRepository.existsByPlanIdAndUserId(planId, req.getUserId());
 
             if (!exists) {
-                // chưa là member → tạo mới
                 memberRepository.save(
                         PlanMember.builder()
                                 .plan(plan)
@@ -1129,11 +1131,9 @@ public class PlanBoardService {
                                 .role(assignedRole)
                                 .build());
             } else {
-                // đã là viewer → phải UPDATE role
                 PlanMember member = memberRepository.findByPlanIdAndUserId(planId, req.getUserId())
                         .orElseThrow(() -> new RuntimeException("Member not found"));
 
-                // Không cho nâng Owner
                 if (member.getRole() == PlanRole.OWNER) {
                     throw new RuntimeException("Cannot change role of the owner.");
                 }
@@ -1142,10 +1142,8 @@ public class PlanBoardService {
                 memberRepository.save(member);
             }
 
-            // cập nhật trạng thái request
             req.setStatus(PlanRequestStatus.APPROVED);
 
-            // gửi mail thông báo
             mailService.sendApproveEmail(
                     targetUser.getEmail(),
                     plan.getTitle(),
@@ -1157,4 +1155,30 @@ public class PlanBoardService {
         throw new RuntimeException("Invalid action: " + action.getAction());
     }
 
+    // ================== OTHER HELPERS ==================
+
+    private PlanList mustLoadListInPlan(Long planId, Long listId) {
+        PlanList list = listRepository.findById(listId)
+                .orElseThrow(() -> new RuntimeException("List not found"));
+        if (!list.getPlan().getId().equals(planId)) {
+            throw new RuntimeException("List not in plan");
+        }
+        return list;
+    }
+
+    private PlanCard mustLoadCardInList(Long planId, Long listId, Long cardId) {
+        PlanList list = mustLoadListInPlan(planId, listId);
+        PlanCard card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new RuntimeException("Card not found"));
+        if (!card.getList().getId().equals(list.getId())) {
+            throw new RuntimeException("Card not in list");
+        }
+        return card;
+    }
+
+    private LocalTime parseTime(String hhmm) {
+        if (hhmm == null || hhmm.isBlank())
+            return null;
+        return LocalTime.parse(hhmm);
+    }
 }
