@@ -22,8 +22,6 @@ public class PlanCard {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ================== THÔNG TIN CƠ BẢN ==================
-
     @Column(nullable = false, length = 1000)
     private String text;
 
@@ -51,8 +49,6 @@ public class PlanCard {
     @OnDelete(action = OnDeleteAction.NO_ACTION)
     private PlanList list;
 
-    // ================== LOẠI HOẠT ĐỘNG & DATA LINH HOẠT ==================
-
     @Enumerated(EnumType.STRING)
     @Column(name = "activity_type")
     private PlanActivityType activityType;
@@ -64,8 +60,6 @@ public class PlanCard {
     @Lob
     @Column(name = "activity_data_json", columnDefinition = "TEXT")
     private String activityDataJson;
-
-    // ================== THAM GIA HOẠT ĐỘNG ==================
 
     /**
      * Số người tham gia hoạt động này (dùng để ước lượng chi phí / người).
@@ -91,23 +85,13 @@ public class PlanCard {
     private String currencyCode = "VND";
 
     /**
-     * Chi phí "chính" ước lượng (tiền phòng, tiền món, tiền vé...),
-     * chưa tính phụ thu / thuế / phí khác.
-     */
-    @Column(name = "base_estimated_cost")
-    private Long baseEstimatedCost;
-
-    /**
-     * Chi phí "chính" thực tế.
-     */
-    @Column(name = "base_actual_cost")
-    private Long baseActualCost;
-
-    /**
      * Tổng chi phí ước lượng = baseEstimatedCost + sum(extra.estimatedAmount)
      */
     @Column(name = "estimated_cost")
     private Long estimatedCost;
+
+    @Column(name = "budget_amount")
+    private Long budgetAmount;
 
     /**
      * Tổng chi phí thực tế = baseActualCost + sum(extra.actualAmount)
@@ -179,5 +163,8 @@ public class PlanCard {
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<PlanCardPayment> payments = new HashSet<>();
+
+    @Column(name = "actual_manual")
+    private Boolean actualManual; // true = user nhập, false = auto
 
 }
