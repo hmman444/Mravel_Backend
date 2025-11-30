@@ -16,6 +16,7 @@ public class PlanCardCostDto {
 
     private Long estimatedCost;
     private Long actualCost;
+    private Boolean actualManual;
 
     private Integer participantCount;
     private List<CardPersonRefDto> participants;

@@ -248,12 +248,12 @@ public class PlanBoardService {
         if (dto == null)
             return;
 
-        // Currency
+        // currency
         if (dto.getCurrencyCode() != null && !dto.getCurrencyCode().isBlank()) {
             card.setCurrencyCode(dto.getCurrencyCode());
         }
 
-        // Estimated & Budget
+        // Estimated cost
         card.setEstimatedCost(dto.getEstimatedCost());
         card.setBudgetAmount(dto.getBudgetAmount());
         card.setParticipantCount(dto.getParticipantCount());
@@ -276,9 +276,12 @@ public class PlanBoardService {
                             .build()));
         }
 
-        // Nếu participantCount null nhưng có participants → auto sync
-        if (card.getParticipantCount() == null && card.getParticipants() != null) {
-            card.setParticipantCount(card.getParticipants().size());
+        if (dto.getActualCost() != null) {
+            card.setActualManual(true);
+            card.setActualCost(dto.getActualCost());
+        } else {
+            // Không gửi actual => auto mode
+            card.setActualManual(false);
         }
     }
 
@@ -333,13 +336,17 @@ public class PlanBoardService {
      * actualCost = estimatedCost + sum(extra.actualAmount)
      */
     private void recalculateCardCosts(PlanCard card) {
-        long est = card.getEstimatedCost() != null ? card.getEstimatedCost() : 0L;
+        // USER đã nhập actual → KHÔNG tính lại
+        if (Boolean.TRUE.equals(card.getActualManual())) {
+            return;
+        }
 
-        long extraActual = card.getExtraCosts().stream()
-                .mapToLong(e -> e.getActualAmount() != null ? e.getActualAmount() : 0L)
+        long est = card.getEstimatedCost() != null ? card.getEstimatedCost() : 0;
+        long extra = card.getExtraCosts().stream()
+                .mapToLong(e -> e.getActualAmount() != null ? e.getActualAmount() : 0)
                 .sum();
 
-        card.setActualCost(est + extraActual);
+        card.setActualCost(est + extra);
     }
 
     /**

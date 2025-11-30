@@ -164,4 +164,7 @@ public class PlanCard {
     @Builder.Default
     private Set<PlanCardPayment> payments = new HashSet<>();
 
+    @Column(name = "actual_manual")
+    private Boolean actualManual; // true = user nhập, false = auto
+
 }
