@@ -38,7 +38,6 @@ public class PlanFeedItem {
         private String type;
     }
 
-    // ✅ FIX: Double lat/lng
     @Data
     @Builder
     @NoArgsConstructor
