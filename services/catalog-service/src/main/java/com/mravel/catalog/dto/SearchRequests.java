@@ -10,14 +10,17 @@ public class SearchRequests {
             String checkIn,    // YYYY-MM-DD (để sau dùng với booking/inventory)
             String checkOut,   // YYYY-MM-DD
             Integer adults,
-            Integer children,  // NEW: số trẻ em
+            Integer children,  // số trẻ em
             Integer rooms
     ) {}
 
-    // Dịch vụ → Quán ăn (2 field)
+    // Dịch vụ → Quán ăn (Restaurant search)
     public record RestaurantSearchRequest(
             String location,
-            Set<String> cuisineSlugs
+            String visitDate,        // YYYY-MM-DD, optional
+            String visitTime,        // HH:mm, optional
+            Integer people,          // tổng số khách (người lớn + trẻ em)
+            Set<String> cuisineSlugs // filter theo loại ẩm thực
     ) {}
 
     // Địa điểm (1 field)
