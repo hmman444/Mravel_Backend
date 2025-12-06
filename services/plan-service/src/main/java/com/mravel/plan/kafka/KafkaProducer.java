@@ -22,4 +22,11 @@ public class KafkaProducer {
                 .build();
         kafkaTemplate.send(KafkaTopics.PLAN_SHARED, evt.getEventId(), evt);
     }
+
+    public void publishBoardEvent(PlanBoardEvent event) {
+        kafkaTemplate.send(
+                KafkaTopics.PLAN_BOARD_EVENTS,
+                String.valueOf(event.getPlanId()),
+                event);
+    }
 }
