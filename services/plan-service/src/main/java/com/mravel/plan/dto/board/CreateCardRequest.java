@@ -26,7 +26,6 @@ public class CreateCardRequest {
     private PlanActivityType activityType;
     private String activityDataJson;
 
-    // ============ THAM GIA HOẠT ĐỘNG ============
     /**
      * FE có thể gửi kèm, hoặc BE tự tính từ participants.
      */
@@ -38,7 +37,6 @@ public class CreateCardRequest {
      */
     private Set<CardPersonRef> participants;
 
-    // ============ CHI PHÍ & CHIA TIỀN ============
     private PlanCardCostDto cost;
     private PlanCardSplitConfigDto split;
 }

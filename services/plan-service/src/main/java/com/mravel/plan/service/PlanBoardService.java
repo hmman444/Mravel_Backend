@@ -33,7 +33,7 @@ public class PlanBoardService {
     private final PlanRequestRepository requestRepo;
     private final KafkaProducer kafkaProducer;
 
-    // ================== HELPER: LOAD LIST / CARD ==================
+    // helper loaders
 
     private PlanList mustLoadList(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
@@ -107,7 +107,7 @@ public class PlanBoardService {
         }
     }
 
-    // ================== BOARD ==================
+    // board
 
     @Transactional
     public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
@@ -162,7 +162,7 @@ public class PlanBoardService {
                 .build();
     }
 
-    // ================== MAPPING: ENTITY -> DTO ==================
+    // map entity -> dto
 
     private CardPersonRefDto toPersonDto(CardPersonRef ref) {
         if (ref == null)
@@ -247,7 +247,7 @@ public class PlanBoardService {
                 .build();
     }
 
-    // ================== MAPPING: DTO -> ENTITY ==================
+    // map entity dto -> entity
 
     private CardPersonRef fromPersonDto(CardPersonRefDto dto) {
         if (dto == null)
@@ -351,7 +351,7 @@ public class PlanBoardService {
         }
     }
 
-    // ================== COST & SPLIT RE-CALC ==================
+    // tính phí và chia tiền
 
     /**
      * Tính lại actualCost cho card:
@@ -453,7 +453,7 @@ public class PlanBoardService {
         }
     }
 
-    // ================== COST SUMMARY ==================
+    // cost summary
 
     @Transactional
     public PlanCostSummaryDto getCostSummary(Long planId, Long userId, boolean isFriend) {
@@ -519,7 +519,7 @@ public class PlanBoardService {
                 .build();
     }
 
-    // ================== CRUD LIST ==================
+    // crud list
 
     @Transactional
     public ListDto createList(Long planId, Long userId, CreateListRequest req) {
@@ -608,7 +608,7 @@ public class PlanBoardService {
         publishBoard(planId, userId, "DELETE_LIST");
     }
 
-    // ================== CRUD CARD ==================
+    // crud card
 
     @Transactional
     public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
@@ -807,7 +807,7 @@ public class PlanBoardService {
         return toCardDto(copy);
     }
 
-    // ================== REORDER (DRAG & DROP) ==================
+    // drag drop
 
     @Transactional
     public BoardResponse reorder(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
@@ -881,7 +881,7 @@ public class PlanBoardService {
         return getBoard(planId, userId, isFriend);
     }
 
-    // ================== INVITES ==================
+    // invite / join
 
     @Transactional
     public List<InviteDto> invite(Long planId, Long userId, InviteRequest req) {
@@ -959,7 +959,7 @@ public class PlanBoardService {
         return planId;
     }
 
-    // ================== SHARE / MEMBERS ==================
+    // share info
 
     @Transactional
     public ShareResponse getShareInfo(Long planId, Long userId) {
@@ -1046,7 +1046,7 @@ public class PlanBoardService {
         inviteTokenRepo.deleteByEmailAndPlanId(email, planId);
     }
 
-    // ================== REQUEST ACCESS ==================
+    // request access
 
     @Transactional
     public PlanRequestDto requestAccess(Long planId, Long userId, PlanRequestCreate req) {
@@ -1192,7 +1192,7 @@ public class PlanBoardService {
         throw new RuntimeException("Invalid action: " + action.getAction());
     }
 
-    // ================== OTHER HELPERS ==================
+    // helpers
 
     private PlanList mustLoadListInPlan(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)

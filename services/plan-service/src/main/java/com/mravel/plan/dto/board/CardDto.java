@@ -30,7 +30,6 @@ public class CardDto {
     private PlanActivityType activityType;
     private String activityDataJson;
 
-    // ============ THAM GIA HOẠT ĐỘNG ============
     /**
      * Số người tham gia hoạt động này.
      * Nếu null, FE có thể tính từ participants.size().
@@ -42,7 +41,7 @@ public class CardDto {
      */
     private Set<CardPersonRef> participants;
 
-    // ============ CHI PHÍ & CHIA TIỀN ============
+    // chi phí và chia tiền
     private PlanCardCostDto cost;
     private PlanCardSplitConfigDto split;
 }
