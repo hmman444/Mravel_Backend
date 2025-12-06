@@ -47,36 +47,49 @@ public class PlanGeneralService {
     public void updateTitle(Long planId, Long userId, String title) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setTitle(title);
+
+        planBoardService.publishBoard(planId, userId, "PLAN_TITLE_UPDATED");
     }
 
     @Transactional
     public void updateDescription(Long planId, Long userId, String desc) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setDescription(desc);
+
+        planBoardService.publishBoard(planId, userId, "PLAN_DESCRIPTION_UPDATED");
+
     }
 
     @Transactional
     public void updateStatus(Long planId, Long userId, PlanStatus status) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setStatus(status);
+
+        planBoardService.publishBoard(planId, userId, "PLAN_STATUS_UPDATED");
+
     }
 
     @Transactional
     public void updateThumbnail(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setThumbnail(url);
+
+        planBoardService.publishBoard(planId, userId, "PLAN_THUMBNAIL_UPDATED");
     }
 
     @Transactional
     public void addImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).getImages().add(url);
+
+        planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_ADDED");
     }
 
     @Transactional
     public void removeImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).getImages().remove(url);
+        planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_REMOVED");
     }
 
     // logic update date
@@ -126,6 +139,7 @@ public class PlanGeneralService {
 
             // set trash at last pos
             trash.setPosition(1);
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
 
             return;
         }
@@ -142,6 +156,7 @@ public class PlanGeneralService {
             plan.setStartDate(startNew);
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
 
             return;
         }
@@ -179,6 +194,7 @@ public class PlanGeneralService {
             if (!startNew.equals(startOld)) {
                 planBoardService.syncDayLists(plan);
             }
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
 
             return;
         }
@@ -210,7 +226,7 @@ public class PlanGeneralService {
 
             trash.setPosition(newCount);
 
-            return;
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
         }
     }
 
@@ -220,11 +236,27 @@ public class PlanGeneralService {
 
         Plan plan = loadPlan(planId);
 
-        if (req.getBudgetCurrency() != null)
-            plan.setBudgetCurrency(req.getBudgetCurrency());
+        Long total = req.getBudgetTotal();
+        Long perPerson = req.getBudgetPerPerson();
 
-        plan.setBudgetTotal(req.getBudgetTotal());
-        plan.setBudgetPerPerson(req.getBudgetPerPerson());
+        if (total != null && total < 0) {
+            throw new RuntimeException("budgetTotal must be >= 0");
+        }
+        if (perPerson != null && perPerson < 0) {
+            throw new RuntimeException("budgetPerPerson must be >= 0");
+        }
+
+        if (req.getBudgetCurrency() != null && !req.getBudgetCurrency().isBlank()) {
+            plan.setBudgetCurrency(req.getBudgetCurrency());
+        }
+        if (total != null) {
+            plan.setBudgetTotal(total);
+        }
+        if (perPerson != null) {
+            plan.setBudgetPerPerson(perPerson);
+        }
+        planBoardService.publishBoard(planId, userId, "PLAN_BUDGET_UPDATED");
+
     }
 
 }

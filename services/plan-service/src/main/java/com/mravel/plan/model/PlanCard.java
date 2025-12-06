@@ -75,8 +75,6 @@ public class PlanCard {
     @Builder.Default
     private Set<CardPersonRef> participants = new HashSet<>();
 
-    // ================== THÔNG TIN CHI PHÍ ==================
-
     /**
      * Mã tiền tệ, mặc định VND.
      */
@@ -106,8 +104,6 @@ public class PlanCard {
     @CollectionTable(name = "card_extra_costs", joinColumns = @JoinColumn(name = "card_id"))
     @Builder.Default
     private Set<ExtraCost> extraCosts = new HashSet<>();
-
-    // ================== THANH TOÁN & CHIA TIỀN ==================
 
     /**
      * Người trả tiền chính (dùng hiển thị nhanh).

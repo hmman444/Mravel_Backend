@@ -27,7 +27,6 @@ public class UpdateCardRequest {
     private PlanActivityType activityType;
     private String activityDataJson;
 
-    // ============ THAM GIA HOẠT ĐỘNG ============
     /**
      * FE có thể không gửi -> BE tự tính từ participants.size()
      */
@@ -38,7 +37,6 @@ public class UpdateCardRequest {
      */
     private Set<CardPersonRef> participants;
 
-    // ============ CHI PHÍ & CHIA TIỀN ============
     private PlanCardCostDto cost;
     private PlanCardSplitConfigDto split;
 }

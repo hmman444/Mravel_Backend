@@ -28,6 +28,8 @@ public class BoardResponse {
 
     private String budgetCurrency;
     private Long budgetTotal;
+    private Long budgetPerPerson;
+
     private Long totalEstimatedCost;
     private Long totalActualCost;
 

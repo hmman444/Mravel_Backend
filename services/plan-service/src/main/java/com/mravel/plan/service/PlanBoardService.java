@@ -3,6 +3,8 @@ package com.mravel.plan.service;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.board.*;
+import com.mravel.plan.kafka.KafkaProducer;
+import com.mravel.plan.kafka.PlanBoardEvent;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
@@ -29,8 +31,9 @@ public class PlanBoardService {
     private final MailService mailService;
     private final UserProfileClient userProfileClient;
     private final PlanRequestRepository requestRepo;
+    private final KafkaProducer kafkaProducer;
 
-    // ================== HELPER: LOAD LIST / CARD ==================
+    // helper loaders
 
     private PlanList mustLoadList(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
@@ -86,7 +89,25 @@ public class PlanBoardService {
         trash.setPosition(dayLists.size());
     }
 
-    // ================== BOARD ==================
+    public void publishBoard(Long planId, Long actorId, String eventType) {
+        try {
+            BoardResponse board = getBoard(planId, actorId, false);
+
+            PlanBoardEvent evt = PlanBoardEvent.builder()
+                    .eventType(eventType)
+                    .planId(planId)
+                    .actorId(actorId)
+                    .timestamp(System.currentTimeMillis())
+                    .board(board)
+                    .build();
+
+            kafkaProducer.publishBoardEvent(evt);
+
+        } catch (Exception ex) {
+        }
+    }
+
+    // board
 
     @Transactional
     public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
@@ -108,6 +129,7 @@ public class PlanBoardService {
                 .endDate(plan.getEndDate())
                 .budgetCurrency(plan.getBudgetCurrency())
                 .budgetTotal(plan.getBudgetTotal())
+                .budgetPerPerson(plan.getBudgetPerPerson())
                 .totalEstimatedCost(plan.getTotalEstimatedCost())
                 .totalActualCost(plan.getTotalActualCost())
                 .status(plan.getStatus().name())
@@ -140,7 +162,7 @@ public class PlanBoardService {
                 .build();
     }
 
-    // ================== MAPPING: ENTITY -> DTO ==================
+    // map entity -> dto
 
     private CardPersonRefDto toPersonDto(CardPersonRef ref) {
         if (ref == null)
@@ -225,7 +247,7 @@ public class PlanBoardService {
                 .build();
     }
 
-    // ================== MAPPING: DTO -> ENTITY ==================
+    // map entity dto -> entity
 
     private CardPersonRef fromPersonDto(CardPersonRefDto dto) {
         if (dto == null)
@@ -329,7 +351,7 @@ public class PlanBoardService {
         }
     }
 
-    // ================== COST & SPLIT RE-CALC ==================
+    // tính phí và chia tiền
 
     /**
      * Tính lại actualCost cho card:
@@ -431,7 +453,7 @@ public class PlanBoardService {
         }
     }
 
-    // ================== COST SUMMARY ==================
+    // cost summary
 
     @Transactional
     public PlanCostSummaryDto getCostSummary(Long planId, Long userId, boolean isFriend) {
@@ -497,7 +519,7 @@ public class PlanBoardService {
                 .build();
     }
 
-    // ================== CRUD LIST ==================
+    // crud list
 
     @Transactional
     public ListDto createList(Long planId, Long userId, CreateListRequest req) {
@@ -529,6 +551,7 @@ public class PlanBoardService {
         trash.setPosition(index + 1);
         plan.setEndDate(date);
 
+        publishBoard(planId, userId, "CREATE_LIST");
         return ListDto.builder()
                 .id(list.getId())
                 .title(list.getTitle())
@@ -550,6 +573,7 @@ public class PlanBoardService {
         }
 
         list.setTitle(req.getTitle());
+        publishBoard(planId, userId, "RENAME_LIST");
     }
 
     @Transactional
@@ -581,9 +605,10 @@ public class PlanBoardService {
         listRepository.delete(target);
 
         syncDayLists(target.getPlan());
+        publishBoard(planId, userId, "DELETE_LIST");
     }
 
-    // ================== CRUD CARD ==================
+    // crud card
 
     @Transactional
     public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
@@ -622,6 +647,7 @@ public class PlanBoardService {
         cardRepository.save(card);
 
         recalculatePlanTotals(plan);
+        publishBoard(planId, userId, "CREATE_CARD");
 
         return toCardDto(card);
     }
@@ -663,7 +689,7 @@ public class PlanBoardService {
         recalculateCardCosts(card);
         recalculateSplitDetails(card);
         recalculatePlanTotals(plan);
-
+        publishBoard(planId, userId, "UPDATE_CARD");
         return toCardDto(card);
     }
 
@@ -674,7 +700,7 @@ public class PlanBoardService {
         PlanCard card = mustLoadCardInList(planId, listId, cardId);
         card.setDone(!card.isDone());
         cardRepository.save(card);
-
+        publishBoard(planId, userId, "TOGGLE_CARD_DONE");
         return toCardDto(card);
     }
 
@@ -695,6 +721,7 @@ public class PlanBoardService {
         }
 
         recalculatePlanTotals(plan);
+        publishBoard(planId, userId, "DELETE_CARD");
     }
 
     @Transactional
@@ -710,6 +737,7 @@ public class PlanBoardService {
         cardRepository.deleteAll(cardsInTrash);
 
         recalculatePlanTotals(plan);
+        publishBoard(planId, userId, "CLEAR_TRASH");
     }
 
     @Transactional
@@ -774,11 +802,12 @@ public class PlanBoardService {
 
         cardRepository.save(copy);
         recalculatePlanTotals(plan);
+        publishBoard(planId, userId, "DUPLICATE_CARD");
 
         return toCardDto(copy);
     }
 
-    // ================== REORDER (DRAG & DROP) ==================
+    // drag drop
 
     @Transactional
     public BoardResponse reorder(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
@@ -789,7 +818,6 @@ public class PlanBoardService {
         } else if ("card".equalsIgnoreCase(req.getType())) {
             return reorderCards(planId, userId, isFriend, req);
         }
-
         throw new RuntimeException("Unknown reorder type");
     }
 
@@ -818,6 +846,7 @@ public class PlanBoardService {
 
         Plan plan = planRepository.findById(planId).orElseThrow();
         syncDayLists(plan);
+        publishBoard(planId, userId, "REORDER_LIST");
 
         return getBoard(planId, userId, isFriend);
     }
@@ -847,11 +876,12 @@ public class PlanBoardService {
                 destCards.get(i).setPosition(i);
             }
         }
+        publishBoard(planId, userId, "REORDER_CARD");
 
         return getBoard(planId, userId, isFriend);
     }
 
-    // ================== INVITES ==================
+    // invite / join
 
     @Transactional
     public List<InviteDto> invite(Long planId, Long userId, InviteRequest req) {
@@ -929,7 +959,7 @@ public class PlanBoardService {
         return planId;
     }
 
-    // ================== SHARE / MEMBERS ==================
+    // share info
 
     @Transactional
     public ShareResponse getShareInfo(Long planId, Long userId) {
@@ -1016,7 +1046,7 @@ public class PlanBoardService {
         inviteTokenRepo.deleteByEmailAndPlanId(email, planId);
     }
 
-    // ================== REQUEST ACCESS ==================
+    // request access
 
     @Transactional
     public PlanRequestDto requestAccess(Long planId, Long userId, PlanRequestCreate req) {
@@ -1162,7 +1192,7 @@ public class PlanBoardService {
         throw new RuntimeException("Invalid action: " + action.getAction());
     }
 
-    // ================== OTHER HELPERS ==================
+    // helpers
 
     private PlanList mustLoadListInPlan(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)

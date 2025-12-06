@@ -75,12 +75,13 @@ public class PlanGeneralController {
     }
 
     @PutMapping("/budget")
-    public ResponseEntity<Void> updateBudget(
+    public ResponseEntity<ApiResponse<?>> updateBudget(
             @PathVariable Long planId,
             @RequestBody UpdateBudgetRequest req) {
 
         service.updateBudget(planId, currentUser.getId(), req);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(
+                ApiResponse.success("Cập nhật ngân sách thành công", null));
     }
 
 }
