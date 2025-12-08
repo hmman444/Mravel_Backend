@@ -6,10 +6,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class BoardResponse {
     private Long planId;
     private String planTitle;

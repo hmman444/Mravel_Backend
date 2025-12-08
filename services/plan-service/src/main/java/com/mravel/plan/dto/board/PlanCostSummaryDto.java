@@ -7,10 +7,9 @@ import java.util.List;
 import com.mravel.plan.model.PlanActivityType;
 
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class PlanCostSummaryDto {
 
     private Long planId;
@@ -25,10 +24,9 @@ public class PlanCostSummaryDto {
     private List<DayCostDto> byDay;
 
     @Getter
-    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
+    @Builder(toBuilder = true)
     public static class ActivityCostDto {
         private PlanActivityType activityType;
         private Long estimatedCost;
@@ -36,10 +34,9 @@ public class PlanCostSummaryDto {
     }
 
     @Getter
-    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
+    @Builder(toBuilder = true)
     public static class DayCostDto {
         private LocalDate date;
         private Long estimatedCost;

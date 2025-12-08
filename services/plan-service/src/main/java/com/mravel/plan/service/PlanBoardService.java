@@ -12,7 +12,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -77,7 +78,7 @@ public class PlanBoardService {
         return card;
     }
 
-    private PlanList findTrash(Long planId) {
+    public PlanList findTrash(Long planId) {
         return listRepository.findByPlanIdOrderByPositionAsc(planId)
                 .stream()
                 .filter(l -> l.getType() == PlanListType.TRASH)
@@ -85,7 +86,7 @@ public class PlanBoardService {
                 .orElseThrow(() -> new RuntimeException("Trash missing"));
     }
 
-    private List<PlanList> findDayLists(Long planId) {
+    public List<PlanList> findDayLists(Long planId) {
         return listRepository.findByPlanIdOrderByPositionAsc(planId)
                 .stream()
                 .filter(l -> l.getType() == PlanListType.DAY)
@@ -115,7 +116,10 @@ public class PlanBoardService {
     public void publishBoard(Long planId, Long actorId, String eventType) {
         try {
             BoardResponse board = getBoard(planId, actorId, false);
-
+            // log.info("[PlanService] publishBoard eventType={}, planId={}, actorId={},
+            // lists={}",
+            // eventType, planId, actorId,
+            // board.getLists() != null ? board.getLists().size() : null);
             PlanBoardEvent evt = PlanBoardEvent.builder()
                     .eventType(eventType)
                     .planId(planId)
@@ -187,21 +191,18 @@ public class PlanBoardService {
                 .build();
     }
 
-    // board
-
+    /**
+     * SNAPSHOT: build toàn bộ BoardResponse và cache theo planId.
+     * Chỉ gọi DB khi cache miss hoặc bị evict.
+     */
     @Transactional
-    public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
-
-        if (!permissionService.canView(planId, userId, isFriend)) {
-            throw new RuntimeException("You don't have permission to view this board.");
-        }
-
+    @Cacheable(value = "boardSnapshot", key = "#planId")
+    public BoardResponse getBoardSnapshot(Long planId) {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        PlanRole myRole = permissionService.getUserRole(planId, userId);
-
         List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
+
         PlanCostSummaryDto costSummary = buildCostSummary(plan, lists);
         PlanMemberCostSummaryDto memberCostSummary = buildMemberCostSummary(plan, lists);
 
@@ -219,13 +220,12 @@ public class PlanBoardService {
                 .status(plan.getStatus().name())
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
-                .myRole(myRole != null ? myRole.name() : null)
-
+                // myRole = null
+                .myRole(null)
                 .costSummary(costSummary)
                 .memberCostSummary(memberCostSummary)
-
                 .lists(
-                        listRepository.findByPlanIdOrderByPositionAsc(planId).stream()
+                        lists.stream()
                                 .map(l -> ListDto.builder()
                                         .id(l.getId())
                                         .title(l.getTitle())
@@ -239,6 +239,26 @@ public class PlanBoardService {
                                                         .toList())
                                         .build())
                                 .toList())
+                .build();
+    }
+
+    // board
+
+    @Transactional
+    public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
+
+        if (!permissionService.canView(planId, userId, isFriend)) {
+            throw new RuntimeException("You don't have permission to view this board.");
+        }
+
+        PlanRole myRole = permissionService.getUserRole(planId, userId);
+
+        // Lấy snapshot từ cache (không query DB nếu cache còn)
+        BoardResponse snapshot = getBoardSnapshot(planId);
+
+        // Tạo bản copy có myRole riêng cho user (tránh sửa object trong cache)
+        return snapshot.toBuilder()
+                .myRole(myRole != null ? myRole.name() : null)
                 .build();
     }
 
@@ -530,7 +550,9 @@ public class PlanBoardService {
     // crud list
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public ListDto createList(Long planId, Long userId, CreateListRequest req) {
+
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
@@ -539,27 +561,35 @@ public class PlanBoardService {
         List<PlanList> dayLists = findDayLists(planId);
         PlanList trash = findTrash(planId);
 
-        LocalDate date = plan.getEndDate().plusDays(1);
         int index = dayLists.size();
+        LocalDate newDate = plan.getEndDate().plusDays(1);
 
         String title = (req.getTitle() != null && !req.getTitle().isBlank())
                 ? req.getTitle()
                 : "Danh sách hoạt động";
 
+        // TẠO LIST MỚI
         PlanList list = PlanList.builder()
                 .plan(plan)
                 .type(PlanListType.DAY)
                 .position(index)
                 .title(title)
-                .dayDate(date)
+                .dayDate(newDate)
+                .cards(new ArrayList<>())
                 .build();
 
         listRepository.save(list);
 
+        // cập nhật vị trí Trash
         trash.setPosition(index + 1);
-        plan.setEndDate(date);
+        listRepository.save(trash);
 
+        // cập nhật endDate của Plan
+        plan.setEndDate(newDate);
+        planRepository.save(plan);
+        log.info("[PlanService] createList -> before publishBoard, planId={}, userId={}", planId, userId);
         publishBoard(planId, userId, "CREATE_LIST");
+
         return ListDto.builder()
                 .id(list.getId())
                 .title(list.getTitle())
@@ -571,6 +601,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void renameList(Long planId, Long listId, Long userId, RenameListRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -585,6 +616,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void deleteList(Long planId, Long userId, Long listId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -619,6 +651,7 @@ public class PlanBoardService {
     // crud card
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public CardDto createCard(Long planId, Long listId, Long userId, CreateCardRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -661,6 +694,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public CardDto updateCard(Long planId, Long listId, Long cardId, Long userId, UpdateCardRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -702,6 +736,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void deleteCard(Long planId, Long listId, Long cardId, Long userId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -722,6 +757,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void clearTrash(Long planId, Long userId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -738,13 +774,16 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public CardDto duplicateCard(Long planId, Long listId, Long cardId, Long userId) {
+
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         PlanCard original = mustLoadCardInList(planId, listId, cardId);
+
         int nextPos = (int) cardRepository.countByListId(listId);
 
         PlanCard copy = PlanCard.builder()
@@ -756,22 +795,30 @@ public class PlanBoardService {
                 .durationMinutes(original.getDurationMinutes())
                 .done(false)
                 .position(nextPos)
+
+                // activity
                 .activityType(original.getActivityType())
                 .activityDataJson(original.getActivityDataJson())
+
+                // cost
                 .currencyCode(original.getCurrencyCode())
                 .estimatedCost(original.getEstimatedCost())
+                .actualManual(original.getActualManual())
                 .actualCost(original.getActualCost())
                 .budgetAmount(original.getBudgetAmount())
                 .participantCount(original.getParticipantCount())
+
+                // split config
                 .includePayerInSplit(original.isIncludePayerInSplit())
                 .splitType(original.getSplitType())
                 .payerId(original.getPayerId())
+
                 .build();
 
-        // copy participants
+        // participants
         copy.getParticipants().addAll(original.getParticipants());
 
-        // copy extra costs
+        // extra costs
         original.getExtraCosts().forEach(e -> copy.getExtraCosts().add(
                 ExtraCost.builder()
                         .reason(e.getReason())
@@ -780,17 +827,17 @@ public class PlanBoardService {
                         .actualAmount(e.getActualAmount())
                         .build()));
 
-        // copy split members
+        // split members
         copy.getSplitMembers().addAll(original.getSplitMembers());
 
-        // copy splitDetails
+        // split details
         original.getSplitDetails().forEach(sd -> copy.getSplitDetails().add(
                 CardSplitDetail.builder()
                         .userId(sd.getUserId())
                         .amount(sd.getAmount())
                         .build()));
 
-        // copy payments
+        // payments
         original.getPayments().forEach(p -> copy.getPayments().add(
                 PlanCardPayment.builder()
                         .card(copy)
@@ -799,11 +846,11 @@ public class PlanBoardService {
                         .note(p.getNote())
                         .build()));
 
-        // recalc logic
         recalculateCardCosts(copy);
         recalculateSplitDetails(copy);
 
         cardRepository.save(copy);
+
         recalculatePlanTotals(plan);
         publishBoard(planId, userId, "DUPLICATE_CARD");
 
@@ -813,6 +860,7 @@ public class PlanBoardService {
     // drag drop
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public BoardResponse reorder(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -825,6 +873,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public ListDto duplicateList(Long planId, Long userId, Long listId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -965,6 +1014,7 @@ public class PlanBoardService {
         syncDayLists(plan);
         publishBoard(planId, userId, "REORDER_LIST");
 
+        // getBoard sẽ dùng snapshot mới (đã bị evict ở @CacheEvict trên reorder)
         return getBoard(planId, userId, isFriend);
     }
 
@@ -1045,6 +1095,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#result") // evict theo planId trả về
     public Long joinPlan(String token, Long userId) {
 
         PlanInviteToken inv = inviteTokenRepo.findByToken(token)
@@ -1119,6 +1170,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateMemberRole(Long planId, Long ownerId, UpdateMemberRoleRequest req) {
         permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
 
@@ -1141,6 +1193,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void removeMember(Long planId, Long ownerId, Long targetUserId) {
         permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
 
@@ -1241,6 +1294,7 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId")
     public void handleRequest(Long planId, Long reqId, PlanRequestAction action) {
 
         PlanRequest req = requestRepo.findById(reqId)

@@ -7,8 +7,7 @@ import java.time.LocalTime;
 import java.util.Set;
 
 @Getter
-@Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class CardDto {

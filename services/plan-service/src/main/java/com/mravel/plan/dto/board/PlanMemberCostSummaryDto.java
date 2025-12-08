@@ -1,12 +1,16 @@
 package com.mravel.plan.dto.board;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-@Data
-@Builder
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder(toBuilder = true)
 public class PlanMemberCostSummaryDto {
 
     private Long planId;
@@ -18,14 +22,16 @@ public class PlanMemberCostSummaryDto {
 
     private List<MemberCostDto> members;
 
-    @Data
-    @Builder
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder(toBuilder = true)
     public static class MemberCostDto {
         private Long userId;
         private String fullname;
         private String email;
         private String avatar;
-        private String role; // OWNER / EDITOR / VIEWER
+        private String role;
 
         private Long shareActual; // tổng phần chi phí người này phải trả (sum splitDetails.amount)
         private Integer activityCount; // số activity có mặt trong split
