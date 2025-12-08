@@ -6,10 +6,13 @@ import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
 import com.mravel.plan.repository.PlanCardRepository;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -44,6 +47,7 @@ public class PlanGeneralService {
     // general info
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateTitle(Long planId, Long userId, String title) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setTitle(title);
@@ -52,6 +56,7 @@ public class PlanGeneralService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateDescription(Long planId, Long userId, String desc) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setDescription(desc);
@@ -61,6 +66,7 @@ public class PlanGeneralService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateStatus(Long planId, Long userId, PlanStatus status) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setStatus(status);
@@ -70,6 +76,7 @@ public class PlanGeneralService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateThumbnail(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setThumbnail(url);
@@ -78,6 +85,7 @@ public class PlanGeneralService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void addImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).getImages().add(url);
@@ -86,6 +94,7 @@ public class PlanGeneralService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void removeImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).getImages().remove(url);
@@ -94,6 +103,7 @@ public class PlanGeneralService {
 
     // logic update date
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateDates(Long planId, Long userId, LocalDate startNew, LocalDate endNew) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -110,41 +120,41 @@ public class PlanGeneralService {
         int oldCount = dayLists.size();
         int newCount = (int) (endNew.toEpochDay() - startNew.toEpochDay()) + 1;
 
-        // ép về 1 ngày
+        // CASE 1 — ÉP VỀ 1 NGÀY
         if (newCount == 1 && oldCount > 1) {
 
-            // giữ lại day 1
             PlanList keep = dayLists.get(0);
+            keep.setPosition(0);
+            keep.setDayDate(startNew);
 
-            // move cards from other days → trash
+            // move mọi card của các ngày sau -> trash (GIỐNG deleteList)
+            int basePos = (int) cardRepo.countByListId(trash.getId());
+
             for (int i = 1; i < dayLists.size(); i++) {
                 PlanList rm = dayLists.get(i);
 
-                cardRepo.findByListIdOrderByPositionAsc(rm.getId())
-                        .forEach(c -> {
-                            c.setList(trash);
-                            c.setPosition(trash.getCards().size());
-                        });
+                List<PlanCard> cards = cardRepo.findByListIdOrderByPositionAsc(rm.getId());
+                for (PlanCard c : cards) {
+                    c.setList(trash);
+                    c.setPosition(basePos++);
+                }
+                if (!cards.isEmpty()) {
+                    cardRepo.saveAll(cards);
+                }
 
                 listRepo.delete(rm);
             }
 
-            // update keep
-            keep.setPosition(0);
-            keep.setDayDate(startNew);
-
-            // update plan
             plan.setStartDate(startNew);
             plan.setEndDate(startNew);
 
-            // set trash at last pos
             trash.setPosition(1);
-            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
 
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
 
-        // đổi ngày nhưng giữ daycount
+        // CASE 2 — GIỮ NGUYÊN SỐ NGÀY
         if (newCount == oldCount) {
             int shift = (int) (startNew.toEpochDay() - startOld.toEpochDay());
 
@@ -156,12 +166,12 @@ public class PlanGeneralService {
             plan.setStartDate(startNew);
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
-            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
 
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
 
-        // kéo dài daycount
+        // CASE 3 — KÉO DÀI (TĂNG SỐ NGÀY)
         if (newCount > oldCount) {
             int delta = newCount - oldCount;
 
@@ -169,8 +179,6 @@ public class PlanGeneralService {
             LocalDate lastDateOld = dayLists.get(oldCount - 1).getDayDate();
 
             for (int i = 0; i < delta; i++) {
-
-                // tên mặc định mới
                 String defaultTitle = "Danh sách hoạt động";
 
                 listRepo.save(
@@ -179,51 +187,53 @@ public class PlanGeneralService {
                                 .type(PlanListType.DAY)
                                 .title(defaultTitle)
                                 .position(oldCount + i)
+                                .cards(new ArrayList<>())
                                 .dayDate(lastDateOld.plusDays(i + 1))
                                 .build());
             }
 
-            // update plan
             plan.setStartDate(startNew);
             plan.setEndDate(endNew);
-
-            // trash always last
             trash.setPosition(newCount);
 
-            // nếu dời startDate → sync lại vị trí + dayDate
+            // nếu startDate đổi, đồng bộ lại date & position
             if (!startNew.equals(startOld)) {
                 planBoardService.syncDayLists(plan);
             }
-            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
 
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
 
-        // rút ngắn datecount
+        // CASE 4 — RÚT NGẮN (GIẢM SỐ NGÀY)
         if (newCount < oldCount) {
 
-            // range to remove: [newCount .. oldCount-1]
+            // move các list bị remove -> trash (card)
+            int basePos = (int) cardRepo.countByListId(trash.getId());
+
             for (int i = newCount; i < oldCount; i++) {
                 PlanList rm = dayLists.get(i);
 
-                // move cards → trash
-                cardRepo.findByListIdOrderByPositionAsc(rm.getId())
-                        .forEach(c -> {
-                            c.setList(trash);
-                            c.setPosition(trash.getCards().size());
-                        });
+                List<PlanCard> cards = cardRepo.findByListIdOrderByPositionAsc(rm.getId());
+                for (PlanCard c : cards) {
+                    c.setList(trash);
+                    c.setPosition(basePos++);
+                }
+                if (!cards.isEmpty()) {
+                    cardRepo.saveAll(cards);
+                }
 
                 listRepo.delete(rm);
             }
 
-            // update plan
+            // cập nhật các day còn lại
+            for (int i = 0; i < newCount; i++) {
+                dayLists.get(i).setPosition(i);
+                dayLists.get(i).setDayDate(startNew.plusDays(i));
+            }
+
             plan.setStartDate(startNew);
             plan.setEndDate(endNew);
-
-            // sync remaining dayLists (position + date)
-
-            planBoardService.syncDayLists(plan);
-
             trash.setPosition(newCount);
 
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
@@ -231,6 +241,7 @@ public class PlanGeneralService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void updateBudget(Long planId, Long userId, UpdateBudgetRequest req) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
 

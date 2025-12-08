@@ -1,6 +1,5 @@
 package com.mravel.plan.dto.board;
 
-import com.mravel.plan.model.CardPersonRef;
 import com.mravel.plan.model.PlanActivityType;
 import lombok.*;
 
@@ -35,7 +34,7 @@ public class UpdateCardRequest {
     /**
      * Danh sách thành viên tham gia hoạt động.
      */
-    private Set<CardPersonRef> participants;
+    private Set<Long> participants;
 
     private PlanCardCostDto cost;
     private PlanCardSplitConfigDto split;

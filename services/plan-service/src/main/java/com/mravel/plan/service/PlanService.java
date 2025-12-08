@@ -4,13 +4,13 @@ import com.mravel.common.response.UserProfileResponse;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
-import com.mravel.plan.model.AuthorSummary;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanCard;
 import com.mravel.plan.model.PlanComment;
 import com.mravel.plan.model.PlanList;
 import com.mravel.plan.model.PlanListType;
 import com.mravel.plan.model.PlanReaction;
+import com.mravel.plan.model.SplitType;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanCardRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -93,7 +92,7 @@ public class PlanService {
                                 .title(req.getTitle())
                                 .description(req.getDescription())
                                 .visibility(req.getVisibility() != null ? req.getVisibility() : Visibility.PRIVATE)
-                                .author(new AuthorSummary(userId, req.getAuthorName(), req.getAuthorAvatar()))
+                                .authorId(userId)
                                 .startDate(req.getStartDate())
                                 .endDate(req.getEndDate())
                                 .days(days)
@@ -147,7 +146,7 @@ public class PlanService {
                 Plan plan = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-                if (!userId.equals(plan.getAuthor().getId()))
+                if (!userId.equals(plan.getAuthorId()))
                         throw new RuntimeException("Only the owner can change visibility.");
 
                 plan.setVisibility(visibility);
@@ -168,7 +167,7 @@ public class PlanService {
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
                                 .visibility(Visibility.PRIVATE)
-                                .author(new AuthorSummary(userId, null, null))
+                                .authorId(userId)
                                 .startDate(source.getStartDate())
                                 .endDate(source.getEndDate())
                                 .days(source.getDays())
@@ -231,17 +230,15 @@ public class PlanService {
                                                 .actualCost(oc.getActualCost())
 
                                                 .extraCosts(new HashSet<>(oc.getExtraCosts()))
-
-                                                .participants(new HashSet<>(oc.getParticipants()))
-                                                .participantCount(oc.getParticipantCount())
-
-                                                .splitType(oc.getSplitType())
-                                                .includePayerInSplit(oc.isIncludePayerInSplit())
-                                                .splitMembers(new HashSet<>(oc.getSplitMembers()))
-                                                .splitDetails(new HashSet<>(oc.getSplitDetails()))
-
-                                                .payments(Collections.emptySet()) // không copy payment
-                                                .payerId(null) // reset người trả
+                                                // reset
+                                                .participants(Collections.emptySet())
+                                                .participantCount(null)
+                                                .splitType(SplitType.NONE)
+                                                .includePayerInSplit(true)
+                                                .splitMembers(Collections.emptySet())
+                                                .splitDetails(Collections.emptySet())
+                                                .payments(Collections.emptySet())
+                                                .payerId(null)
                                                 .build();
 
                                 cardRepository.save(nc);

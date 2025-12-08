@@ -19,6 +19,6 @@ public class PlanCardCostDto {
     private Boolean actualManual;
 
     private Integer participantCount;
-    private List<CardPersonRefDto> participants;
+    private List<Long> participants;
     private List<ExtraCostDto> extraCosts;
 }

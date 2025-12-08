@@ -14,16 +14,12 @@ import org.springframework.data.repository.query.Param;
 public interface PlanRepository extends JpaRepository<Plan, Long> {
     Page<Plan> findByVisibility(Visibility visibility, Pageable pageable);
 
-    Page<Plan> findByAuthor_Id(Long authorId, Pageable pageable);
-
-    List<Plan> findByAuthor_Id(Long authorId);
-
-    List<Plan> findByIdIn(List<Long> ids);
+    List<Plan> findByAuthorId(Long authorId);
 
     @Query("""
                 select p from Plan p
                 where p.visibility = 'PUBLIC'
-                   or p.author.id = :viewerId
+                   or p.authorId = :viewerId
                    or p.id in :memberPlanIds
                 order by p.createdAt desc
             """)

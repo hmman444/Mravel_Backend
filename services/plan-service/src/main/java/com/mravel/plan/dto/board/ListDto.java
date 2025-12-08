@@ -9,10 +9,9 @@ import java.util.List;
  * DTO biểu diễn một danh sách (list / ngày) trong bảng PlanBoard.
  */
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class ListDto {
     private Long id;
     private String title;

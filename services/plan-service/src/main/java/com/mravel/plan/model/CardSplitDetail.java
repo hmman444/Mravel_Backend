@@ -1,7 +1,7 @@
 package com.mravel.plan.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import jakarta.persistence.Embedded;
 import lombok.*;
 
 @Embeddable
@@ -11,17 +11,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class CardSplitDetail {
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    /**
-     * Người phải chịu chi phí cho card này.
-     * Có thể là member (memberId != null) hoặc người ngoài (external = true).
-     */
-    @Embedded
-    private CardPersonRef person;
-
-    /**
-     * Số tiền người này phải trả (theo kết quả chia).
-     * Đây là số tiền GROSS, không phải net giữa các thành viên.
-     */
+    @Column(name = "amount", nullable = false)
     private Long amount;
 }

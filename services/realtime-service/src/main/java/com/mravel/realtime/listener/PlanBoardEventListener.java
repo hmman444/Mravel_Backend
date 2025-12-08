@@ -25,6 +25,9 @@ public class PlanBoardEventListener {
         try {
             PlanBoardEvent event = objectMapper.readValue(messageJson, PlanBoardEvent.class);
 
+            // log.info("[Gateway] Received board event: type={} planId={}",
+            // event.getEventType(), event.getPlanId());
+
             Long planId = event.getPlanId();
             String destination = "/topic/plans/" + planId + "/board";
 
