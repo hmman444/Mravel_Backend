@@ -18,7 +18,7 @@ public class PlanPermissionService {
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         // owner toàn quyền
-        if (plan.getAuthor() != null && userId.equals(plan.getAuthor().getId()))
+        if (plan.getAuthorId() != null && userId.equals(plan.getAuthorId()))
             return;
 
         // member
@@ -41,7 +41,7 @@ public class PlanPermissionService {
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         // owner toàn quyền
-        if (plan.getAuthor() != null && userId != null && userId.equals(plan.getAuthor().getId()))
+        if (plan.getAuthorId() != null && userId != null && userId.equals(plan.getAuthorId()))
             return true;
 
         // member
@@ -77,7 +77,7 @@ public class PlanPermissionService {
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         // owner
-        if (plan.getAuthor() != null && userId != null && userId.equals(plan.getAuthor().getId())) {
+        if (plan.getAuthorId() != null && userId != null && userId.equals(plan.getAuthorId())) {
             return PlanRole.OWNER;
         }
 

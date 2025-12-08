@@ -10,6 +10,6 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class CreateListRequest {
-    private String title; // ví dụ: "Ngày 1"
-    private LocalDate dayDate; // optional
+    private String title;
+    private LocalDate dayDate;
 }

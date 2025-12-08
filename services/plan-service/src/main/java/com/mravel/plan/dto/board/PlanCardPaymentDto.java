@@ -8,7 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class PlanCardPaymentDto {
-    private CardPersonRefDto payer;
+    private Long payerUserId;
     private Long amount;
     private String note;
 }

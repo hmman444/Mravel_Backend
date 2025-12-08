@@ -17,7 +17,7 @@ public class PlanCardSplitConfigDto {
     private Long payerId;
     private boolean includePayerInSplit;
 
-    private List<CardPersonRefDto> splitMembers;
+    private List<Long> splitMembers;
     private List<CardSplitDetailDto> splitDetails;
     private List<PlanCardPaymentDto> payments;
 }

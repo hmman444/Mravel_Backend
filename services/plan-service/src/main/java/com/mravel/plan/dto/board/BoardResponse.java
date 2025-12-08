@@ -16,9 +16,6 @@ public class BoardResponse {
     private String myRole;
 
     private List<ListDto> lists;
-    private List<LabelDto> labels;
-    private List<InviteDto> invites;
-
     private String thumbnail;
     private List<String> images;
     private String description;
@@ -34,4 +31,8 @@ public class BoardResponse {
     private Long totalActualCost;
 
     private String status;
+
+    private PlanCostSummaryDto costSummary;
+
+    private PlanMemberCostSummaryDto memberCostSummary;
 }

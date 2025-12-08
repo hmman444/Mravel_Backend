@@ -20,11 +20,8 @@ public class PlanCardPayment {
     @JoinColumn(name = "card_id", nullable = false)
     private PlanCard card;
 
-    /**
-     * Người đã trả tiền cho activity này.
-     */
-    @Embedded
-    private CardPersonRef payer;
+    @Column(name = "payer_user_id", nullable = false)
+    private Long payerUserId;
 
     @Column(name = "amount", nullable = false)
     private Long amount;

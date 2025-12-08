@@ -8,15 +8,20 @@ import com.mravel.plan.kafka.PlanBoardEvent;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlanBoardService {
@@ -25,7 +30,6 @@ public class PlanBoardService {
     private final PlanRepository planRepository;
     private final PlanListRepository listRepository;
     private final PlanCardRepository cardRepository;
-    private final PlanInviteRepository inviteRepository;
     private final PlanInviteTokenRepository inviteTokenRepo;
     private final PlanMemberRepository memberRepository;
     private final MailService mailService;
@@ -34,6 +38,25 @@ public class PlanBoardService {
     private final KafkaProducer kafkaProducer;
 
     // helper loaders
+
+    private void validateMemberIds(Long planId, Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty())
+            return;
+
+        Set<Long> ids = userIds.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (ids.isEmpty())
+            return;
+
+        Set<Long> memberIds = memberRepository.findUserIdsByPlanId(planId); // custom query
+        for (Long uid : ids) {
+            if (!memberIds.contains(uid)) {
+                throw new RuntimeException("User " + uid + " is not a member of this plan");
+            }
+        }
+    }
 
     private PlanList mustLoadList(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
@@ -104,7 +127,64 @@ public class PlanBoardService {
             kafkaProducer.publishBoardEvent(evt);
 
         } catch (Exception ex) {
+            log.error("Failed to publish board event for planId={}", planId, ex);
         }
+    }
+
+    private PlanCostSummaryDto buildCostSummary(Plan plan, List<PlanList> lists) {
+        Map<PlanActivityType, long[]> byType = new EnumMap<>(PlanActivityType.class);
+        Map<LocalDate, long[]> byDay = new HashMap<>();
+
+        for (PlanList list : lists) {
+            if (list.getType() == PlanListType.TRASH)
+                continue;
+            LocalDate date = list.getDayDate();
+
+            for (PlanCard c : list.getCards()) {
+                PlanActivityType type = c.getActivityType();
+                long est = c.getEstimatedCost() != null ? c.getEstimatedCost() : 0L;
+                long act = c.getActualCost() != null ? c.getActualCost() : 0L;
+
+                if (type != null) {
+                    byType.computeIfAbsent(type, k -> new long[2]);
+                    byType.get(type)[0] += est;
+                    byType.get(type)[1] += act;
+                }
+
+                if (date != null) {
+                    byDay.computeIfAbsent(date, k -> new long[2]);
+                    byDay.get(date)[0] += est;
+                    byDay.get(date)[1] += act;
+                }
+            }
+        }
+
+        List<PlanCostSummaryDto.ActivityCostDto> byTypeList = byType.entrySet().stream()
+                .map(e -> PlanCostSummaryDto.ActivityCostDto.builder()
+                        .activityType(e.getKey())
+                        .estimatedCost(e.getValue()[0])
+                        .actualCost(e.getValue()[1])
+                        .build())
+                .toList();
+
+        List<PlanCostSummaryDto.DayCostDto> byDayList = byDay.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> PlanCostSummaryDto.DayCostDto.builder()
+                        .date(e.getKey())
+                        .estimatedCost(e.getValue()[0])
+                        .actualCost(e.getValue()[1])
+                        .build())
+                .toList();
+
+        return PlanCostSummaryDto.builder()
+                .planId(plan.getId())
+                .budgetCurrency(plan.getBudgetCurrency())
+                .budgetTotal(plan.getBudgetTotal())
+                .totalEstimatedCost(plan.getTotalEstimatedCost())
+                .totalActualCost(plan.getTotalActualCost())
+                .byActivityType(byTypeList)
+                .byDay(byDayList)
+                .build();
     }
 
     // board
@@ -121,6 +201,10 @@ public class PlanBoardService {
 
         PlanRole myRole = permissionService.getUserRole(planId, userId);
 
+        List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
+        PlanCostSummaryDto costSummary = buildCostSummary(plan, lists);
+        PlanMemberCostSummaryDto memberCostSummary = buildMemberCostSummary(plan, lists);
+
         return BoardResponse.builder()
                 .planId(plan.getId())
                 .planTitle(plan.getTitle())
@@ -136,6 +220,10 @@ public class PlanBoardService {
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
                 .myRole(myRole != null ? myRole.name() : null)
+
+                .costSummary(costSummary)
+                .memberCostSummary(memberCostSummary)
+
                 .lists(
                         listRepository.findByPlanIdOrderByPositionAsc(planId).stream()
                                 .map(l -> ListDto.builder()
@@ -151,26 +239,6 @@ public class PlanBoardService {
                                                         .toList())
                                         .build())
                                 .toList())
-                .invites(
-                        inviteRepository.findByPlanId(planId).stream()
-                                .map(inv -> InviteDto.builder()
-                                        .id(inv.getId())
-                                        .email(inv.getEmail())
-                                        .role(inv.getRole())
-                                        .build())
-                                .toList())
-                .build();
-    }
-
-    // map entity -> dto
-
-    private CardPersonRefDto toPersonDto(CardPersonRef ref) {
-        if (ref == null)
-            return null;
-        return CardPersonRefDto.builder()
-                .memberId(ref.getMemberId())
-                .displayName(ref.getDisplayName())
-                .external(ref.getExternal())
                 .build();
     }
 
@@ -184,15 +252,19 @@ public class PlanBoardService {
     }
 
     private CardSplitDetailDto toSplitDetailDto(CardSplitDetail d) {
+        if (d == null)
+            return null;
         return CardSplitDetailDto.builder()
-                .person(toPersonDto(d.getPerson()))
+                .userId(d.getUserId())
                 .amount(d.getAmount())
                 .build();
     }
 
     private PlanCardPaymentDto toPaymentDto(PlanCardPayment p) {
+        if (p == null)
+            return null;
         return PlanCardPaymentDto.builder()
-                .payer(toPersonDto(p.getPayer()))
+                .payerUserId(p.getPayerUserId())
                 .amount(p.getAmount())
                 .note(p.getNote())
                 .build();
@@ -213,14 +285,12 @@ public class PlanBoardService {
                 .cost(
                         PlanCardCostDto.builder()
                                 .currencyCode(c.getCurrencyCode())
-                                .estimatedCost(c.getEstimatedCost()) // chi phí ước lượng
-                                .actualCost(c.getActualCost()) // BE đã tính
-                                .budgetAmount(c.getBudgetAmount()) // ngân sách activity
+                                .estimatedCost(c.getEstimatedCost())
+                                .actualCost(c.getActualCost())
+                                .budgetAmount(c.getBudgetAmount())
                                 .participantCount(c.getParticipantCount())
                                 .participants(
-                                        c.getParticipants().stream()
-                                                .map(this::toPersonDto)
-                                                .toList())
+                                        new ArrayList<>(c.getParticipants())) // Set<Long> -> List<Long>
                                 .extraCosts(
                                         c.getExtraCosts().stream()
                                                 .map(this::toExtraCostDto)
@@ -232,9 +302,7 @@ public class PlanBoardService {
                                 .payerId(c.getPayerId())
                                 .includePayerInSplit(c.isIncludePayerInSplit())
                                 .splitMembers(
-                                        c.getSplitMembers().stream()
-                                                .map(this::toPersonDto)
-                                                .toList())
+                                        new ArrayList<>(c.getSplitMembers())) // Set<Long> -> List<Long>
                                 .splitDetails(
                                         c.getSplitDetails().stream()
                                                 .map(this::toSplitDetailDto)
@@ -244,18 +312,7 @@ public class PlanBoardService {
                                                 .map(this::toPaymentDto)
                                                 .toList())
                                 .build())
-                .build();
-    }
 
-    // map entity dto -> entity
-
-    private CardPersonRef fromPersonDto(CardPersonRefDto dto) {
-        if (dto == null)
-            return null;
-        return CardPersonRef.builder()
-                .memberId(dto.getMemberId())
-                .displayName(dto.getDisplayName())
-                .external(dto.getExternal())
                 .build();
     }
 
@@ -283,7 +340,9 @@ public class PlanBoardService {
         // Participants
         card.getParticipants().clear();
         if (dto.getParticipants() != null) {
-            dto.getParticipants().forEach(p -> card.getParticipants().add(fromPersonDto(p)));
+            Long planId = card.getList().getPlan().getId();
+            validateMemberIds(planId, dto.getParticipants());
+            card.getParticipants().addAll(dto.getParticipants());
         }
 
         // Extra costs
@@ -311,26 +370,40 @@ public class PlanBoardService {
         if (dto == null)
             return;
 
+        Long planId = card.getList().getPlan().getId();
+
         card.setSplitType(dto.getSplitType());
         card.setIncludePayerInSplit(dto.isIncludePayerInSplit());
 
+        // payerId: cũng phải là member nếu khác null
         if (dto.getPayerId() != null) {
+            validateMemberIds(planId, List.of(dto.getPayerId()));
             card.setPayerId(dto.getPayerId());
+        } else {
+            card.setPayerId(null);
         }
 
-        // splitMembers
+        // splitMembers = list userId
         card.getSplitMembers().clear();
         if (dto.getSplitMembers() != null) {
-            dto.getSplitMembers().forEach(p -> card.getSplitMembers().add(fromPersonDto(p)));
+            validateMemberIds(planId, dto.getSplitMembers());
+            card.getSplitMembers().addAll(dto.getSplitMembers());
         }
 
         // payments
         card.getPayments().clear();
         if (dto.getPayments() != null) {
+            // collect all payerUserId để validate
+            List<Long> payerIds = dto.getPayments().stream()
+                    .map(PlanCardPaymentDto::getPayerUserId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            validateMemberIds(planId, payerIds);
+
             dto.getPayments().forEach(pDto -> {
                 PlanCardPayment payment = PlanCardPayment.builder()
                         .card(card)
-                        .payer(fromPersonDto(pDto.getPayer()))
+                        .payerUserId(pDto.getPayerUserId())
                         .amount(pDto.getAmount())
                         .note(pDto.getNote())
                         .build();
@@ -338,14 +411,19 @@ public class PlanBoardService {
             });
         }
 
-        // splitDetails:
-        // - EXACT: FE có thể gửi sẵn; ta lưu luôn
-        // - EVEN: sẽ tính lại trong recalculateSplitDetails
+        // splitDetails (EXACT): mỗi detail gắn userId
         if (dto.getSplitDetails() != null && dto.getSplitType() == SplitType.EXACT) {
             card.getSplitDetails().clear();
+
+            List<Long> userIds = dto.getSplitDetails().stream()
+                    .map(CardSplitDetailDto::getUserId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            validateMemberIds(planId, userIds);
+
             dto.getSplitDetails().forEach(d -> card.getSplitDetails().add(
                     CardSplitDetail.builder()
-                            .person(fromPersonDto(d.getPerson()))
+                            .userId(d.getUserId())
                             .amount(d.getAmount())
                             .build()));
         }
@@ -396,9 +474,6 @@ public class PlanBoardService {
         plan.setTotalActualCost(totalAct);
     }
 
-    /**
-     * Tính lại splitDetails dựa trên actualCost (ưu tiên) hoặc estimatedCost.
-     */
     private void recalculateSplitDetails(PlanCard card) {
         SplitType type = card.getSplitType();
         if (type == null || type == SplitType.NONE) {
@@ -406,7 +481,7 @@ public class PlanBoardService {
             return;
         }
 
-        // Với EXACT: giữ nguyên những gì applySplit đã set, không đụng vào
+        // EXACT: giữ nguyên, đã set ở applySplit
         if (type == SplitType.EXACT) {
             return;
         }
@@ -420,7 +495,7 @@ public class PlanBoardService {
             return;
         }
 
-        List<CardPersonRef> members = new ArrayList<>(card.getSplitMembers());
+        List<Long> members = new ArrayList<>(card.getSplitMembers());
         if (members.isEmpty()) {
             card.getSplitDetails().clear();
             return;
@@ -430,93 +505,26 @@ public class PlanBoardService {
 
         switch (type) {
             case EVEN -> splitEven(card, members, total);
-            // các kiểu khác (PERCENT, SHARES...) bổ sung thêm tại đây
             default -> {
             }
         }
     }
 
-    private void splitEven(PlanCard card, List<CardPersonRef> members, long total) {
+    private void splitEven(PlanCard card, List<Long> members, long total) {
         int n = members.size();
         long baseShare = total / n;
         long remainder = total % n;
 
         for (int i = 0; i < n; i++) {
-            CardPersonRef p = members.get(i);
+            Long userId = members.get(i);
             long amount = baseShare + (i < remainder ? 1 : 0);
 
             card.getSplitDetails().add(
                     CardSplitDetail.builder()
-                            .person(p)
+                            .userId(userId)
                             .amount(amount)
                             .build());
         }
-    }
-
-    // cost summary
-
-    @Transactional
-    public PlanCostSummaryDto getCostSummary(Long planId, Long userId, boolean isFriend) {
-        if (!permissionService.canView(planId, userId, isFriend)) {
-            throw new RuntimeException("You don't have permission to view this board.");
-        }
-
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
-
-        Map<PlanActivityType, long[]> byType = new EnumMap<>(PlanActivityType.class);
-        Map<LocalDate, long[]> byDay = new HashMap<>();
-
-        for (PlanList list : plan.getLists()) {
-            if (list.getType() == PlanListType.TRASH)
-                continue;
-            LocalDate date = list.getDayDate();
-
-            for (PlanCard c : list.getCards()) {
-                PlanActivityType type = c.getActivityType();
-                long est = c.getEstimatedCost() != null ? c.getEstimatedCost() : 0L;
-                long act = c.getActualCost() != null ? c.getActualCost() : 0L;
-
-                if (type != null) {
-                    byType.computeIfAbsent(type, k -> new long[2]);
-                    byType.get(type)[0] += est;
-                    byType.get(type)[1] += act;
-                }
-
-                if (date != null) {
-                    byDay.computeIfAbsent(date, k -> new long[2]);
-                    byDay.get(date)[0] += est;
-                    byDay.get(date)[1] += act;
-                }
-            }
-        }
-
-        List<PlanCostSummaryDto.ActivityCostDto> byTypeList = byType.entrySet().stream()
-                .map(e -> PlanCostSummaryDto.ActivityCostDto.builder()
-                        .activityType(e.getKey())
-                        .estimatedCost(e.getValue()[0])
-                        .actualCost(e.getValue()[1])
-                        .build())
-                .toList();
-
-        List<PlanCostSummaryDto.DayCostDto> byDayList = byDay.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(e -> PlanCostSummaryDto.DayCostDto.builder()
-                        .date(e.getKey())
-                        .estimatedCost(e.getValue()[0])
-                        .actualCost(e.getValue()[1])
-                        .build())
-                .toList();
-
-        return PlanCostSummaryDto.builder()
-                .planId(plan.getId())
-                .budgetCurrency(plan.getBudgetCurrency())
-                .budgetTotal(plan.getBudgetTotal())
-                .totalEstimatedCost(plan.getTotalEstimatedCost())
-                .totalActualCost(plan.getTotalActualCost())
-                .byActivityType(byTypeList)
-                .byDay(byDayList)
-                .build();
     }
 
     // crud list
@@ -694,17 +702,6 @@ public class PlanBoardService {
     }
 
     @Transactional
-    public CardDto toggleDone(Long planId, Long listId, Long cardId, Long userId) {
-        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
-
-        PlanCard card = mustLoadCardInList(planId, listId, cardId);
-        card.setDone(!card.isDone());
-        cardRepository.save(card);
-        publishBoard(planId, userId, "TOGGLE_CARD_DONE");
-        return toCardDto(card);
-    }
-
-    @Transactional
     public void deleteCard(Long planId, Long listId, Long cardId, Long userId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
@@ -772,12 +769,7 @@ public class PlanBoardService {
                 .build();
 
         // copy participants
-        original.getParticipants().forEach(p -> copy.getParticipants().add(
-                CardPersonRef.builder()
-                        .memberId(p.getMemberId())
-                        .displayName(p.getDisplayName())
-                        .external(p.getExternal())
-                        .build()));
+        copy.getParticipants().addAll(original.getParticipants());
 
         // copy extra costs
         original.getExtraCosts().forEach(e -> copy.getExtraCosts().add(
@@ -788,15 +780,26 @@ public class PlanBoardService {
                         .actualAmount(e.getActualAmount())
                         .build()));
 
-        // copy split members (không copy payments)
-        original.getSplitMembers().forEach(p -> copy.getSplitMembers().add(
-                CardPersonRef.builder()
-                        .memberId(p.getMemberId())
-                        .displayName(p.getDisplayName())
-                        .external(p.getExternal())
+        // copy split members
+        copy.getSplitMembers().addAll(original.getSplitMembers());
+
+        // copy splitDetails
+        original.getSplitDetails().forEach(sd -> copy.getSplitDetails().add(
+                CardSplitDetail.builder()
+                        .userId(sd.getUserId())
+                        .amount(sd.getAmount())
                         .build()));
 
-        // tính lại để đảm bảo logic mới
+        // copy payments
+        original.getPayments().forEach(p -> copy.getPayments().add(
+                PlanCardPayment.builder()
+                        .card(copy)
+                        .payerUserId(p.getPayerUserId())
+                        .amount(p.getAmount())
+                        .note(p.getNote())
+                        .build()));
+
+        // recalc logic
         recalculateCardCosts(copy);
         recalculateSplitDetails(copy);
 
@@ -819,6 +822,120 @@ public class PlanBoardService {
             return reorderCards(planId, userId, isFriend, req);
         }
         throw new RuntimeException("Unknown reorder type");
+    }
+
+    @Transactional
+    public ListDto duplicateList(Long planId, Long userId, Long listId) {
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+        PlanList source = mustLoadList(planId, listId);
+        if (source.getType() == PlanListType.TRASH) {
+            throw new RuntimeException("Cannot duplicate trash list");
+        }
+
+        List<PlanList> dayLists = findDayLists(planId);
+        PlanList trash = findTrash(planId);
+
+        LocalDate newDate = plan.getEndDate().plusDays(1);
+        int newIndex = dayLists.size();
+
+        PlanList cloneList = PlanList.builder()
+                .plan(plan)
+                .type(PlanListType.DAY)
+                .position(newIndex)
+                .title(source.getTitle() + " (Copy)")
+                .dayDate(newDate)
+                .cards(new ArrayList<>())
+                .build();
+
+        cloneList = listRepository.save(cloneList);
+
+        trash.setPosition(newIndex + 1);
+        plan.setEndDate(newDate);
+
+        List<PlanCard> cards = cardRepository.findByListIdOrderByPositionAsc(source.getId());
+
+        for (int i = 0; i < cards.size(); i++) {
+            PlanCard original = cards.get(i);
+
+            PlanCard copy = PlanCard.builder()
+                    .list(cloneList)
+                    .text(original.getText())
+                    .description(original.getDescription())
+                    .startTime(original.getStartTime())
+                    .endTime(original.getEndTime())
+                    .durationMinutes(original.getDurationMinutes())
+                    .done(false)
+                    .position(i)
+                    .activityType(original.getActivityType())
+                    .activityDataJson(original.getActivityDataJson())
+                    .currencyCode(original.getCurrencyCode())
+                    .estimatedCost(original.getEstimatedCost())
+                    .actualCost(original.getActualCost())
+                    .budgetAmount(original.getBudgetAmount())
+                    .participantCount(original.getParticipantCount())
+                    .includePayerInSplit(original.isIncludePayerInSplit())
+                    .splitType(original.getSplitType())
+                    .payerId(original.getPayerId())
+                    .build();
+
+            // participants
+            copy.getParticipants().addAll(original.getParticipants());
+
+            // extra costs
+            original.getExtraCosts().forEach(ec -> copy.getExtraCosts().add(
+                    ExtraCost.builder()
+                            .reason(ec.getReason())
+                            .type(ec.getType())
+                            .estimatedAmount(ec.getEstimatedAmount())
+                            .actualAmount(ec.getActualAmount())
+                            .build()));
+
+            // split members
+            copy.getSplitMembers().addAll(original.getSplitMembers());
+
+            // split details
+            original.getSplitDetails().forEach(sd -> copy.getSplitDetails().add(
+                    CardSplitDetail.builder()
+                            .userId(sd.getUserId())
+                            .amount(sd.getAmount())
+                            .build()));
+
+            // payments
+            original.getPayments().forEach(p -> copy.getPayments().add(
+                    PlanCardPayment.builder()
+                            .card(copy)
+                            .payerUserId(p.getPayerUserId())
+                            .amount(p.getAmount())
+                            .note(p.getNote())
+                            .build()));
+
+            cloneList.getCards().add(copy);
+
+            recalculateCardCosts(copy);
+            recalculateSplitDetails(copy);
+
+            cardRepository.save(copy);
+        }
+
+        recalculatePlanTotals(plan);
+        publishBoard(planId, userId, "DUPLICATE_LIST");
+
+        return ListDto.builder()
+                .id(cloneList.getId())
+                .title(cloneList.getTitle())
+                .position(cloneList.getPosition())
+                .type("DAY")
+                .dayDate(cloneList.getDayDate())
+                .cards(
+                        cloneList.getCards().stream()
+                                .sorted(Comparator.comparingInt(PlanCard::getPosition))
+                                .map(this::toCardDto)
+                                .toList())
+                .build();
     }
 
     @Transactional
@@ -1082,7 +1199,7 @@ public class PlanBoardService {
 
         Plan plan = planRepository.getReferenceById(planId);
         UserProfileResponse requester = userProfileClient.getUserById(userId);
-        UserProfileResponse owner = userProfileClient.getUserById(plan.getAuthor().getId());
+        UserProfileResponse owner = userProfileClient.getUserById(plan.getAuthorId());
 
         mailService.sendRequestEmailToOwner(
                 owner.getEmail(),
@@ -1213,9 +1330,110 @@ public class PlanBoardService {
         return card;
     }
 
-    private LocalTime parseTime(String hhmm) {
-        if (hhmm == null || hhmm.isBlank())
-            return null;
-        return LocalTime.parse(hhmm);
+    @Data
+    @AllArgsConstructor
+    private static class MemberAgg {
+        long shareActual;
+        int activityCount;
+
+        MemberAgg() {
+            this.shareActual = 0L;
+            this.activityCount = 0;
+        }
     }
+
+    private PlanMemberCostSummaryDto buildMemberCostSummary(Plan plan, List<PlanList> lists) {
+        Long planId = plan.getId();
+
+        List<PlanMember> members = memberRepository.findByPlanId(planId);
+
+        // Nếu không có member thì vẫn trả owner
+        if (members.isEmpty() && plan.getAuthorId() != null) {
+            PlanMember ownerMember = PlanMember.builder()
+                    .plan(plan)
+                    .userId(plan.getAuthorId())
+                    .role(PlanRole.OWNER)
+                    .build();
+            members = List.of(ownerMember);
+        }
+
+        Map<Long, MemberAgg> aggMap = new HashMap<>();
+        for (PlanMember m : members) {
+            aggMap.put(m.getUserId(), new MemberAgg());
+        }
+
+        // Duyệt tất cả card (bỏ TRASH), cộng shareActual + activityCount
+        for (PlanList list : lists) {
+            if (list.getType() == PlanListType.TRASH)
+                continue;
+
+            for (PlanCard card : list.getCards()) {
+                if (card.getSplitDetails() == null || card.getSplitDetails().isEmpty())
+                    continue;
+
+                Set<Long> countedInThisCard = new HashSet<>();
+
+                for (CardSplitDetail detail : card.getSplitDetails()) {
+                    Long uid = detail.getUserId();
+                    if (uid == null)
+                        continue;
+
+                    MemberAgg agg = aggMap.get(uid);
+                    if (agg == null) {
+                        // userId trong splitDetails nhưng không còn là member (data cũ) → skip
+                        continue;
+                    }
+
+                    long amount = detail.getAmount() != null ? detail.getAmount() : 0L;
+                    agg.shareActual += amount;
+
+                    if (countedInThisCard.add(uid)) {
+                        agg.activityCount++;
+                    }
+                }
+            }
+        }
+
+        Map<Long, UserProfileResponse> profileCache = new HashMap<>();
+
+        List<PlanMemberCostSummaryDto.MemberCostDto> memberDtos = members.stream()
+                .map(m -> {
+                    Long uid = m.getUserId();
+                    MemberAgg agg = aggMap.getOrDefault(uid, new MemberAgg());
+
+                    UserProfileResponse profile = profileCache.computeIfAbsent(uid, id -> {
+                        try {
+                            return userProfileClient.getUserById(id);
+                        } catch (Exception ex) {
+                            return null;
+                        }
+                    });
+
+                    String fullname = profile != null ? profile.getFullname() : null;
+                    String email = profile != null ? profile.getEmail() : null;
+                    String avatar = profile != null ? profile.getAvatar() : null;
+
+                    return PlanMemberCostSummaryDto.MemberCostDto.builder()
+                            .userId(uid)
+                            .fullname(fullname)
+                            .email(email)
+                            .avatar(avatar)
+                            .role(m.getRole().name())
+                            .shareActual(agg.shareActual)
+                            .activityCount(agg.activityCount)
+                            .memberBudget(plan.getBudgetPerPerson())
+                            .build();
+                })
+                .toList();
+
+        return PlanMemberCostSummaryDto.builder()
+                .planId(planId)
+                .budgetCurrency(plan.getBudgetCurrency())
+                .budgetTotal(plan.getBudgetTotal())
+                .budgetPerPerson(plan.getBudgetPerPerson())
+                .totalActualCost(plan.getTotalActualCost())
+                .members(memberDtos)
+                .build();
+    }
+
 }
