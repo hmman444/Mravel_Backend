@@ -261,8 +261,6 @@ public class PlanService {
         public PlanFeedItem.Comment addComment(
                         Long planId,
                         Long userId,
-                        String userName,
-                        String userAvatar,
                         String text,
                         Long parentId) {
 
@@ -280,14 +278,19 @@ public class PlanService {
                                 .plan(plan)
                                 .parent(parent)
                                 .userId(userId)
-                                .userName(userName)
-                                .userAvatar(userAvatar)
                                 .text(text)
                                 .createdAt(Instant.now())
                                 .build();
 
                 entityManager.persist(comment);
                 entityManager.flush();
+
+                // cache profile
+                UserProfileResponse profile = null;
+                try {
+                        profile = userProfileClient.getUserById(userId);
+                } catch (Exception ignored) {
+                }
 
                 return PlanFeedItem.Comment.builder()
                                 .id(comment.getId())
@@ -296,8 +299,8 @@ public class PlanService {
                                 .createdAt(comment.getCreatedAt())
                                 .user(PlanFeedItem.Comment.User.builder()
                                                 .id(userId)
-                                                .name(userName)
-                                                .avatar(userAvatar)
+                                                .name(profile != null ? profile.getFullname() : null)
+                                                .avatar(profile != null ? profile.getAvatar() : null)
                                                 .build())
                                 .build();
         }
@@ -322,8 +325,6 @@ public class PlanService {
                         PlanReaction newReact = PlanReaction.builder()
                                         .plan(plan)
                                         .userId(userId)
-                                        .userName(user.getFullname())
-                                        .userAvatar(user.getAvatar())
                                         .type(key)
                                         .createdAt(Instant.now())
                                         .build();

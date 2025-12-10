@@ -82,8 +82,6 @@ public class PlanController {
                 PlanFeedItem.Comment comment = planService.addComment(
                                 id,
                                 req.getUserId(),
-                                req.getUserName(),
-                                req.getUserAvatar(),
                                 req.getText(),
                                 req.getParentId());
 

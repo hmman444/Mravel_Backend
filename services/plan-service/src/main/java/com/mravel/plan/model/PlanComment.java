@@ -18,8 +18,6 @@ public class PlanComment {
     private Long id;
 
     private Long userId;
-    private String userName;
-    private String userAvatar;
     private String text;
     private Instant createdAt;
 
