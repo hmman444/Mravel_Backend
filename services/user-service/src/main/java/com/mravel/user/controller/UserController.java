@@ -2,15 +2,25 @@ package com.mravel.user.controller;
 
 import com.mravel.common.request.UpdateUserProfileRequest;
 import com.mravel.common.response.UserProfileResponse;
+import com.mravel.user.client.PlanProfileClient;
+import com.mravel.user.dto.PlanFeedItem;
+import com.mravel.user.dto.UpdatePublicProfileRequest;
+import com.mravel.user.dto.UserProfilePageResponse;
+import com.mravel.user.dto.UserPublicProfileResponse;
 import com.mravel.user.model.Gender;
+import com.mravel.user.model.RelationshipType;
 import com.mravel.user.model.UserProfile;
 import com.mravel.user.repository.UserRepository;
 import com.mravel.user.service.AuthTokenClient;
+import com.mravel.user.service.FriendService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -19,6 +29,11 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final AuthTokenClient authTokenClient;
+    private final FriendService friendService;
+    private final PlanProfileClient planProfileClient;
+
+    // ---------------------------------- basic query
+    // ----------------------------------
 
     @GetMapping("/by-email")
     public UserProfileResponse getUserByEmail(@RequestParam("email") String email) {
@@ -31,92 +46,184 @@ public class UserController {
     @GetMapping("/{id}")
     public UserProfileResponse getUserById(@PathVariable Long id) {
         return userRepository.findById(id)
-                .map(user -> UserProfileResponse.builder()
-                        .id(user.getId())
-                        .email(user.getEmail())
-                        .fullname(user.getFullname())
-                        .avatar(user.getAvatar())
-                        .provider(user.getProvider())
-                        .build())
+                .map(this::toResponse)
                 .orElseThrow(() -> new RuntimeException("User not found: " + id));
     }
 
+    // ---------------------------------- update APIs
+    // ----------------------------------
+
+    // dùng cho hệ thống nội bộ, ví dụ admin / service khác
     @PutMapping("/by-email")
     public UserProfileResponse updateUserByEmail(@RequestParam("email") String email,
             @RequestBody UpdateUserProfileRequest request) {
         UserProfile user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        applyUpdates(user, request);
+        applySensitiveUpdates(user, request);
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         return toResponse(user);
     }
 
+    /**
+     * API chỉnh thông tin NHẠY CẢM (DOB, phone, email phụ, địa chỉ, gender,...)
+     * Không chỉnh các field public như fullname, username, avatar, cover, bio.
+     */
     @PutMapping("/me")
     public UserProfileResponse updateCurrentUser(
             @RequestHeader("Authorization") String authorizationHeader,
             @RequestBody UpdateUserProfileRequest request) {
 
-        // Gọi auth-service để validate token & lấy email
-        Map<String, Object> result = authTokenClient.validateToken(authorizationHeader);
+        Long currentUserId = getCurrentUserId(authorizationHeader);
 
-        Boolean valid = (Boolean) result.get("valid");
-        if (valid == null || !valid) {
-            throw new RuntimeException("Token không hợp lệ");
-        }
+        UserProfile user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
 
-        String email = (String) result.get("email");
-        if (email == null) {
-            throw new RuntimeException("Không lấy được email từ token");
-        }
-
-        UserProfile user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
-
-        applyUpdates(user, request);
+        applySensitiveUpdates(user, request);
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         return toResponse(user);
     }
 
-    private void applyUpdates(UserProfile user, UpdateUserProfileRequest request) {
-        if (request.getFullname() != null)
-            user.setFullname(request.getFullname());
-        if (request.getAvatar() != null)
-            user.setAvatar(request.getAvatar());
+    /**
+     * API chỉnh thông tin PUBLIC PROFILE (fullname, username, avatar, cover, bio,
+     * city,...)
+     * Đây là phần hiển thị trên trang profile và ai cũng có thể xem được.
+     */
+    @PutMapping("/me/public-profile")
+    public UserPublicProfileResponse updateMyPublicProfile(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody UpdatePublicProfileRequest request) {
 
-        if (request.getGender() != null) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+
+        UserProfile user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
+
+        applyPublicProfileUpdates(user, request);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return UserPublicProfileResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .fullname(user.getFullname())
+                .avatar(user.getAvatar())
+                .coverImage(user.getCoverImage())
+                .bio(user.getBio())
+                .city(user.getCity())
+                .country(user.getCountry())
+                .hometown(user.getHometown())
+                .occupation(user.getOccupation())
+                .membershipTier(user.getMembershipTier() != null ? user.getMembershipTier().name() : null)
+                .joinedAt(user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate().toString() : null)
+                .build();
+    }
+
+    // ------------------------------ profile-page cho FE
+    // ------------------------------
+
+    @GetMapping("/{id}/profile-page")
+    public UserProfilePageResponse getUserProfilePage(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+
+        // 1. viewer (nếu có)
+        Long tmpViewerId = null;
+        if (authorizationHeader != null) {
             try {
-                user.setGender(Gender.valueOf(request.getGender()));
-            } catch (IllegalArgumentException ex) {
-                throw new RuntimeException("Giới tính không hợp lệ");
+                tmpViewerId = getCurrentUserId(authorizationHeader);
+            } catch (Exception ignored) {
             }
         }
 
-        if (request.getDateOfBirth() != null)
-            user.setDateOfBirth(request.getDateOfBirth());
-        if (request.getCity() != null)
-            user.setCity(request.getCity());
-        if (request.getCountry() != null)
-            user.setCountry(request.getCountry());
-        if (request.getAddressLine() != null)
-            user.setAddressLine(request.getAddressLine());
+        final Long viewerId = tmpViewerId;
 
-        if (request.getSecondaryEmail() != null)
-            user.setSecondaryEmail(request.getSecondaryEmail());
-        if (request.getTertiaryEmail() != null)
-            user.setTertiaryEmail(request.getTertiaryEmail());
+        // 2. user profile
+        UserProfile user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found: " + id));
 
-        if (request.getPhone1() != null)
-            user.setPhone1(request.getPhone1());
-        if (request.getPhone2() != null)
-            user.setPhone2(request.getPhone2());
-        if (request.getPhone3() != null)
-            user.setPhone3(request.getPhone3());
+        // 3. relationship
+        RelationshipType relationship = friendService.getRelationship(viewerId, id);
+        boolean isFriend = relationship == RelationshipType.FRIEND;
+
+        // 4. friends + mutual
+        List<Long> friendIds = friendService.getFriendIds(id)
+                .stream()
+                .filter(fid -> !Objects.equals(fid, viewerId))
+                .toList();
+        int totalFriends = friendIds.size();
+        int mutualFriends = (viewerId != null && !viewerId.equals(id))
+                ? friendService.countMutualFriends(viewerId, id)
+                : 0;
+
+        // 4b. friends preview
+        List<UserProfilePageResponse.FriendPreview> friendsPreview = List.of();
+        if (!friendIds.isEmpty()) {
+            List<UserProfile> friendProfiles = userRepository.findAllById(friendIds);
+
+            friendsPreview = friendProfiles.stream()
+                    .map(f -> UserProfilePageResponse.FriendPreview.builder()
+                            .id(f.getId())
+                            .fullname(f.getFullname())
+                            .avatar(f.getAvatar())
+                            .mutualFriends(
+                                    (viewerId != null && !viewerId.equals(id))
+                                            ? friendService.countMutualFriends(viewerId, f.getId())
+                                            : null)
+                            .build())
+                    .limit(12) // preview tối đa 12 người
+                    .collect(Collectors.toList());
+        }
+
+        // 5. plans preview (ảnh lấy từ images trong PlanFeedItem, FE đã xử lý)
+        List<PlanFeedItem> plansPreview = List.of();
+        try {
+            var apiResp = planProfileClient.getPlansOfUser(
+                    id,
+                    1, // page 1
+                    5, // 5 plan gần nhất
+                    isFriend,
+                    authorizationHeader != null ? authorizationHeader : "");
+            if (apiResp != null && apiResp.getData() != null) {
+                plansPreview = apiResp.getData().getItems();
+            }
+        } catch (Exception ex) {
+        }
+
+        // 6. map BasicInfo + RelationshipInfo
+        UserProfilePageResponse.BasicInfo basicInfo = UserProfilePageResponse.BasicInfo.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .fullname(user.getFullname())
+                .avatar(user.getAvatar())
+                .coverImage(user.getCoverImage())
+                .bio(user.getBio())
+                .city(user.getCity())
+                .country(user.getCountry())
+                .membershipTier(user.getMembershipTier() != null ? user.getMembershipTier().name() : null)
+                .joinedDate(user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate() : null)
+                .totalFriends(totalFriends)
+                .mutualFriends(mutualFriends)
+                .build();
+
+        UserProfilePageResponse.RelationshipInfo relInfo = UserProfilePageResponse.RelationshipInfo.builder()
+                .type(relationship)
+                .friend(isFriend)
+                .build();
+
+        return UserProfilePageResponse.builder()
+                .user(basicInfo)
+                .relationship(relInfo)
+                .plansPreview(plansPreview)
+                .friendsPreview(friendsPreview)
+                .build();
     }
+
+    // ------------------------------ helpers ------------------------------
 
     private UserProfileResponse toResponse(UserProfile user) {
         return UserProfileResponse.builder()
@@ -139,5 +246,78 @@ public class UserController {
                 .locale(user.getLocale())
                 .timeZone(user.getTimeZone())
                 .build();
+    }
+
+    private Long getCurrentUserId(String authorizationHeader) {
+        Map<String, Object> result = authTokenClient.validateToken(authorizationHeader);
+        Boolean valid = (Boolean) result.get("valid");
+        if (valid == null || !valid) {
+            throw new RuntimeException("Token không hợp lệ");
+        }
+
+        Integer idInt = (Integer) result.get("id");
+        if (idInt == null) {
+            throw new RuntimeException("Không lấy được userId từ token");
+        }
+        return idInt.longValue();
+    }
+
+    private void applySensitiveUpdates(UserProfile user, UpdateUserProfileRequest request) {
+        // KHÔNG đụng fullname / username / avatar / coverImage / bio / city / country
+
+        if (request.getGender() != null) {
+            try {
+                user.setGender(Gender.valueOf(request.getGender()));
+            } catch (IllegalArgumentException ex) {
+                throw new RuntimeException("Giới tính không hợp lệ");
+            }
+        }
+
+        if (request.getDateOfBirth() != null)
+            user.setDateOfBirth(request.getDateOfBirth());
+
+        if (request.getAddressLine() != null)
+            user.setAddressLine(request.getAddressLine());
+
+        if (request.getSecondaryEmail() != null)
+            user.setSecondaryEmail(request.getSecondaryEmail());
+        if (request.getTertiaryEmail() != null)
+            user.setTertiaryEmail(request.getTertiaryEmail());
+
+        if (request.getPhone1() != null)
+            user.setPhone1(request.getPhone1());
+        if (request.getPhone2() != null)
+            user.setPhone2(request.getPhone2());
+        if (request.getPhone3() != null)
+            user.setPhone3(request.getPhone3());
+    }
+
+    private void applyPublicProfileUpdates(UserProfile user, UpdatePublicProfileRequest request) {
+        if (request.getFullname() != null)
+            user.setFullname(request.getFullname());
+
+        if (request.getUsername() != null)
+            user.setUsername(request.getUsername());
+
+        if (request.getAvatar() != null)
+            user.setAvatar(request.getAvatar());
+
+        if (request.getCoverImage() != null)
+            user.setCoverImage(request.getCoverImage());
+
+        if (request.getBio() != null)
+            user.setBio(request.getBio());
+
+        if (request.getCity() != null)
+            user.setCity(request.getCity());
+
+        if (request.getCountry() != null)
+            user.setCountry(request.getCountry());
+
+        if (request.getHometown() != null)
+            user.setHometown(request.getHometown());
+
+        if (request.getOccupation() != null)
+            user.setOccupation(request.getOccupation());
     }
 }

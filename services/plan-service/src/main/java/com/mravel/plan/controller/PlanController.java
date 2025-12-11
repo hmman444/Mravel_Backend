@@ -105,4 +105,45 @@ public class PlanController {
                 return ResponseEntity.ok(
                                 ApiResponse.success("Tăng lượt xem thành công", null));
         }
+
+        @GetMapping("/me")
+        public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getMyPlans(
+                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(defaultValue = "10") int size) {
+
+                Long userId = currentUser.getId();
+                Page<PlanFeedItem> data = planService.getUserPlans(userId, userId);
+
+                PageResponse<PlanFeedItem> resp = PageResponse.<PlanFeedItem>builder()
+                                .items(data.getContent())
+                                .page(page)
+                                .size(size)
+                                .total(data.getTotalElements())
+                                .hasMore(page * size < data.getTotalElements())
+                                .build();
+
+                return ResponseEntity.ok(ApiResponse.success("Lấy plan của bản thân thành công", resp));
+        }
+
+        @GetMapping("/user/{userId}")
+        public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getPlansOfUser(
+                        @PathVariable Long userId,
+                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        @RequestParam(defaultValue = "false") boolean isFriend) {
+
+                Long viewerId = currentUser.getId();
+                Page<PlanFeedItem> data = planService.getUserPlans(userId, viewerId, isFriend);
+
+                PageResponse<PlanFeedItem> resp = PageResponse.<PlanFeedItem>builder()
+                                .items(data.getContent())
+                                .page(page)
+                                .size(size)
+                                .total(data.getTotalElements())
+                                .hasMore(page * size < data.getTotalElements())
+                                .build();
+
+                return ResponseEntity.ok(ApiResponse.success("Lấy plan user khác thành công", resp));
+        }
+
 }

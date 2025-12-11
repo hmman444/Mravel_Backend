@@ -27,4 +27,22 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
             @Param("memberPlanIds") List<Long> memberPlanIds,
             Pageable pageable);
 
+    @Query("""
+            SELECT p FROM Plan p
+            WHERE p.authorId = :ownerId
+              AND (
+                    p.visibility = 'PUBLIC'
+                 OR (p.visibility = 'FRIENDS' AND :isFriend = TRUE)
+                 OR (p.visibility = 'PRIVATE' AND p.id IN :memberPlanIds)
+              )
+            ORDER BY p.createdAt DESC
+            """)
+    Page<Plan> findAllPlansOfUserWithVisibility(
+            @Param("ownerId") Long ownerId,
+            @Param("isFriend") boolean isFriend,
+            @Param("memberPlanIds") List<Long> memberPlanIds,
+            Pageable pageable);
+
+    Page<Plan> findByAuthorId(Long authorId, Pageable pageable);
+
 }

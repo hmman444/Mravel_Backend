@@ -344,4 +344,37 @@ public class PlanService {
                 plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
                 planRepository.save(plan);
         }
+
+        public Page<PlanFeedItem> getUserPlans(Long ownerId, Long viewerId) {
+                return getUserPlans(ownerId, viewerId, false);
+        }
+
+        public Page<PlanFeedItem> getUserPlans(Long ownerId, Long viewerId, boolean isFriend) {
+
+                List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
+                if (memberPlanIds.isEmpty())
+                        memberPlanIds = List.of(-1L); // tránh IN ()
+
+                Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+                Page<Plan> plans;
+
+                // Nếu xem kế hoạch của chính mình → xem tất cả
+                if (Objects.equals(ownerId, viewerId)) {
+                        plans = planRepository.findByAuthorId(ownerId, pageable);
+                } else {
+                        plans = planRepository.findAllPlansOfUserWithVisibility(
+                                        ownerId,
+                                        isFriend,
+                                        memberPlanIds,
+                                        pageable);
+                }
+
+                List<PlanFeedItem> items = plans.getContent().stream()
+                                .map(planMapper::toFeedItem)
+                                .toList();
+
+                return new PageImpl<>(items, pageable, plans.getTotalElements());
+        }
+
 }
