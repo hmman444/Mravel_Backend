@@ -4,9 +4,7 @@ import com.mravel.common.request.UpdateUserProfileRequest;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.user.client.PlanProfileClient;
 import com.mravel.user.dto.PlanFeedItem;
-import com.mravel.user.dto.UpdatePublicProfileRequest;
 import com.mravel.user.dto.UserProfilePageResponse;
-import com.mravel.user.dto.UserPublicProfileResponse;
 import com.mravel.user.model.Gender;
 import com.mravel.user.model.RelationshipType;
 import com.mravel.user.model.UserProfile;
@@ -14,6 +12,8 @@ import com.mravel.user.repository.UserRepository;
 import com.mravel.user.service.AuthTokenClient;
 import com.mravel.user.service.FriendService;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -60,17 +60,13 @@ public class UserController {
         UserProfile user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        applySensitiveUpdates(user, request);
+        applyFullProfileUpdates(user, request);
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         return toResponse(user);
     }
 
-    /**
-     * API chỉnh thông tin NHẠY CẢM (DOB, phone, email phụ, địa chỉ, gender,...)
-     * Không chỉnh các field public như fullname, username, avatar, cover, bio.
-     */
     @PutMapping("/me")
     public UserProfileResponse updateCurrentUser(
             @RequestHeader("Authorization") String authorizationHeader,
@@ -81,46 +77,12 @@ public class UserController {
         UserProfile user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
 
-        applySensitiveUpdates(user, request);
+        applyFullProfileUpdates(user, request);
+
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         return toResponse(user);
-    }
-
-    /**
-     * API chỉnh thông tin PUBLIC PROFILE (fullname, username, avatar, cover, bio,
-     * city,...)
-     * Đây là phần hiển thị trên trang profile và ai cũng có thể xem được.
-     */
-    @PutMapping("/me/public-profile")
-    public UserPublicProfileResponse updateMyPublicProfile(
-            @RequestHeader("Authorization") String authorizationHeader,
-            @RequestBody UpdatePublicProfileRequest request) {
-
-        Long currentUserId = getCurrentUserId(authorizationHeader);
-
-        UserProfile user = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
-
-        applyPublicProfileUpdates(user, request);
-        user.setUpdatedAt(LocalDateTime.now());
-        userRepository.save(user);
-
-        return UserPublicProfileResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .fullname(user.getFullname())
-                .avatar(user.getAvatar())
-                .coverImage(user.getCoverImage())
-                .bio(user.getBio())
-                .city(user.getCity())
-                .country(user.getCountry())
-                .hometown(user.getHometown())
-                .occupation(user.getOccupation())
-                .membershipTier(user.getMembershipTier() != null ? user.getMembershipTier().name() : null)
-                .joinedAt(user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate().toString() : null)
-                .build();
     }
 
     // ------------------------------ profile-page cho FE
@@ -166,15 +128,21 @@ public class UserController {
             List<UserProfile> friendProfiles = userRepository.findAllById(friendIds);
 
             friendsPreview = friendProfiles.stream()
-                    .map(f -> UserProfilePageResponse.FriendPreview.builder()
-                            .id(f.getId())
-                            .fullname(f.getFullname())
-                            .avatar(f.getAvatar())
-                            .mutualFriends(
-                                    (viewerId != null && !viewerId.equals(id))
-                                            ? friendService.countMutualFriends(viewerId, f.getId())
-                                            : null)
-                            .build())
+                    .map(f -> {
+                        Integer mutualForFriend = null;
+
+                        // Nếu có viewer đăng nhập -> luôn tính mutual giữa viewer và từng friend
+                        if (viewerId != null) {
+                            mutualForFriend = friendService.countMutualFriends(viewerId, f.getId());
+                        }
+
+                        return UserProfilePageResponse.FriendPreview.builder()
+                                .id(f.getId())
+                                .fullname(f.getFullname())
+                                .avatar(f.getAvatar())
+                                .mutualFriends(mutualForFriend)
+                                .build();
+                    })
                     .limit(12) // preview tối đa 12 người
                     .collect(Collectors.toList());
         }
@@ -204,10 +172,21 @@ public class UserController {
                 .bio(user.getBio())
                 .city(user.getCity())
                 .country(user.getCountry())
+                .hometown(user.getHometown())
+                .occupation(user.getOccupation())
+                .gender(user.getGender() != null ? user.getGender().name() : null)
+                .dateOfBirth(user.getDateOfBirth())
+                .addressLine(user.getAddressLine())
+                .secondaryEmail(user.getSecondaryEmail())
+                .tertiaryEmail(user.getTertiaryEmail())
+                .phone1((viewerId != null && (viewerId.equals(id) || isFriend)) ? user.getPhone1() : null)
+                .phone2((viewerId != null && (viewerId.equals(id) || isFriend)) ? user.getPhone2() : null)
+                .phone3((viewerId != null && (viewerId.equals(id) || isFriend)) ? user.getPhone3() : null)
                 .membershipTier(user.getMembershipTier() != null ? user.getMembershipTier().name() : null)
                 .joinedDate(user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate() : null)
                 .totalFriends(totalFriends)
                 .mutualFriends(mutualFriends)
+                .totalTrips(plansPreview != null ? plansPreview.size() : 0) // hoặc dùng totalItems từ API
                 .build();
 
         UserProfilePageResponse.RelationshipInfo relInfo = UserProfilePageResponse.RelationshipInfo.builder()
@@ -252,7 +231,7 @@ public class UserController {
         Map<String, Object> result = authTokenClient.validateToken(authorizationHeader);
         Boolean valid = (Boolean) result.get("valid");
         if (valid == null || !valid) {
-            throw new RuntimeException("Token không hợp lệ");
+            throw new UnauthorizedException("JWT expired");
         }
 
         Integer idInt = (Integer) result.get("id");
@@ -262,37 +241,16 @@ public class UserController {
         return idInt.longValue();
     }
 
-    private void applySensitiveUpdates(UserProfile user, UpdateUserProfileRequest request) {
-        // KHÔNG đụng fullname / username / avatar / coverImage / bio / city / country
-
-        if (request.getGender() != null) {
-            try {
-                user.setGender(Gender.valueOf(request.getGender()));
-            } catch (IllegalArgumentException ex) {
-                throw new RuntimeException("Giới tính không hợp lệ");
-            }
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public class UnauthorizedException extends RuntimeException {
+        public UnauthorizedException(String message) {
+            super(message);
         }
-
-        if (request.getDateOfBirth() != null)
-            user.setDateOfBirth(request.getDateOfBirth());
-
-        if (request.getAddressLine() != null)
-            user.setAddressLine(request.getAddressLine());
-
-        if (request.getSecondaryEmail() != null)
-            user.setSecondaryEmail(request.getSecondaryEmail());
-        if (request.getTertiaryEmail() != null)
-            user.setTertiaryEmail(request.getTertiaryEmail());
-
-        if (request.getPhone1() != null)
-            user.setPhone1(request.getPhone1());
-        if (request.getPhone2() != null)
-            user.setPhone2(request.getPhone2());
-        if (request.getPhone3() != null)
-            user.setPhone3(request.getPhone3());
     }
 
-    private void applyPublicProfileUpdates(UserProfile user, UpdatePublicProfileRequest request) {
+    private void applyFullProfileUpdates(UserProfile user, UpdateUserProfileRequest request) {
+
+        // PUBLIC FIELDS
         if (request.getFullname() != null)
             user.setFullname(request.getFullname());
 
@@ -319,5 +277,49 @@ public class UserController {
 
         if (request.getOccupation() != null)
             user.setOccupation(request.getOccupation());
+
+        // SENSITIVE FIELDS
+        String genderStr = request.getGender();
+        if (genderStr != null) {
+            String g = genderStr.trim();
+
+            if (g.isEmpty()) {
+                // FE gửi chuỗi rỗng -> xóa giới tính
+                user.setGender(null);
+            } else {
+                try {
+                    String normalized = g.toUpperCase();
+                    // hỗ trợ vài case tiếng Việt
+                    if (normalized.equals("NAM"))
+                        normalized = "MALE";
+                    if (normalized.equals("NU") || normalized.equals("NỮ"))
+                        normalized = "FEMALE";
+
+                    user.setGender(Gender.valueOf(normalized));
+                } catch (IllegalArgumentException ex) {
+                    // không hợp lệ thì bỏ qua, KHÔNG throw nữa
+                }
+            }
+        }
+
+        if (request.getDateOfBirth() != null)
+            user.setDateOfBirth(request.getDateOfBirth());
+
+        if (request.getAddressLine() != null)
+            user.setAddressLine(request.getAddressLine());
+
+        if (request.getSecondaryEmail() != null)
+            user.setSecondaryEmail(request.getSecondaryEmail());
+
+        if (request.getTertiaryEmail() != null)
+            user.setTertiaryEmail(request.getTertiaryEmail());
+
+        if (request.getPhone1() != null)
+            user.setPhone1(request.getPhone1());
+        if (request.getPhone2() != null)
+            user.setPhone2(request.getPhone2());
+        if (request.getPhone3() != null)
+            user.setPhone3(request.getPhone3());
     }
+
 }

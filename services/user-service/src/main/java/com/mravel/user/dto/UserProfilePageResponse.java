@@ -2,6 +2,8 @@ package com.mravel.user.dto;
 
 import lombok.Builder;
 import lombok.Data;
+
+import com.mravel.user.model.Gender;
 import com.mravel.user.model.RelationshipType;
 import java.time.LocalDate;
 import java.util.List;
@@ -25,6 +27,20 @@ public class UserProfilePageResponse {
         private LocalDate joinedDate;
         private Integer totalFriends;
         private Integer mutualFriends;
+        private String gender;
+        private LocalDate dateOfBirth;
+        private String addressLine;
+        private String secondaryEmail;
+        private String tertiaryEmail;
+
+        private String phone1;
+        private String phone2;
+        private String phone3;
+
+        private Integer totalTrips;
+
+        private String hometown;
+        private String occupation;
     }
 
     @Data

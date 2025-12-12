@@ -120,6 +120,35 @@ public class PlanGeneralService {
         int oldCount = dayLists.size();
         int newCount = (int) (endNew.toEpochDay() - startNew.toEpochDay()) + 1;
 
+        boolean startChanged = !startNew.equals(startOld);
+        boolean durationUnchanged = newCount == oldCount;
+
+        // -------------------------------------------------------------
+        // CASE A — USER CHỈ ĐỔI startDate → GIỮ NGUYÊN duration
+        // -------------------------------------------------------------
+        if (startChanged && durationUnchanged) {
+
+            int shift = (int) (startNew.toEpochDay() - startOld.toEpochDay());
+
+            for (int i = 0; i < dayLists.size(); i++) {
+                dayLists.get(i).setPosition(i);
+                dayLists.get(i).setDayDate(startOld.plusDays(i + shift));
+            }
+
+            plan.setStartDate(startNew);
+            plan.setEndDate(startNew.plusDays(oldCount - 1));
+
+            trash.setPosition(oldCount);
+
+            planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            return;
+        }
+
+        // -------------------------------------------------------------
+        // CASE B — LOGIC THAY ĐỔI endDate (tăng/giảm/tối ưu ngày)
+        // (Toàn bộ các logic cũ giữ nguyên)
+        // -------------------------------------------------------------
+
         // CASE 1 — ÉP VỀ 1 NGÀY
         if (newCount == 1 && oldCount > 1) {
 
@@ -127,9 +156,7 @@ public class PlanGeneralService {
             keep.setPosition(0);
             keep.setDayDate(startNew);
 
-            // move mọi card của các ngày sau -> trash (GIỐNG deleteList)
             int basePos = (int) cardRepo.countByListId(trash.getId());
-
             for (int i = 1; i < dayLists.size(); i++) {
                 PlanList rm = dayLists.get(i);
 
@@ -138,29 +165,27 @@ public class PlanGeneralService {
                     c.setList(trash);
                     c.setPosition(basePos++);
                 }
-                if (!cards.isEmpty()) {
+                if (!cards.isEmpty())
                     cardRepo.saveAll(cards);
-                }
 
                 listRepo.delete(rm);
             }
 
             plan.setStartDate(startNew);
             plan.setEndDate(startNew);
-
             trash.setPosition(1);
 
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
 
-        // CASE 2 — GIỮ NGUYÊN SỐ NGÀY
+        // CASE 2 — GIỮ NGUYÊN SỐ NGÀY (nhưng start không đổi)
         if (newCount == oldCount) {
-            int shift = (int) (startNew.toEpochDay() - startOld.toEpochDay());
 
+            // Trường hợp này start không đổi và chỉ đổi endDate → không cần shift
             for (int i = 0; i < dayLists.size(); i++) {
                 dayLists.get(i).setPosition(i);
-                dayLists.get(i).setDayDate(startOld.plusDays(i + shift));
+                dayLists.get(i).setDayDate(startNew.plusDays(i));
             }
 
             plan.setStartDate(startNew);
@@ -171,21 +196,18 @@ public class PlanGeneralService {
             return;
         }
 
-        // CASE 3 — KÉO DÀI (TĂNG SỐ NGÀY)
+        // CASE 3 — KÉO DÀI NGÀY
         if (newCount > oldCount) {
-            int delta = newCount - oldCount;
 
-            // ngày cuối cũ
+            int delta = newCount - oldCount;
             LocalDate lastDateOld = dayLists.get(oldCount - 1).getDayDate();
 
             for (int i = 0; i < delta; i++) {
-                String defaultTitle = "Danh sách hoạt động";
-
                 listRepo.save(
                         PlanList.builder()
                                 .plan(plan)
                                 .type(PlanListType.DAY)
-                                .title(defaultTitle)
+                                .title("Danh sách hoạt động")
                                 .position(oldCount + i)
                                 .cards(new ArrayList<>())
                                 .dayDate(lastDateOld.plusDays(i + 1))
@@ -196,19 +218,17 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
-            // nếu startDate đổi, đồng bộ lại date & position
-            if (!startNew.equals(startOld)) {
+            // nếu startDate đổi trong khi kéo dài (hiếm), sync lại
+            if (startChanged)
                 planBoardService.syncDayLists(plan);
-            }
 
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
 
-        // CASE 4 — RÚT NGẮN (GIẢM SỐ NGÀY)
+        // CASE 4 — RÚT NGẮN NGÀY
         if (newCount < oldCount) {
 
-            // move các list bị remove -> trash (card)
             int basePos = (int) cardRepo.countByListId(trash.getId());
 
             for (int i = newCount; i < oldCount; i++) {
@@ -219,14 +239,12 @@ public class PlanGeneralService {
                     c.setList(trash);
                     c.setPosition(basePos++);
                 }
-                if (!cards.isEmpty()) {
+                if (!cards.isEmpty())
                     cardRepo.saveAll(cards);
-                }
 
                 listRepo.delete(rm);
             }
 
-            // cập nhật các day còn lại
             for (int i = 0; i < newCount; i++) {
                 dayLists.get(i).setPosition(i);
                 dayLists.get(i).setDayDate(startNew.plusDays(i));

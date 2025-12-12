@@ -4,6 +4,8 @@ import com.mravel.common.response.UserProfileResponse;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
+import com.mravel.plan.dto.board.PlanRecentView;
+import com.mravel.plan.model.ExtraCost;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanCard;
 import com.mravel.plan.model.PlanComment;
@@ -14,6 +16,7 @@ import com.mravel.plan.model.SplitType;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanCardRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
+import com.mravel.plan.repository.PlanRecentViewRepository;
 import com.mravel.plan.repository.PlanRepository;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanMemberRepository;
@@ -27,6 +30,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +44,7 @@ public class PlanService {
         private final PlanListRepository listRepository;
         private final PlanCardRepository cardRepository;
         private final PlanMemberRepository memberRepository;
-
+        private final PlanRecentViewRepository recentViewRepository;
         // EntityManager để truy vấn trực tiếp cho comment
         @PersistenceContext
         private EntityManager entityManager;
@@ -163,6 +167,7 @@ public class PlanService {
                 if (source.getVisibility() != Visibility.PUBLIC)
                         throw new RuntimeException("Only public plans can be copied.");
 
+                // Tạo plan mới
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
@@ -173,8 +178,12 @@ public class PlanService {
                                 .days(source.getDays())
                                 .budgetCurrency(source.getBudgetCurrency())
                                 .budgetTotal(source.getBudgetTotal())
+                                .budgetPerPerson(source.getBudgetPerPerson())
                                 .createdAt(Instant.now())
                                 .views(0L)
+                                // Tổng chi phí sẽ tính lại sau hoặc để 0
+                                .totalEstimatedCost(0L)
+                                .totalActualCost(0L)
                                 .images(new ArrayList<>(source.getImages()))
                                 .destinations(new ArrayList<>(source.getDestinations()))
                                 .build();
@@ -189,7 +198,6 @@ public class PlanService {
                                 .sorted(Comparator.comparingInt(PlanList::getPosition))
                                 .toList();
 
-                // mapping list IDs
                 Map<Long, PlanList> oldToNewList = new HashMap<>();
 
                 for (int i = 0; i < sourceDays.size(); i++) {
@@ -227,19 +235,25 @@ public class PlanService {
 
                                                 .currencyCode(oc.getCurrencyCode())
                                                 .estimatedCost(oc.getEstimatedCost())
-                                                .actualCost(oc.getActualCost())
-
-                                                .extraCosts(new HashSet<>(oc.getExtraCosts()))
-                                                // reset
-                                                .participants(Collections.emptySet())
+                                                // Reset actual về null, để tính lại sau
+                                                .actualCost(null)
+                                                .actualManual(false)
+                                                .budgetAmount(oc.getBudgetAmount())
                                                 .participantCount(null)
+
+                                                // reset chia tiền
                                                 .splitType(SplitType.NONE)
                                                 .includePayerInSplit(true)
-                                                .splitMembers(Collections.emptySet())
-                                                .splitDetails(Collections.emptySet())
-                                                .payments(Collections.emptySet())
                                                 .payerId(null)
                                                 .build();
+
+                                oc.getExtraCosts().forEach(e -> nc.getExtraCosts().add(
+                                                ExtraCost.builder()
+                                                                .reason(e.getReason())
+                                                                .type(e.getType())
+                                                                .estimatedAmount(e.getEstimatedAmount())
+                                                                .actualAmount(e.getActualAmount())
+                                                                .build()));
 
                                 cardRepository.save(nc);
                         }
@@ -375,6 +389,55 @@ public class PlanService {
                                 .toList();
 
                 return new PageImpl<>(items, pageable, plans.getTotalElements());
+        }
+
+        @Transactional
+        public List<PlanFeedItem> getRecentPlans(Long viewerId) {
+                if (viewerId == null) {
+                        return List.of();
+                }
+
+                // Lấy top 20 lịch trình vừa xem gần đây nhất
+                List<PlanRecentView> views = recentViewRepository
+                                .findTop20ByUserIdOrderByViewedAtDesc(viewerId);
+
+                if (views.isEmpty())
+                        return List.of();
+
+                List<Long> planIds = views.stream()
+                                .map(PlanRecentView::getPlanId)
+                                .toList();
+
+                // Load plan
+                List<Plan> plans = planRepository.findAllById(planIds);
+
+                // Map id -> Plan để giữ đúng thứ tự theo viewedAt
+                Map<Long, Plan> planMap = plans.stream()
+                                .collect(Collectors.toMap(Plan::getId, p -> p));
+
+                List<PlanFeedItem> result = new ArrayList<>();
+
+                for (PlanRecentView v : views) {
+                        Plan p = planMap.get(v.getPlanId());
+                        if (p == null)
+                                continue;
+
+                        // Chỉ thêm nếu user hiện tại vẫn xem được (tránh case visibility đổi)
+                        if (!permissionService.canView(p.getId(), viewerId, false)) {
+                                continue;
+                        }
+
+                        result.add(planMapper.toFeedItem(p));
+                }
+
+                return result;
+        }
+
+        @Transactional
+        public void removeRecentPlan(Long planId, Long viewerId) {
+                if (viewerId == null)
+                        return;
+                recentViewRepository.deleteByUserIdAndPlanId(viewerId, planId);
         }
 
 }

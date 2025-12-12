@@ -6,6 +6,9 @@ import com.mravel.plan.model.Visibility;
 import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.service.PlanService;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -146,4 +149,20 @@ public class PlanController {
                 return ResponseEntity.ok(ApiResponse.success("Lấy plan user khác thành công", resp));
         }
 
+        @GetMapping("/recent")
+        public ResponseEntity<ApiResponse<List<PlanFeedItem>>> getRecentPlans() {
+                Long userId = currentUser.getId();
+                List<PlanFeedItem> items = planService.getRecentPlans(userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.success("Lấy danh sách lịch trình xem gần đây thành công", items));
+        }
+
+        @DeleteMapping("/recent/{planId}")
+        public ResponseEntity<ApiResponse<?>> removeRecentPlan(@PathVariable Long planId) {
+                Long userId = currentUser.getId();
+                planService.removeRecentPlan(planId, userId);
+                return ResponseEntity.ok(
+                                ApiResponse.success("Xoá lịch trình khỏi danh sách xem gần đây thành công", null));
+        }
 }

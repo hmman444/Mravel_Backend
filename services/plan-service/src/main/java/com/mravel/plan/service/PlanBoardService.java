@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -37,7 +39,8 @@ public class PlanBoardService {
     private final UserProfileClient userProfileClient;
     private final PlanRequestRepository requestRepo;
     private final KafkaProducer kafkaProducer;
-
+    private final PlanRecentViewRepository planRecentViewRepository;
+    private final ObjectMapper objectMapper;
     // helper loaders
 
     private void validateMemberIds(Long planId, Collection<Long> userIds) {
@@ -255,6 +258,9 @@ public class PlanBoardService {
 
         // Lấy snapshot từ cache (không query DB nếu cache còn)
         BoardResponse snapshot = getBoardSnapshot(planId);
+        if (myRole == null) {
+            saveRecentViewIfNotMember(planId, userId);
+        }
 
         // Tạo bản copy có myRole riêng cho user (tránh sửa object trong cache)
         return snapshot.toBuilder()
@@ -688,6 +694,7 @@ public class PlanBoardService {
         cardRepository.save(card);
 
         recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
         publishBoard(planId, userId, "CREATE_CARD");
 
         return toCardDto(card);
@@ -731,6 +738,7 @@ public class PlanBoardService {
         recalculateCardCosts(card);
         recalculateSplitDetails(card);
         recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
         publishBoard(planId, userId, "UPDATE_CARD");
         return toCardDto(card);
     }
@@ -753,6 +761,7 @@ public class PlanBoardService {
         }
 
         recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
         publishBoard(planId, userId, "DELETE_CARD");
     }
 
@@ -770,6 +779,7 @@ public class PlanBoardService {
         cardRepository.deleteAll(cardsInTrash);
 
         recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
         publishBoard(planId, userId, "CLEAR_TRASH");
     }
 
@@ -852,6 +862,7 @@ public class PlanBoardService {
         cardRepository.save(copy);
 
         recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
         publishBoard(planId, userId, "DUPLICATE_CARD");
 
         return toCardDto(copy);
@@ -971,6 +982,7 @@ public class PlanBoardService {
         }
 
         recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
         publishBoard(planId, userId, "DUPLICATE_LIST");
 
         return ListDto.builder()
@@ -1019,7 +1031,13 @@ public class PlanBoardService {
     }
 
     @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     private BoardResponse reorderCards(Long planId, Long userId, boolean isFriend, ReorderRequest req) {
+
+        permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
+
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         PlanList source = mustLoadList(planId, req.getSourceListId());
         PlanList dest = mustLoadList(planId, req.getDestListId());
@@ -1038,11 +1056,16 @@ public class PlanBoardService {
             sourceCards.get(i).setPosition(i);
         }
 
+        // Nếu khác list -> update position list đích
         if (!source.getId().equals(dest.getId())) {
             for (int i = 0; i < destCards.size(); i++) {
                 destCards.get(i).setPosition(i);
             }
         }
+
+        recalculatePlanTotals(plan);
+        recalculateDestinations(plan);
+
         publishBoard(planId, userId, "REORDER_CARD");
 
         return getBoard(planId, userId, isFriend);
@@ -1490,4 +1513,194 @@ public class PlanBoardService {
                 .build();
     }
 
+    private List<Destination> extractDestinationsFromActivity(String activityJson) {
+        if (activityJson == null || activityJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(activityJson);
+            if (root == null || root.isNull())
+                return List.of();
+
+            List<Destination> result = new ArrayList<>();
+            // để tránh trùng trong cùng 1 card
+            Set<String> seen = new HashSet<>();
+
+            // Các field location có thể xuất hiện trong mọi loại activity
+            String[] locationFields = {
+                    "restaurantLocation",
+                    "placeLocation",
+                    "stayLocation",
+                    "fromLocation",
+                    "toLocation",
+                    "location"
+            };
+
+            for (String field : locationFields) {
+                JsonNode loc = root.get(field);
+                if (loc == null || !loc.isObject())
+                    continue;
+
+                String name = null;
+                if (loc.hasNonNull("label")) {
+                    name = loc.get("label").asText();
+                } else if (loc.hasNonNull("name")) {
+                    name = loc.get("name").asText();
+                }
+
+                String address = null;
+                if (loc.hasNonNull("fullAddress")) {
+                    address = loc.get("fullAddress").asText();
+                } else if (loc.hasNonNull("address")) {
+                    address = loc.get("address").asText();
+                }
+
+                Double lat = loc.hasNonNull("lat") ? loc.get("lat").asDouble() : null;
+                Double lng = loc.hasNonNull("lng") ? loc.get("lng").asDouble() : null;
+
+                // cả name và address đều null → bỏ
+                if (name == null && address == null)
+                    continue;
+
+                String key = (name != null ? name : "") + "|" + (address != null ? address : "");
+                if (!seen.add(key))
+                    continue; // đã có rồi thì bỏ
+
+                result.add(Destination.builder()
+                        .name(name)
+                        .address(address)
+                        .lat(lat)
+                        .lng(lng)
+                        .build());
+            }
+
+            // helper check trùng theo name trong result
+            java.util.function.Predicate<String> existsByName = placeName -> {
+                if (placeName == null)
+                    return false;
+                String p = placeName.trim();
+                if (p.isEmpty())
+                    return false;
+                return result.stream().anyMatch(d -> {
+                    String n = d.getName();
+                    return n != null && n.trim().equalsIgnoreCase(p);
+                });
+            };
+
+            // ĐẶC BIỆT CHO TRANSPORT:
+            // Nếu trong JSON có fromPlace / toPlace mà CHƯA có dest nào cùng tên,
+            // mới thêm fallback (tránh tạo thêm dòng chỉ có name + lat/lng null).
+            if (root.hasNonNull("fromPlace")) {
+                String fromPlace = root.get("fromPlace").asText().trim();
+                if (!fromPlace.isEmpty() && !existsByName.test(fromPlace)) {
+                    String key = fromPlace + "|";
+                    if (seen.add(key)) {
+                        result.add(Destination.builder()
+                                .name(fromPlace)
+                                .address(null)
+                                .lat(null)
+                                .lng(null)
+                                .build());
+                    }
+                }
+            }
+
+            if (root.hasNonNull("toPlace")) {
+                String toPlace = root.get("toPlace").asText().trim();
+                if (!toPlace.isEmpty() && !existsByName.test(toPlace)) {
+                    String key = toPlace + "|";
+                    if (seen.add(key)) {
+                        result.add(Destination.builder()
+                                .name(toPlace)
+                                .address(null)
+                                .lat(null)
+                                .lng(null)
+                                .build());
+                    }
+                }
+            }
+
+            return result;
+        } catch (Exception ex) {
+            log.warn("Failed to parse activityDataJson to extract destinations: {}", ex.getMessage());
+            return List.of();
+        }
+    }
+
+    private void recalculateDestinations(Plan plan) {
+        Long planId = plan.getId();
+
+        // Load lists theo đúng thứ tự position ASC
+        List<PlanList> lists = listRepository.findByPlanIdOrderByPositionAsc(planId);
+
+        // Unique theo key name|address (LinkedHashMap để giữ thứ tự)
+        Map<String, Destination> uniq = new LinkedHashMap<>();
+
+        for (PlanList list : lists) {
+
+            // Bỏ qua toàn bộ card nếu list = TRASH
+            if (list.getType() == PlanListType.TRASH) {
+                continue;
+            }
+
+            // Duyệt từng card theo đúng position
+            for (PlanCard card : list.getCards()) {
+
+                if (card.getActivityDataJson() == null
+                        || card.getActivityDataJson().isBlank()) {
+                    continue;
+                }
+
+                // Lấy danh sách địa điểm từ JSON của activity
+                List<Destination> extracted = extractDestinationsFromActivity(card.getActivityDataJson());
+                if (extracted == null || extracted.isEmpty())
+                    continue;
+
+                // Thêm vào uniq nếu chưa có
+                for (Destination d : extracted) {
+                    String name = d.getName() != null ? d.getName() : "";
+                    String addr = d.getAddress() != null ? d.getAddress() : "";
+                    String key = name + "|" + addr;
+
+                    uniq.putIfAbsent(key, d);
+                }
+            }
+        }
+
+        // Lọc bỏ mọi Destination rỗng (name & address đều null/blank)
+        List<Destination> cleaned = uniq.values().stream()
+                .filter(d -> {
+                    String n = d.getName();
+                    String a = d.getAddress();
+                    return (n != null && !n.isBlank()) || (a != null && !a.isBlank());
+                })
+                .toList();
+
+        // Ghi lại vào plan
+        plan.getDestinations().clear();
+        plan.getDestinations().addAll(cleaned);
+
+        planRepository.save(plan);
+    }
+
+    private void saveRecentViewIfNotMember(Long planId, Long userId) {
+        if (userId == null)
+            return;
+
+        // Nếu đã là member thì không lưu vào "xem gần đây"
+        boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
+        if (isMember)
+            return;
+
+        PlanRecentView rv = planRecentViewRepository
+                .findByUserIdAndPlanId(userId, planId)
+                .orElseGet(() -> PlanRecentView.builder()
+                        .userId(userId)
+                        .planId(planId)
+                        .build());
+
+        rv.setViewedAt(Instant.now());
+        planRecentViewRepository.save(rv);
+    }
 }
