@@ -17,44 +17,47 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .cors(cors -> {})
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // 🔥 Mở quyền cho tất cả API booking-service
-                        .requestMatchers("/api/bookings/**").permitAll()
+  @Bean
+  SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http
+      .csrf(csrf -> csrf.disable())
+      .cors(cors -> {})
+      .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+      .authorizeHttpRequests(auth -> auth
+        // ✅ public guest endpoints
+        .requestMatchers("/api/booking/public/**").permitAll()
 
-                        // Swagger / OpenAPI
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+        // ✅ swagger
+        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // Actuator
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+        // ✅ actuator
+        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
 
-                        // Error page
-                        .requestMatchers("/error").permitAll()
+        // ✅ secure account endpoints
+        .requestMatchers("/api/booking/my").authenticated()
+        .requestMatchers("/api/booking/bookings/claim").authenticated()
 
-                        // Tạm thời permitAll toàn bộ (tiểu luận không cần phức tạp)
-                        .anyRequest().permitAll()
-                );
-        return http.build();
-    }
+        // các API booking còn lại tuỳ bạn: demo thì permitAll, về sau siết dần
+        .requestMatchers("/api/booking/**").permitAll()
 
-    @Bean
-    CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:3000"
-        ));
-        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("*"));
-        cors.setAllowCredentials(true);
+        .anyRequest().permitAll()
+      )
+      // ✅ bật parse/verify JWT
+      .oauth2ResourceServer(oauth2 -> oauth2.jwt());
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", cors);
-        return source;
-    }
+    return http.build();
+  }
+
+  @Bean
+  CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration cors = new CorsConfiguration();
+    cors.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000"));
+    cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+    cors.setAllowedHeaders(List.of("*"));
+    cors.setAllowCredentials(true);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", cors);
+    return source;
+  }
 }

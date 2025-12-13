@@ -45,7 +45,7 @@ public class HotelBookingService {
     private final MomoGatewayClient momoPaymentService;
 
     @Transactional
-    public HotelBookingCreatedDTO createHotelBooking(CreateHotelBookingRequest req) {
+    public HotelBookingCreatedDTO createHotelBooking(CreateHotelBookingRequest req, String guestSid) {
         validateRequest(req);
         validateDates(req.checkInDate(), req.checkOutDate());
 
@@ -113,6 +113,7 @@ public class HotelBookingService {
         HotelBooking booking = HotelBooking.builder()
                 .code(generateCode())
                 .userId(req.userId())
+                .guestSessionId(req.userId() == null ? guestSid : null)
                 .contactName(req.contactName())
                 .contactPhone(req.contactPhone())
                 .contactEmail(req.contactEmail())
@@ -375,5 +376,24 @@ public class HotelBookingService {
         return map.entrySet().stream()
                 .map(e -> new RoomRequestDTO(e.getKey(), e.getValue()))
                 .toList();
+    }
+
+    @Transactional
+    public int claimGuestBookingsToUser(String sid, Long userId) {
+        if (userId == null) throw new IllegalArgumentException("Thiếu userId");
+        if (sid == null || sid.isBlank()) return 0;
+
+        var list = hotelBookingRepository
+            .findByGuestSessionIdAndUserIdIsNullOrderByCreatedAtDesc(sid);
+
+        if (list.isEmpty()) return 0;
+
+        for (var b : list) {
+            b.setUserId(userId);
+            b.setGuestSessionId(null); // hoặc giữ lại nếu bạn vẫn muốn “đơn trên thiết bị”
+        }
+
+        hotelBookingRepository.saveAll(list);
+        return list.size();
     }
 }
