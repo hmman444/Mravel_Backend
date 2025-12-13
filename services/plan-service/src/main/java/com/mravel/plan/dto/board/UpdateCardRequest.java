@@ -1,6 +1,5 @@
 package com.mravel.plan.dto.board;
 
-import com.mravel.plan.model.CardPersonRef;
 import com.mravel.plan.model.PlanActivityType;
 import lombok.*;
 
@@ -27,7 +26,6 @@ public class UpdateCardRequest {
     private PlanActivityType activityType;
     private String activityDataJson;
 
-    // ============ THAM GIA HOẠT ĐỘNG ============
     /**
      * FE có thể không gửi -> BE tự tính từ participants.size()
      */
@@ -36,9 +34,8 @@ public class UpdateCardRequest {
     /**
      * Danh sách thành viên tham gia hoạt động.
      */
-    private Set<CardPersonRef> participants;
+    private Set<Long> participants;
 
-    // ============ CHI PHÍ & CHIA TIỀN ============
     private PlanCardCostDto cost;
     private PlanCardSplitConfigDto split;
 }

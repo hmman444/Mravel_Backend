@@ -33,14 +33,10 @@ public class Plan {
 
     private Long views;
 
-    @Embedded
-    private AuthorSummary author;
+    @Column(name = "author_id", nullable = false)
+    private Long authorId;
 
     private Instant createdAt;
-
-    @ElementCollection
-    @CollectionTable(name = "plan_invites", joinColumns = @JoinColumn(name = "plan_id"))
-    private List<Invite> inviteList = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "plan_images", joinColumns = @JoinColumn(name = "plan_id"))
@@ -69,22 +65,7 @@ public class Plan {
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<PlanInvite> invites = new ArrayList<>();
-
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<PlanMember> members = new ArrayList<>();
-
-    @Embeddable
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class Invite {
-        private String email;
-        private String role; // editor / viewer
-    }
 
     @Builder.Default
     private String budgetCurrency = "VND"; // default "VND"

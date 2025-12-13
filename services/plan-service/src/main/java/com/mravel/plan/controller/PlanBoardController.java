@@ -66,6 +66,16 @@ public class PlanBoardController {
                                 ApiResponse.success("Xoá danh sách thành công", null));
         }
 
+        @PostMapping("/lists/{listId}/duplicate")
+        public ResponseEntity<ApiResponse<ListDto>> duplicateList(
+                        @PathVariable Long planId,
+                        @PathVariable Long listId) {
+                Long userId = currentUser.getId();
+                ListDto list = service.duplicateList(planId, userId, listId);
+                return ResponseEntity.ok(
+                                ApiResponse.success("Nhân bản danh sách thành công", list));
+        }
+
         // card
         @PostMapping("/lists/{listId}/cards")
         public ResponseEntity<ApiResponse<CardDto>> createCard(
@@ -88,17 +98,6 @@ public class PlanBoardController {
                 CardDto card = service.updateCard(planId, listId, cardId, userId, req);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Cập nhật thẻ thành công", card));
-        }
-
-        @PatchMapping("/lists/{listId}/cards/{cardId}/toggle")
-        public ResponseEntity<ApiResponse<CardDto>> toggleDone(
-                        @PathVariable Long planId,
-                        @PathVariable Long listId,
-                        @PathVariable Long cardId) {
-                Long userId = currentUser.getId();
-                CardDto card = service.toggleDone(planId, listId, cardId, userId);
-                return ResponseEntity.ok(
-                                ApiResponse.success("Cập nhật trạng thái thẻ thành công", card));
         }
 
         @DeleteMapping("/lists/{listId}/cards/{cardId}")
@@ -144,16 +143,6 @@ public class PlanBoardController {
                 BoardResponse board = service.reorder(planId, userId, isFriend, req);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Cập nhật thứ tự thành công", board));
-        }
-
-        @GetMapping("/stats/cost")
-        public ResponseEntity<ApiResponse<PlanCostSummaryDto>> getCostSummary(
-                        @PathVariable Long planId,
-                        @RequestParam(defaultValue = "false") boolean isFriend) {
-                Long userId = currentUser.getId();
-                PlanCostSummaryDto dto = service.getCostSummary(planId, userId, isFriend);
-                return ResponseEntity.ok(
-                                ApiResponse.success("Lấy thống kê chi phí thành công", dto));
         }
 
         // Owner

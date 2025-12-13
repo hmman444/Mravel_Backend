@@ -6,19 +6,15 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class BoardResponse {
     private Long planId;
     private String planTitle;
     private String myRole;
 
     private List<ListDto> lists;
-    private List<LabelDto> labels;
-    private List<InviteDto> invites;
-
     private String thumbnail;
     private List<String> images;
     private String description;
@@ -28,8 +24,14 @@ public class BoardResponse {
 
     private String budgetCurrency;
     private Long budgetTotal;
+    private Long budgetPerPerson;
+
     private Long totalEstimatedCost;
     private Long totalActualCost;
 
     private String status;
+
+    private PlanCostSummaryDto costSummary;
+
+    private PlanMemberCostSummaryDto memberCostSummary;
 }

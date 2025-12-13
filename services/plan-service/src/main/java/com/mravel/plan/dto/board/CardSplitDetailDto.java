@@ -8,6 +8,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class CardSplitDetailDto {
-    private CardPersonRefDto person;
+    private Long userId;
     private Long amount;
 }

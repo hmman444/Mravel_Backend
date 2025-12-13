@@ -20,59 +20,46 @@ public class PlanListService {
 
     public List<MyPlanDto> getMyPlans(Long userId) {
 
-        List<Plan> owned = planRepository.findByAuthor_Id(userId);
+        List<Plan> owned = planRepository.findByAuthorId(userId);
         List<PlanMember> joined = memberRepository.findByUserId(userId);
-
-        Map<Long, UserProfileResponse> userCache = new HashMap<>();
 
         List<MyPlanDto> result = new ArrayList<>();
 
-        // owner plans
         for (Plan p : owned) {
-            result.add(toDto(p, PlanRole.OWNER, userCache));
+            result.add(toDto(p, PlanRole.OWNER));
         }
 
-        // plans user joined
         for (PlanMember m : joined) {
             Plan p = m.getPlan();
-            if (!Objects.equals(p.getAuthor().getId(), userId)) {
-                result.add(toDto(p, m.getRole(), userCache));
+            if (!Objects.equals(p.getAuthorId(), userId)) {
+                result.add(toDto(p, m.getRole()));
             }
         }
 
         return result;
     }
 
-    private MyPlanDto toDto(Plan p, PlanRole myRole, Map<Long, UserProfileResponse> cache) {
+    private MyPlanDto toDto(Plan p, PlanRole myRole) {
 
-        Long ownerId = p.getAuthor().getId();
-
-        UserProfileResponse ownerProfile = cache.computeIfAbsent(
-                ownerId, id -> userClient.getUserById(id));
-
-        int memberCount = p.getMembers() != null ? p.getMembers().size() : 1;
+        Long ownerId = p.getAuthorId();
+        UserProfileResponse ownerProfile = userClient.getUserById(ownerId); // cache
 
         return MyPlanDto.builder()
                 .id(p.getId())
                 .title(p.getTitle())
                 .description(p.getDescription())
                 .owner(ownerProfile.getFullname())
-                .members(memberCount)
-
-                .totalEstimatedCost(
-                        p.getTotalEstimatedCost() != null ? p.getTotalEstimatedCost() : 0L)
-                .totalActualCost(
-                        p.getTotalActualCost() != null ? p.getTotalActualCost() : 0L)
+                .members(p.getMembers() != null ? p.getMembers().size() : 1)
+                .totalEstimatedCost(Optional.ofNullable(p.getTotalEstimatedCost()).orElse(0L))
+                .totalActualCost(Optional.ofNullable(p.getTotalActualCost()).orElse(0L))
                 .budgetCurrency(p.getBudgetCurrency())
                 .budgetTotal(p.getBudgetTotal())
-
                 .startDate(p.getStartDate())
                 .endDate(p.getEndDate())
-
                 .thumbnail(p.getThumbnail())
-
                 .status(p.getStatus())
                 .myRole(myRole)
                 .build();
     }
+
 }

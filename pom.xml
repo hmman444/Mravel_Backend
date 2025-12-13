@@ -94,10 +94,11 @@
 
     <!-- Services -->
     <module>services/auth-service</module>
-	  <module>services/catalog-service</module>
-	  <module>services/user-service</module>
-	  <module>services/plan-service</module>
-    <module>services/booking-service</module>
+	<module>services/catalog-service</module>
+	<module>services/user-service</module>
+	<module>services/plan-service</module>
+	<module>services/realtime-service</module>
+  <module>services/booking-service</module>
     <!--<module>services/review-service</module>
     <module>services/location-service</module>
     <module>services/report-service</module> -->

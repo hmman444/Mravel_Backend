@@ -20,8 +20,6 @@ public class UserController {
     private final UserRepository userRepository;
     private final AuthTokenClient authTokenClient;
 
-    // ====== 1. Lấy theo email (dùng cho internal, admin, ... nếu cần) ======
-
     @GetMapping("/by-email")
     public UserProfileResponse getUserByEmail(@RequestParam("email") String email) {
         UserProfile user = userRepository.findByEmail(email)
@@ -56,8 +54,6 @@ public class UserController {
         return toResponse(user);
     }
 
-    // ====== 2. Cập nhật "current user" dựa trên JWT ======
-
     @PutMapping("/me")
     public UserProfileResponse updateCurrentUser(
             @RequestHeader("Authorization") String authorizationHeader,
@@ -86,7 +82,6 @@ public class UserController {
         return toResponse(user);
     }
 
-    // ====== Hàm dùng chung để update field ======
     private void applyUpdates(UserProfile user, UpdateUserProfileRequest request) {
         if (request.getFullname() != null)
             user.setFullname(request.getFullname());
