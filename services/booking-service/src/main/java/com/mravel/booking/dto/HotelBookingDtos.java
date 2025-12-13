@@ -2,6 +2,7 @@
 package com.mravel.booking.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -68,5 +69,58 @@ public class HotelBookingDtos {
             // Sau này khi tích hợp Momo có thể add:
             String paymentMethod,     // "MOMO_WALLET"
             String paymentUrl         // payUrl redirect tới Momo (hiện tại có thể để null)
+    ) {}
+
+    public record BookingRoomLine(
+            Long id,
+            String roomTypeId,
+            String roomTypeName,
+            String ratePlanId,
+            String ratePlanName,
+            Integer quantity,
+            Integer nights,
+            BigDecimal pricePerNight,
+            BigDecimal totalAmount
+    ) {}
+
+    public record HotelBookingDetailDTO(
+            Long id,
+            Instant createdAt,
+            Instant updatedAt,
+
+            String code,
+            Long userId,
+            String guestSessionId,
+
+            String contactName,
+            String contactPhone,
+            String contactEmail,
+            String note,
+
+            String hotelId,
+            String hotelSlug,
+            String hotelName,
+
+            LocalDate checkInDate,
+            LocalDate checkOutDate,
+            Integer nights,
+            Integer roomsCount,
+
+            String payOption,
+            BigDecimal totalAmount,
+            BigDecimal depositAmount,
+            BigDecimal amountPayable,
+            BigDecimal amountPaid,
+            String currencyCode,
+
+            String status,
+            String paymentStatus,
+            Instant paidAt,
+            Instant cancelledAt,
+            String cancelReason,
+
+            Boolean inventoryDeducted,
+
+            List<BookingRoomLine> rooms
     ) {}
 }

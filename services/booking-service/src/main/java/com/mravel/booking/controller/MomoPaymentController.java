@@ -57,7 +57,7 @@ public class MomoPaymentController {
             );
         }
 
-        String feUrl = "http://localhost:5173/hotels";
+        String feUrl = "http://localhost:5173/my-bookings";
 
         // gắn thêm query cho FE show toast nếu thích:
         // String feUrl = "http://localhost:5173/hotels?paid=" + (resultCode != null && resultCode == 0 ? "1" : "0")

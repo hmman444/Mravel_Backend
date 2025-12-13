@@ -9,7 +9,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(name = "bookings")
+@Table(
+    name = "bookings",
+    indexes = {
+        @Index(name = "idx_booking_guest_sid", columnList = "guest_session_id"),
+        @Index(name = "idx_booking_user_id", columnList = "user_id")
+    }
+)
 @Inheritance(strategy = InheritanceType.JOINED)
 @Getter
 @Setter
@@ -21,7 +27,12 @@ public abstract class BookingBase extends BaseEntity {
     @Column(nullable = false, unique = true, length = 32)
     private String code;
 
+    @Column(name = "user_id")
     private Long userId;
+
+    // ✅ NEW: guest session id (cookie)
+    @Column(name = "guest_session_id", length = 64)
+    private String guestSessionId;
 
     @Column(nullable = false, length = 100)
     private String contactName;
