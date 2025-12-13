@@ -118,7 +118,16 @@ public class HotelDtos {
 
             // Thông tin đối tác & moderation (nếu bạn muốn show ở admin UI)
             PublisherDTO publisher,
-            ModerationDTO moderation
+            ModerationDTO moderation,
+
+            BookingConfigDTO bookingConfig
+    ) {}
+
+    public record BookingConfigDTO(
+            Boolean allowFullPayment,
+            Boolean allowDeposit,
+            BigDecimal depositPercent,
+            Integer freeCancelMinutes
     ) {}
 
     // ================== SUB-DTO CHO CÁC PHẦN CON ==================
@@ -251,10 +260,7 @@ public class HotelDtos {
 
         // Label khuyến mãi + flag cảnh báo
         String promoLabel,
-        Boolean showLowAvailability,
-
-        // Số phòng còn trống của rate plan
-        Integer availableRooms
+        Boolean showLowAvailability
 ) {}
 
     // ================== PUBLISHER & MODERATION ==================

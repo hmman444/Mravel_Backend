@@ -139,6 +139,17 @@ public class HotelMapper {
         PublisherDTO publisher = h.getPublisher() == null ? null : toPublisher(h.getPublisher());
         ModerationDTO moderation = h.getModeration() == null ? null : toModeration(h.getModeration());
 
+        BookingConfigDTO bookingConfigDTO = null;
+        if (h.getBookingConfig() != null) {
+            var bc = h.getBookingConfig();
+            bookingConfigDTO = new BookingConfigDTO(
+                    bc.getAllowFullPayment(),
+                    bc.getAllowDeposit(),
+                    bc.getDepositPercent(),
+                    bc.getFreeCancelMinutes()
+            );
+        }
+
         return new HotelDetailDTO(
                 h.getId(),
                 h.getName(),
@@ -176,7 +187,8 @@ public class HotelMapper {
                 content,
                 roomTypes,
                 publisher,
-                moderation
+                moderation,
+                bookingConfigDTO
         );
     }
 
@@ -336,10 +348,8 @@ public class HotelMapper {
                 rp.getRefundable(),
                 rp.getCancellationPolicy(),
 
-                // Giá cơ bản
+                // Giá
                 rp.getPricePerNight(),
-
-                // Giá gốc + % giảm
                 rp.getReferencePricePerNight(),
                 rp.getDiscountPercent(),
 
@@ -351,10 +361,7 @@ public class HotelMapper {
 
                 // Promo
                 rp.getPromoLabel(),
-                rp.getShowLowAvailability(),
-
-                // Số phòng còn
-                rp.getAvailableRooms()
+                rp.getShowLowAvailability()
         );
     }
 
