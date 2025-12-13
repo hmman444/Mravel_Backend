@@ -13,7 +13,6 @@ import org.springframework.stereotype.Repository;
 
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
-import com.mravel.catalog.model.enums.VenueType;
 import com.mravel.catalog.repository.PlaceDocRepositoryCustom;
 
 @Repository
@@ -48,32 +47,8 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
   // ===== helpers =====
   private static boolean has(String s) { return s != null && !s.isBlank(); }
 
-  /** kind=VENUE + venueType=... */
-  private static List<Criteria> baseActiveVenue(VenueType vt) {
-    List<Criteria> cs = new ArrayList<>();
-    cs.add(where("active").is(true));
-    cs.add(where("kind").is(PlaceKind.VENUE));
-    cs.add(where("venueType").is(vt));
-    return cs;
-  }
-
   private static Criteria and(List<Criteria> cs) {
     return new Criteria().andOperator(cs.toArray(new Criteria[0]));
-  }
-
-  /** Ưu tiên match theo parentSlug (destination slug), rồi tới mã/tên địa lý + địa chỉ */
-  private static Criteria locationCrit(String locRaw) {
-    String loc = locRaw.trim();
-    return new Criteria().orOperator(
-      where("parentSlug").is(loc),   // ← nếu bạn có field này trong PlaceDoc
-      where("provinceCode").is(loc),
-      where("districtCode").is(loc),
-      where("wardCode").is(loc),
-      where("addressLine").regex(loc, "i"),
-      where("provinceName").regex(loc, "i"),
-      where("districtName").regex(loc, "i"),
-      where("wardName").regex(loc, "i")
-    );
   }
 
   @Override

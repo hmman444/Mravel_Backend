@@ -48,9 +48,16 @@ public class GeoSuggestService {
                     .collectList()
                     .block();
         } catch (WebClientResponseException ex) {
-            // 4xx/5xx từ Nominatim
+            int status = ex.getStatusCode().value();
+            String reason = ex.getStatusText();
+
+            var req = ex.getRequest();
+            String uri = (req != null && req.getURI() != null)
+                    ? req.getURI().toString()
+                    : "unknown";
+
             log.warn("GeoSuggestService.suggest error with query '{}': {} {} from {}",
-                    q, ex.getRawStatusCode(), ex.getStatusText(), ex.getRequest().getURI());
+                    q, status, reason, uri);
         } catch (Exception ex) {
             log.warn("GeoSuggestService.suggest unexpected error with query '{}': {}",
                     q, ex.toString());

@@ -6,19 +6,19 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "payments")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id", nullable = false)
-    private Booking booking;
+    private BookingBase booking;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

@@ -14,5 +14,7 @@ public class UserRegisteredEvent {
     private String avatar;
     private String provider;
     private String providerId;
+
+    @Builder.Default
     private String version = "v1";
 }

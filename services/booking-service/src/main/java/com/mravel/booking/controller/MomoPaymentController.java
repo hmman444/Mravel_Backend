@@ -4,7 +4,9 @@ package com.mravel.booking.controller;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
+import java.net.URI;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,17 +30,14 @@ public class MomoPaymentController {
         return ResponseEntity.ok("OK");
     }
 
-    // ======= API confirm dành cho FE / Postman khi dev local =======
     @PostMapping("/confirm")
-    public ResponseEntity<ApiResponse<Void>> confirmFromClient(
-            @RequestBody MomoConfirmRequest body
-    ) {
+    public ResponseEntity<ApiResponse<Void>> confirmFromClient(@RequestBody MomoConfirmRequest body) {
         momoPaymentService.handleClientConfirm(body);
         return ResponseEntity.ok(ApiResponse.success("Xác nhận thanh toán thành công", null));
     }
 
     @GetMapping("/redirect")
-    public ResponseEntity<String> handleRedirect(
+    public ResponseEntity<Void> handleRedirect(
             @RequestParam(required = false, name = "orderId") String orderId,
             @RequestParam(required = false, name = "bookingCode") String bookingCode,
             @RequestParam(required = false) Long amount,
@@ -49,7 +48,6 @@ public class MomoPaymentController {
                 + ", amount=" + amount
                 + ", resultCode=" + resultCode);
 
-        // Ưu tiên orderId, fallback sang bookingCode
         String code = (orderId != null) ? orderId : bookingCode;
 
         if (code != null && resultCode != null && resultCode == 0) {
@@ -59,7 +57,14 @@ public class MomoPaymentController {
             );
         }
 
-        return ResponseEntity.ok("Payment confirmed");
-    }
+        String feUrl = "http://localhost:5173/hotels";
 
+        // gắn thêm query cho FE show toast nếu thích:
+        // String feUrl = "http://localhost:5173/hotels?paid=" + (resultCode != null && resultCode == 0 ? "1" : "0")
+        //        + (code != null ? "&bookingCode=" + code : "");
+
+        return ResponseEntity.status(HttpStatus.FOUND) // 302
+                .location(URI.create(feUrl))
+                .build();
+    }
 }

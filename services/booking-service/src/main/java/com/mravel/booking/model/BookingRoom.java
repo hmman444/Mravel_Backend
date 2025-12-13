@@ -3,41 +3,40 @@ package com.mravel.booking.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "booking_rooms")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class BookingRoom extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
-    private Booking booking;
+    @JoinColumn(name = "hotel_booking_id", nullable = false)
+    private HotelBooking booking;
 
-    // Tham chiếu sang HotelDoc.RoomType + RatePlan
     @Column(nullable = false)
-    private String roomTypeId;       // HotelDoc.RoomType.id
+    private String roomTypeId;
 
     @Column(nullable = false, length = 200)
-    private String roomTypeName;     // snapshot tên phòng
+    private String roomTypeName;
 
-    private String ratePlanId;       // HotelDoc.RatePlan.id
-    private String ratePlanName;     // snapshot tên gói
-
-    @Column(nullable = false)
-    private Integer quantity;        // số phòng loại này
+    private String ratePlanId;
+    private String ratePlanName;
 
     @Column(nullable = false)
-    private Integer nights;          // số đêm áp dụng cho loại phòng này
+    private Integer quantity;
+
+    @Column(nullable = false)
+    private Integer nights;
 
     @Column(nullable = false, precision = 18, scale = 2)
-    private BigDecimal pricePerNight;   // giá/đêm tại thời điểm đặt (đã apply khuyến mãi)
+    private BigDecimal pricePerNight;
 
     @Column(nullable = false, precision = 18, scale = 2)
-    private BigDecimal totalAmount;     // = pricePerNight * nights * quantity
+    private BigDecimal totalAmount;
 }
