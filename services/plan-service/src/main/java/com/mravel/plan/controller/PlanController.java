@@ -23,10 +23,11 @@ public class PlanController {
 
         @GetMapping
         public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getFeed(
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                         @RequestParam(defaultValue = "1") int page,
                         @RequestParam(defaultValue = "10") int size) {
                 Long viewerId = currentUser.getId();
-                Page<PlanFeedItem> data = planService.getFeed(page, size, viewerId);
+                Page<PlanFeedItem> data = planService.getFeed(page, size, viewerId, authorizationHeader);
 
                 PageResponse<PlanFeedItem> pageResponse = PageResponse.<PlanFeedItem>builder()
                                 .items(data.getContent())
@@ -43,9 +44,10 @@ public class PlanController {
         @GetMapping("/{id}")
         public ResponseEntity<ApiResponse<PlanFeedItem>> getById(
                         @PathVariable Long id,
-                        @RequestParam(defaultValue = "false") boolean isFriend) {
-                Long viewerId = currentUser.getId();
-                PlanFeedItem item = planService.getById(id, viewerId, isFriend);
+                        @RequestHeader("Authorization") String authorizationHeader) {
+
+                PlanFeedItem item = planService.getById(id, authorizationHeader);
+
                 return ResponseEntity.ok(
                                 ApiResponse.success("Lấy chi tiết plan thành công", item));
         }
@@ -70,10 +72,10 @@ public class PlanController {
         }
 
         @PostMapping("/{id}/copy")
-        public ResponseEntity<ApiResponse<PlanFeedItem>> copyPublicPlan(
+        public ResponseEntity<ApiResponse<PlanFeedItem>> copyPlan(
                         @PathVariable Long id) {
                 Long userId = currentUser.getId();
-                PlanFeedItem copied = planService.copyPublicPlan(id, userId);
+                PlanFeedItem copied = planService.copyPlan(id, userId);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Sao chép plan công khai thành công", copied));
         }
@@ -164,5 +166,14 @@ public class PlanController {
                 planService.removeRecentPlan(planId, userId);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Xoá lịch trình khỏi danh sách xem gần đây thành công", null));
+        }
+
+        @DeleteMapping("/{planId}")
+        public ResponseEntity<ApiResponse<Void>> deletePlan(@PathVariable Long planId) {
+                Long userId = currentUser.getId();
+                planService.deletePlan(planId, userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.success("Plan deleted successfully", null));
         }
 }

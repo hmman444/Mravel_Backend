@@ -1,6 +1,7 @@
 package com.mravel.plan.service;
 
 import com.mravel.common.response.UserProfileResponse;
+import com.mravel.plan.client.FriendClient;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.board.*;
 import com.mravel.plan.kafka.KafkaProducer;
@@ -41,6 +42,7 @@ public class PlanBoardService {
     private final KafkaProducer kafkaProducer;
     private final PlanRecentViewRepository planRecentViewRepository;
     private final ObjectMapper objectMapper;
+    private final FriendClient friendClient;
     // helper loaders
 
     private void validateMemberIds(Long planId, Collection<Long> userIds) {
@@ -263,6 +265,45 @@ public class PlanBoardService {
         }
 
         // Tạo bản copy có myRole riêng cho user (tránh sửa object trong cache)
+        return snapshot.toBuilder()
+                .myRole(myRole != null ? myRole.name() : null)
+                .build();
+    }
+
+    @Transactional
+    public BoardResponse getBoard(Long planId, Long userId, String authorizationHeader) {
+
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+        boolean isFriend = false;
+
+        // owner luôn coi như có quyền xem (tùy rule của bạn)
+        if (!Objects.equals(plan.getAuthorId(), userId)) {
+            // Nếu userId là member thì khỏi cần check friend
+            boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
+
+            if (!isMember && authorizationHeader != null && !authorizationHeader.isBlank()) {
+                try {
+                    var rel = friendClient.getRelationship(authorizationHeader, plan.getAuthorId());
+                    isFriend = (rel == com.mravel.common.response.RelationshipType.FRIEND);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        if (!permissionService.canView(planId, userId, isFriend)) {
+            throw new RuntimeException("You don't have permission to view this board.");
+        }
+
+        PlanRole myRole = permissionService.getUserRole(planId, userId);
+
+        BoardResponse snapshot = getBoardSnapshot(planId);
+
+        if (myRole == null) {
+            saveRecentViewIfNotMember(planId, userId);
+        }
+
         return snapshot.toBuilder()
                 .myRole(myRole != null ? myRole.name() : null)
                 .build();

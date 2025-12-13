@@ -1,6 +1,8 @@
 package com.mravel.plan.service;
 
+import com.mravel.common.response.RelationshipType;
 import com.mravel.common.response.UserProfileResponse;
+import com.mravel.plan.client.FriendClient;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
@@ -15,9 +17,11 @@ import com.mravel.plan.model.PlanReaction;
 import com.mravel.plan.model.SplitType;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanCardRepository;
+import com.mravel.plan.repository.PlanInviteTokenRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRecentViewRepository;
 import com.mravel.plan.repository.PlanRepository;
+import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanMemberRepository;
 import jakarta.persistence.EntityManager;
@@ -45,24 +49,32 @@ public class PlanService {
         private final PlanCardRepository cardRepository;
         private final PlanMemberRepository memberRepository;
         private final PlanRecentViewRepository recentViewRepository;
+        private final PlanInviteTokenRepository inviteTokenRepository;
+        private final CurrentUserService currentUser;
+        private final FriendClient friendClient;
+
         // EntityManager để truy vấn trực tiếp cho comment
         @PersistenceContext
         private EntityManager entityManager;
 
-        public Page<PlanFeedItem> getFeed(int page, int size, Long viewerId) {
+        public Page<PlanFeedItem> getFeed(int page, int size, Long viewerId, String authorizationHeader) {
                 PageRequest pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-                Page<Plan> pageResult;
+                List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
+                if (memberPlanIds.isEmpty())
+                        memberPlanIds = List.of(-1L);
 
-                if (viewerId == null) {
-                        pageResult = planRepository.findByVisibility(Visibility.PUBLIC, pageable);
-                } else {
-                        List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
-                        if (memberPlanIds.isEmpty()) {
-                                memberPlanIds = Collections.singletonList(-1L); // tránh IN ()
+                List<Long> friendIds = List.of();
+                if (authorizationHeader != null) {
+                        try {
+                                friendIds = friendClient.getFriendIds(authorizationHeader);
+                        } catch (Exception ignored) {
                         }
-                        pageResult = planRepository.findVisibleForUser(viewerId, memberPlanIds, pageable);
                 }
+                if (friendIds.isEmpty())
+                        friendIds = List.of(-1L);
+
+                Page<Plan> pageResult = planRepository.findFeedForUser(viewerId, memberPlanIds, friendIds, pageable);
 
                 List<PlanFeedItem> content = pageResult.getContent().stream()
                                 .map(planMapper::toFeedItem)
@@ -71,12 +83,22 @@ public class PlanService {
                 return new PageImpl<>(content, pageable, pageResult.getTotalElements());
         }
 
-        public PlanFeedItem getById(Long id, Long viewerId, boolean isFriend) {
+        public PlanFeedItem getById(Long id, String authorizationHeader) {
+
+                Long viewerId = currentUser.getId();
+
                 Plan plan = planRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-                if (!permissionService.canView(id, viewerId, isFriend))
+                RelationshipType relationship = friendClient.getRelationship(
+                                authorizationHeader,
+                                plan.getAuthorId());
+
+                boolean isFriend = relationship == RelationshipType.FRIEND;
+
+                if (!permissionService.canView(id, viewerId, isFriend)) {
                         throw new RuntimeException("You don't have permission to view this plan.");
+                }
 
                 return planMapper.toFeedItem(plan);
         }
@@ -159,14 +181,16 @@ public class PlanService {
         }
 
         @Transactional
-        public PlanFeedItem copyPublicPlan(Long planId, Long userId) {
+        public PlanFeedItem copyPlan(Long planId, Long userId) {
 
                 Plan source = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-                if (source.getVisibility() != Visibility.PUBLIC)
-                        throw new RuntimeException("Only public plans can be copied.");
+                boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
 
+                if (source.getVisibility() != Visibility.PUBLIC && !isMember) {
+                        throw new RuntimeException("You don't have permission to copy this plan.");
+                }
                 // Tạo plan mới
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
@@ -438,6 +462,23 @@ public class PlanService {
                 if (viewerId == null)
                         return;
                 recentViewRepository.deleteByUserIdAndPlanId(viewerId, planId);
+        }
+
+        @Transactional
+        public void deletePlan(Long planId, Long userId) {
+                inviteTokenRepository.deleteByPlanId(planId);
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+
+                if (!Objects.equals(plan.getAuthorId(), userId)) {
+                        throw new RuntimeException("Only the owner can delete this plan.");
+                }
+
+                recentViewRepository.deleteByPlanId(planId);
+
+                planRepository.delete(plan);
+
+                planRepository.flush();
         }
 
 }

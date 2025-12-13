@@ -12,37 +12,51 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PlanRepository extends JpaRepository<Plan, Long> {
-    Page<Plan> findByVisibility(Visibility visibility, Pageable pageable);
+        Page<Plan> findByVisibility(Visibility visibility, Pageable pageable);
 
-    List<Plan> findByAuthorId(Long authorId);
+        List<Plan> findByAuthorId(Long authorId);
 
-    @Query("""
-                select p from Plan p
-                where p.visibility = 'PUBLIC'
-                   or p.authorId = :viewerId
-                   or p.id in :memberPlanIds
-                order by p.createdAt desc
-            """)
-    Page<Plan> findVisibleForUser(@Param("viewerId") Long viewerId,
-            @Param("memberPlanIds") List<Long> memberPlanIds,
-            Pageable pageable);
+        @Query("""
+                            select p from Plan p
+                            where p.visibility = 'PUBLIC'
+                               or p.authorId = :viewerId
+                               or p.id in :memberPlanIds
+                            order by p.createdAt desc
+                        """)
+        Page<Plan> findVisibleForUser(@Param("viewerId") Long viewerId,
+                        @Param("memberPlanIds") List<Long> memberPlanIds,
+                        Pageable pageable);
 
-    @Query("""
-            SELECT p FROM Plan p
-            WHERE p.authorId = :ownerId
-              AND (
-                    p.visibility = 'PUBLIC'
-                 OR (p.visibility = 'FRIENDS' AND :isFriend = TRUE)
-                 OR (p.visibility = 'PRIVATE' AND p.id IN :memberPlanIds)
-              )
-            ORDER BY p.createdAt DESC
-            """)
-    Page<Plan> findAllPlansOfUserWithVisibility(
-            @Param("ownerId") Long ownerId,
-            @Param("isFriend") boolean isFriend,
-            @Param("memberPlanIds") List<Long> memberPlanIds,
-            Pageable pageable);
+        @Query("""
+                        SELECT p FROM Plan p
+                        WHERE p.authorId = :ownerId
+                          AND (
+                                p.visibility = 'PUBLIC'
+                             OR (p.visibility = 'FRIENDS' AND :isFriend = TRUE)
+                             OR (p.visibility = 'PRIVATE' AND p.id IN :memberPlanIds)
+                          )
+                        ORDER BY p.createdAt DESC
+                        """)
+        Page<Plan> findAllPlansOfUserWithVisibility(
+                        @Param("ownerId") Long ownerId,
+                        @Param("isFriend") boolean isFriend,
+                        @Param("memberPlanIds") List<Long> memberPlanIds,
+                        Pageable pageable);
 
-    Page<Plan> findByAuthorId(Long authorId, Pageable pageable);
+        Page<Plan> findByAuthorId(Long authorId, Pageable pageable);
+
+        @Query("""
+                        SELECT p FROM Plan p
+                        WHERE
+                            p.visibility = com.mravel.plan.model.Visibility.PUBLIC
+                         OR p.authorId = :viewerId
+                         OR p.id IN :memberPlanIds
+                         OR (p.visibility = com.mravel.plan.model.Visibility.FRIENDS AND p.authorId IN :friendIds)
+                        """)
+        Page<Plan> findFeedForUser(
+                        @Param("viewerId") Long viewerId,
+                        @Param("memberPlanIds") List<Long> memberPlanIds,
+                        @Param("friendIds") List<Long> friendIds,
+                        Pageable pageable);
 
 }

@@ -7,6 +7,7 @@ import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -75,4 +76,13 @@ public class FriendController {
         RelationshipType type = friendService.getRelationship(viewerId, profileUserId);
         return ApiResponse.success("Lấy quan hệ thành công", type);
     }
+
+    @GetMapping("/ids")
+    public ApiResponse<List<Long>> getFriendIds(
+            @RequestHeader("Authorization") String authorizationHeader) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+        List<Long> ids = friendService.getFriendIds(currentUserId);
+        return ApiResponse.success("Lấy friendIds thành công", ids);
+    }
+
 }
