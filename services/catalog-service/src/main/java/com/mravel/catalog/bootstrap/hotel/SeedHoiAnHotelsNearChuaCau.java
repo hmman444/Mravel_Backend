@@ -256,7 +256,7 @@ public class SeedHoiAnHotelsNearChuaCau {
             .maxAdults(2)
             .maxChildren(0)
             .maxGuests(2)
-            .totalRooms(2)
+            .totalRooms(30)
             .images(List.of(
                 img("https://ik.imagekit.io/tvlk/generic-asset/Ixf4aptF5N2Qdfmh4fGGYhTN274kJXuNMkUAzpL5HuD9jzSxIGG5kZNhhHY-p7nw/hotel/asset/67788415-40b386dd4aa1a67d9ab61b08f2138609.jpeg?_src=imagekit&tr=dpr-2,c-at_max,f-jpg,h-460,pr-true,q-40,w-724", "Phòng Deluxe Twin với 2 giường đơn", true, 0),
                 img("https://ik.imagekit.io/tvlk/generic-asset/Ixf4aptF5N2Qdfmh4fGGYhTN274kJXuNMkUAzpL5HuD9jzSxIGG5kZNhhHY-p7nw/hotel/asset/67788415-6b87c5b998f53106be04311d5d0d91ca.jpeg?_src=imagekit&tr=dpr-2,c-at_max,f-jpg,h-460,pr-true,q-40,w-724", "Không gian rộng rãi", false, 1),
@@ -295,16 +295,15 @@ public class SeedHoiAnHotelsNearChuaCau {
                     .priceIncludesTax(true)
                     .priceIncludesServiceFee(true)
                     .lengthOfStayDiscounts(List.of())
-                    .promoLabel("Chỉ còn 1 phòng")
+                    .promoLabel("Giá tốt cho phòng đôi")
                     .showLowAvailability(true)
-                    .availableRooms(1)
                     .build(),
                 // Plan 2: Deluxe Twin Room - Room Only, giá cao hơn
                 RatePlan.builder()
                     .id("rp-bespoke-deluxe-twin-room-only-nonref-2")
                     .name("Deluxe Twin Room - Room Only")
-                    .boardType(BoardType.ROOM_ONLY)
-                    .paymentType(PaymentType.PREPAID)
+                    .boardType(BoardType.BREAKFAST_INCLUDED)
+                    .paymentType(PaymentType.PAY_AT_HOTEL)
                     .refundable(false)
                     .cancellationPolicy("Không được hoàn tiền.")
                     .pricePerNight(new BigDecimal("434308"))      // giảm còn (bao gồm thuế/phí)
@@ -315,9 +314,8 @@ public class SeedHoiAnHotelsNearChuaCau {
                     .priceIncludesTax(true)
                     .priceIncludesServiceFee(true)
                     .lengthOfStayDiscounts(List.of())
-                    .promoLabel("Chỉ còn 1 phòng")
+                    .promoLabel("Bửa sáng ngon miệng cho 2 người")
                     .showLowAvailability(true)
-                    .availableRooms(1)
                     .build()
             ))
             .build();
@@ -343,7 +341,7 @@ public class SeedHoiAnHotelsNearChuaCau {
             .maxAdults(4)
             .maxChildren(0)
             .maxGuests(4)
-            .totalRooms(2)
+            .totalRooms(25)
             .images(List.of(
                 img("https://ik.imagekit.io/tvlk/generic-asset/Ixf4aptF5N2Qdfmh4fGGYhTN274kJXuNMkUAzpL5HuD9jzSxIGG5kZNhhHY-p7nw/hotel/asset/67788415-a0dcfa844ef3fa9dca7471bb2a425c06.jpeg?_src=imagekit&tr=dpr-2,c-at_max,f-jpg,h-460,pr-true,q-40,w-724", "Phòng Family với giường King và giường đơn", true, 0),
                 img("https://ik.imagekit.io/tvlk/generic-asset/Ixf4aptF5N2Qdfmh4fGGYhTN274kJXuNMkUAzpL5HuD9jzSxIGG5kZNhhHY-p7nw/hotel/asset/67788415-baa1ba82fcc6360f9cf43d7b89d8ca4f.jpeg?_src=imagekit&tr=dpr-2,c-at_max,f-jpg,h-460,pr-true,q-40,w-724", "Không gian phòng Family hướng thành phố", false, 1),
@@ -384,13 +382,12 @@ public class SeedHoiAnHotelsNearChuaCau {
                     .lengthOfStayDiscounts(List.of())
                     .promoLabel("Giá tốt cho phòng Family")
                     .showLowAvailability(true) // còn 2 phòng
-                    .availableRooms(3)
                     .build(),
                 // Plan 2: Family Room - Room Only, thanh toán tại KS, có hủy theo chính sách
                 RatePlan.builder()
                     .id("rp-bespoke-family-room-only-pay-hotel")
                     .name("Family Room - Room Only")
-                    .boardType(BoardType.ROOM_ONLY)
+                    .boardType(BoardType.BREAKFAST_INCLUDED)
                     .paymentType(PaymentType.PAY_AT_HOTEL)
                     .refundable(true)
                     .cancellationPolicy("Áp dụng chính sách hủy phòng, vui lòng xem chi tiết khi đặt.")
@@ -402,9 +399,8 @@ public class SeedHoiAnHotelsNearChuaCau {
                     .priceIncludesTax(true)
                     .priceIncludesServiceFee(true)
                     .lengthOfStayDiscounts(List.of())
-                    .promoLabel("Thanh toán tại khách sạn")
+                    .promoLabel("Bửa sáng ngon miệng cho cả gia đình")
                     .showLowAvailability(true)
-                    .availableRooms(1)
                     .build()
             ))
             .build();

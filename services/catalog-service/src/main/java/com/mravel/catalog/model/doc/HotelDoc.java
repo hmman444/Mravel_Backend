@@ -136,6 +136,14 @@ public class HotelDoc {
     private TaxAndFeeConfig taxConfig;
 
     /**
+     * Cấu hình booking cơ bản cho khách sạn:
+     *  - Cho phép FULL / DEPOSIT
+     *  - % cọc
+     *  - Số phút free-cancel sau khi đặt
+     */
+    private BookingConfig bookingConfig;
+
+    /**
      * Các flag filter tổng hợp từ roomTypes.ratePlans
      * (miễn phí huỷ, thanh toán tại KS, bao gồm bữa sáng...)
      */
@@ -355,52 +363,29 @@ public class HotelDoc {
     @AllArgsConstructor
     @Builder
     public static class RatePlan {
-        private String id;                  // UUID
-        private String name;                // "Không gồm bữa sáng", "Bao gồm bữa sáng"
-        private BoardType boardType;        // ROOM_ONLY, BREAKFAST_INCLUDED...
-        private PaymentType paymentType;    // PAY_AT_HOTEL, PREPAID
-        private Boolean refundable;         // true/false (dùng cho filter "Miễn phí hủy")
-        private String cancellationPolicy;  // "Miễn phí huỷ trong 1 giờ sau khi xác nhận..."
+        private String id;
+        private String name;
+        private BoardType boardType;
+        private PaymentType paymentType;
+        private Boolean refundable;
+        private String cancellationPolicy;
 
-        /**
-         * Giá/đêm cơ bản (chưa tính VAT/phí nếu priceIncludesTax/ServiceFee == false).
-         * Tổng tiền search = pricePerNight * nights * (1 + tax + fee) tùy config.
-         */
         private BigDecimal pricePerNight;
-
-        /** Giá gốc/đêm – dùng để hiển thị giá gạch ngang từng rate plan. */
         private BigDecimal referencePricePerNight;
-
-        /** % giảm cho rate plan này so với referencePricePerNight (optional). */
         private Integer discountPercent;
 
-        /** VAT (%) override cho rate plan này (nếu null thì dùng từ taxConfig ở hotel). */
         private BigDecimal taxPercent;
-
-        /** Phí dịch vụ (%) override cho rate plan này (nếu null thì dùng từ taxConfig). */
         private BigDecimal serviceFeePercent;
-
-        /** Giá đã bao gồm VAT hay chưa. */
         @Builder.Default
         private Boolean priceIncludesTax = false;
-
-        /** Giá đã bao gồm phí dịch vụ hay chưa. */
         @Builder.Default
         private Boolean priceIncludesServiceFee = false;
 
-        /**
-         * Giảm giá theo số đêm ở (length-of-stay).
-         * Ví dụ: ở ≥2 đêm giảm 10%.
-         */
         private List<LengthOfStayDiscount> lengthOfStayDiscounts;
 
-        /** Nhãn khuyến mãi, highlight: "Đặc biệt dành cho bạn!", "Chỉ còn 1 phòng" */
         private String promoLabel;
-
-        /** Hiển thị cảnh báo còn ít phòng. */
         private Boolean showLowAvailability;
 
-        private Integer availableRooms;  // số phòng còn trống (nếu có)
     }
 
     /** Cấu hình thuế/phí mặc định cho khách sạn */
@@ -422,6 +407,45 @@ public class HotelDoc {
          */
         @Builder.Default
         private Boolean showPricePreTax = true;
+    }
+
+    /** Cấu hình booking cơ bản của khách sạn (hình thức thanh toán, cọc, free-cancel) */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class BookingConfig {
+
+        /**
+         * Có cho phép user thanh toán toàn bộ (FULL) không.
+         * Mặc định: true.
+         */
+        @Builder.Default
+        private Boolean allowFullPayment = true;
+
+        /**
+         * Có cho phép user chọn hình thức đặt cọc (DEPOSIT) không.
+         * Nếu false -> chỉ sử dụng FULL.
+         * Mặc định: true.
+         */
+        @Builder.Default
+        private Boolean allowDeposit = true;
+
+        /**
+         * % cọc trên tổng giá trị booking (0–100).
+         * Ví dụ: 30 nghĩa là cọc 30% tổng tiền phòng.
+         * Nếu null -> dùng default hệ thống (ví dụ 30% ở booking-service).
+         */
+        private BigDecimal depositPercent;
+
+        /**
+         * Số phút đầu sau khi tạo booking cho phép hủy và được hoàn 100%
+         * số tiền đã thanh toán (áp dụng cho cả FULL/DEPOSIT).
+         * Ví dụ: 30 => quy tắc “hủy trong 30 phút đầu được hoàn tiền”.
+         * Nếu null -> dùng default hệ thống.
+         */
+        private Integer freeCancelMinutes;
     }
 
     /** Giảm giá theo số đêm lưu trú (Length-of-stay discount) */
