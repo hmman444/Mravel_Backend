@@ -1,4 +1,3 @@
-// src/main/java/com/mravel/booking/payment/MomoPaymentService.java
 package com.mravel.booking.payment;
 
 import lombok.RequiredArgsConstructor;
@@ -14,6 +13,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -22,24 +22,24 @@ public class MomoGatewayClient {
 
     private final RestTemplate restTemplate;
 
-    // --- SANDBOX CONFIG (giống project MERN cũ) ---
+    // --- SANDBOX CONFIG (demo) ---
     private static final String ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create";
     private static final String PARTNER_CODE = "MOMO";
     private static final String ACCESS_KEY = "F8BBA842ECF85";
     private static final String SECRET_KEY = "K951B6PE1waDMi640xX08PD3vg6EkVlz";
     private static final String REQUEST_TYPE = "captureWallet";
 
-    // TODO: sửa cho đúng FE & BE của bạn
+    // NOTE: nên đưa vào application.yml/env sau
     private static final String REDIRECT_URL = "http://localhost:8084/api/payment/momo/redirect";
     private static final String IPN_URL = "http://localhost:8084/api/payment/momo/ipn";
 
     /**
      * Tạo giao dịch MoMo cho 1 booking và trả về payUrl.
-     * @param bookingCode mã booking (BK-XXXX)
-     * @param amount      số tiền cần thanh toán (VND)
-     * @param hotelName   tên khách sạn (để show trong orderInfo cho đẹp)
      */
     public String createPayment(String bookingCode, BigDecimal amount, String hotelName) {
+        if (bookingCode == null || bookingCode.isBlank()) {
+            throw new IllegalArgumentException("bookingCode không hợp lệ");
+        }
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Amount không hợp lệ");
         }
@@ -47,15 +47,11 @@ public class MomoGatewayClient {
         // Momo yêu cầu amount là số nguyên VND dạng string
         String amountStr = amount.setScale(0, RoundingMode.HALF_UP).toPlainString();
 
-        String orderId   = bookingCode;
-        String requestId = bookingCode; // giống Node: requestId = orderId
+        String orderId = bookingCode;
+        String requestId = bookingCode;
         String orderInfo = "Thanh toan dat phong " + (hotelName != null ? hotelName : bookingCode);
         String extraData = "";
 
-        // rawSignature giống hệt Node:
-        // accessKey=<ACCESS_KEY>&amount=<AMOUNT>&extraData=<EXTRA_DATA>&ipnUrl=<IPN_URL>
-        // &orderId=<ORDER_ID>&orderInfo=<ORDER_INFO>&partnerCode=<PARTNER_CODE>
-        // &redirectUrl=<REDIRECT_URL>&requestId=<REQUEST_ID>&requestType=<REQUEST_TYPE>
         String rawSignature =
                 "accessKey=" + ACCESS_KEY +
                         "&amount=" + amountStr +
@@ -88,28 +84,36 @@ public class MomoGatewayClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         log.info("[MoMo] createPayment request: orderId={}, amount={}", orderId, amountStr);
 
-        ResponseEntity<Map> resp = restTemplate.postForEntity(ENDPOINT, entity, Map.class);
-        if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+        ResponseEntity<Map> resp = restTemplate.postForEntity(
+                ENDPOINT,
+                new HttpEntity<>(body, headers),
+                Map.class
+        );
+
+        if (!resp.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("MoMo create payment thất bại: " + resp.getStatusCode());
         }
 
-        Map<String, Object> respBody = resp.getBody();
-        Object resultCodeObj = respBody.get("resultCode");
-        int resultCode = (resultCodeObj instanceof Number)
-                ? ((Number) resultCodeObj).intValue()
-                : Integer.parseInt(String.valueOf(resultCodeObj));
+        // resp.getBody() có thể null theo null-analysis => bắt buộc requireNonNull
+        @SuppressWarnings("unchecked")
+        Map<String, Object> respBody = (Map<String, Object>) Objects.requireNonNull(
+                resp.getBody(),
+                "MoMo response body is null"
+        );
 
-        log.info("[MoMo] response resultCode={}, message={}", resultCode, respBody.get("message"));
+        int resultCode = asInt(respBody.get("resultCode"), -999);
+        Object message = respBody.get("message");
+
+        log.info("[MoMo] response resultCode={}, message={}", resultCode, message);
 
         if (resultCode != 0) {
-            throw new IllegalStateException("MoMo từ chối giao dịch: " + respBody.get("message"));
+            throw new IllegalStateException("MoMo từ chối giao dịch: " + message);
         }
 
-        String payUrl = (String) respBody.get("payUrl");
+        String payUrl = Objects.toString(respBody.get("payUrl"), null);
         if (payUrl == null || payUrl.isBlank()) {
             throw new IllegalStateException("MoMo trả về payUrl rỗng");
         }
@@ -117,18 +121,26 @@ public class MomoGatewayClient {
         return payUrl;
     }
 
-    private String hmacSHA256(String secretKey, String data) {
+    private static int asInt(Object obj, int defaultVal) {
+        if (obj == null) return defaultVal;
+        if (obj instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(String.valueOf(obj));
+        } catch (Exception ignore) {
+            return defaultVal;
+        }
+    }
+
+    private static String hmacSHA256(String secretKey, String data) {
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");
             SecretKeySpec secretKeySpec =
                     new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             hmac.init(secretKeySpec);
-            byte[] hash = hmac.doFinal(data.getBytes(StandardCharsets.UTF_8));
 
+            byte[] hash = hmac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(2 * hash.length);
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b & 0xff));
-            }
+            for (byte b : hash) sb.append(String.format("%02x", b & 0xff));
             return sb.toString();
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi generate HMAC SHA256", e);

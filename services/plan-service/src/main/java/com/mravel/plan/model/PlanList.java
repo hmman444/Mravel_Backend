@@ -20,11 +20,9 @@ public class PlanList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // vd ngày 1
     @Column(nullable = false)
     private String title;
 
-    // dùng để sort list kéo thả
     @Column(nullable = false)
     private Integer position;
 
@@ -38,6 +36,7 @@ public class PlanList {
 
     @OneToMany(mappedBy = "list")
     @OrderBy("position ASC")
+    @Builder.Default
     private List<PlanCard> cards = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)

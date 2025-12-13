@@ -2,12 +2,12 @@
 package com.mravel.booking.service;
 
 import com.mravel.booking.dto.HotelBookingDtos.HotelBookingCreatedDTO;
-import com.mravel.booking.model.Booking;
+import com.mravel.booking.model.HotelBooking;
 
 public class HotelBookingMapper {
 
     public static HotelBookingCreatedDTO toCreatedDTO(
-            Booking b,
+            HotelBooking b,
             String paymentMethod,
             String paymentUrl
     ) {
