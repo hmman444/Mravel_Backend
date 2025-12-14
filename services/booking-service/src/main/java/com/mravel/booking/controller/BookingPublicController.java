@@ -105,4 +105,33 @@ public class BookingPublicController {
         if (digits.length() <= 4) return digits;
         return digits.substring(digits.length() - 4);
     }
+
+    @PostMapping("/lookup/detail")
+    public ResponseEntity<ApiResponse<HotelBookingDetailDTO>> lookupDetail(
+        @RequestBody BookingLookupRequest body
+    ) {
+    if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
+        throw new IllegalArgumentException("Thiếu bookingCode");
+    }
+    if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
+        throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+    }
+
+    HotelBooking b = hotelBookingRepository.findWithRoomsByCode(body.bookingCode().trim())
+        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+    String last4 = last4Digits(b.getContactPhone());
+    if (!body.phoneLast4().trim().equals(last4)) {
+        throw new IllegalStateException("Sai 4 số cuối SĐT");
+    }
+
+    if (body.email() != null && !body.email().isBlank()) {
+        String bEmail = b.getContactEmail();
+        if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
+        throw new IllegalStateException("Email không khớp");
+        }
+    }
+
+    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
+    }
 }

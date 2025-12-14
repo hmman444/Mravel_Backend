@@ -191,9 +191,86 @@ public class RestaurantDoc {
     private PublisherInfo publisher;
     private ModerationInfo moderation;
 
+    private List<TableType> tableTypes;
+
+    /** Cấu hình booking riêng cho nhà hàng (slot, duration, hủy/hoàn, pending expire...) */
+    private BookingConfig bookingConfig;
+
     // =====================================================================
     //                              SUBDOCUMENTS
     // =====================================================================
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class TableType {
+        private String id;                 // "tb-2", "tb-4-vip" ...
+        private String name;               // "Bàn 2", "Bàn 4 VIP"
+        private Integer seats;             // 2/4/6...
+        private Integer minPeople;         // optional
+        private Integer maxPeople;         // optional
+
+        /** Tổng số bàn của loại này (tồn kho tĩnh) */
+        private Integer totalTables;
+
+        /** Tiền cọc cho 1 bàn loại này */
+        private BigDecimal depositPrice;
+        private String currencyCode;       // "VND"
+
+        /** Loại bàn đặc biệt (để UI show badge) */
+        @Builder.Default private Boolean vip = false;
+        @Builder.Default private Boolean privateRoom = false;
+
+        /** Nếu tableType này có duration riêng thì override */
+        private List<Integer> allowedDurationsMinutes; // vd: [60, 90, 120]
+        private Integer defaultDurationMinutes;        // vd: 90
+
+        private String note;               // mô tả ngắn cho UI
+    }
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class BookingConfig {
+
+        /** Booking slot size (phút). Ví dụ 15/30. Khuyến nghị 30 cho tiểu luận */
+        @Builder.Default
+        private Integer slotMinutes = 30;
+
+        /** Danh sách duration user có thể chọn (nếu tableType không override) */
+        @Builder.Default
+        private List<Integer> allowedDurationsMinutes = List.of(60, 90, 120);
+
+        /** Default duration nếu user không chọn */
+        @Builder.Default
+        private Integer defaultDurationMinutes = 90;
+
+        /** Đặt trước tối thiểu bao nhiêu phút (lead time) */
+        @Builder.Default
+        private Integer minBookingLeadTimeMinutes = 60;
+
+        /**
+         * Cho phép khách đến trễ tối đa bao nhiêu phút so với reservationTime.
+         * (khác với pending payment expire)
+         */
+        @Builder.Default
+        private Integer graceArrivalMinutes = 15;
+
+        /** Số phút đầu được hủy và hoàn 100% cọc */
+        @Builder.Default
+        private Integer freeCancelMinutes = 30;
+
+        /** Pending payment tối đa bao nhiêu phút rồi auto-cancel */
+        @Builder.Default
+        private Integer pendingPaymentExpireMinutes = 30;
+
+        /**
+         * Rule cho booking res: luôn là đặt cọc (DEPOSIT only)
+         * (để nhất quán với BookingBase.payOption)
+         */
+        @Builder.Default
+        private Boolean depositOnly = true;
+
+        /** Giới hạn số bàn tối đa/booking (để tránh spam giữ chỗ) */
+        @Builder.Default
+        private Integer maxTablesPerBooking = 5;
+    }
 
     /** Ảnh dùng chung (giống HotelDoc.Image) */
     @Getter

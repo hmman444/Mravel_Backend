@@ -6,6 +6,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Table(name = "restaurant_bookings")
@@ -22,4 +23,12 @@ public class RestaurantBooking extends BookingBase {
     private LocalDate reservationDate;
     private LocalTime reservationTime;
     private Integer people;
+
+    private Integer durationMinutes;
+
+    @Column
+    private Integer tablesCount;
+
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookingTable> tables;
 }

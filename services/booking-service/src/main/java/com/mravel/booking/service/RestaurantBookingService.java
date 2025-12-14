@@ -1,0 +1,225 @@
+// src/main/java/com/mravel/booking/service/RestaurantBookingService.java
+package com.mravel.booking.service;
+
+import com.mravel.booking.client.CatalogRestaurantInventoryClient;
+import com.mravel.booking.dto.RestaurantBookingDtos.*;
+import com.mravel.booking.model.*;
+import com.mravel.booking.repository.RestaurantBookingRepository;
+import com.mravel.booking.payment.MomoGatewayClient;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class RestaurantBookingService {
+
+  private final RestaurantBookingRepository repo;
+  private final CatalogRestaurantInventoryClient invClient;
+  private final MomoGatewayClient momoGateway;
+
+  @Transactional
+  public RestaurantBookingCreatedDTO create(CreateRestaurantBookingRequest req, String guestSessionId) {
+    // 1) validate cơ bản
+    if (req == null) throw new IllegalArgumentException("req null");
+    if (req.restaurantId() == null) throw new IllegalArgumentException("Thiếu restaurantId");
+    if (req.reservationDate() == null || req.reservationTime() == null) throw new IllegalArgumentException("Thiếu thời gian");
+    if (req.tables() == null || req.tables().isEmpty()) throw new IllegalArgumentException("Chưa chọn bàn");
+    int people = req.people() == null ? 0 : req.people();
+    if (people <= 0) throw new IllegalArgumentException("people không hợp lệ");
+
+    // 2) compute deposit (khuyến nghị: BE tự tính từ snapshot catalog, nhưng tạm thời dùng req)
+    BigDecimal depositAmount = BigDecimal.ZERO;
+    int tablesCount = 0;
+
+    for (SelectedTable t : req.tables()) {
+      if (t == null || t.quantity() == null || t.quantity() <= 0) continue;
+      if (t.depositPrice() == null) throw new IllegalArgumentException("Thiếu depositPrice cho tableType " + t.tableTypeId());
+
+      BigDecimal line = t.depositPrice().multiply(BigDecimal.valueOf(t.quantity()));
+      depositAmount = depositAmount.add(line);
+      tablesCount += t.quantity();
+    }
+    if (tablesCount <= 0) throw new IllegalArgumentException("Số bàn không hợp lệ");
+    if (depositAmount.compareTo(BigDecimal.ZERO) <= 0) throw new IllegalArgumentException("depositAmount không hợp lệ");
+
+    // 3) CHECK + HOLD bên catalog
+    var checkReq = new CatalogTableReq(req.restaurantId(), req.reservationDate(), req.reservationTime(), req.durationMinutes(),
+        req.tables().stream().map(t -> new TableReq(t.tableTypeId(), t.quantity())).toList()
+    );
+    invClient.check(checkReq);
+
+    var holdReq = new CatalogHoldReq(req.restaurantId(), req.restaurantSlug(), req.reservationDate(), req.reservationTime(), req.durationMinutes(),
+        req.tables().stream().map(t -> new TableReq(t.tableTypeId(), t.quantity())).toList()
+    );
+    invClient.hold(holdReq);
+
+    // 4) tạo booking record
+    String code = "RB-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
+
+    RestaurantBooking booking = RestaurantBooking.builder()
+        .code(code)
+        .userId(req.userId())
+        .guestSessionId(guestSessionId)
+
+        .contactName(req.contactName())
+        .contactPhone(req.contactPhone())
+        .contactEmail(req.contactEmail())
+        .note(req.note())
+
+        .restaurantId(req.restaurantId())
+        .restaurantSlug(req.restaurantSlug())
+        .restaurantName(req.restaurantName())
+
+        .reservationDate(req.reservationDate())
+        .reservationTime(req.reservationTime())
+        .durationMinutes(req.durationMinutes())
+        .people(people)
+        .tablesCount(tablesCount)
+
+        .payOption(BookingBase.PayOption.DEPOSIT)
+        .totalAmount(depositAmount)          // nhà hàng: total = deposit
+        .depositAmount(depositAmount)
+        .amountPayable(depositAmount)
+        .amountPaid(BigDecimal.ZERO)
+        .currencyCode("VND")
+
+        .status(BookingBase.BookingStatus.PENDING_PAYMENT)
+        .paymentStatus(BookingBase.PaymentStatus.PENDING)
+        .inventoryDeducted(true)             // nghĩa là đang HELD
+        .build();
+
+    List<BookingTable> lines = req.tables().stream()
+        .filter(t -> t != null && t.quantity() != null && t.quantity() > 0)
+        .map(t -> {
+            BookingTable bt = BookingTable.builder()
+                .booking(booking)
+                .tableTypeId(t.tableTypeId())
+                .tableTypeName(t.tableTypeName())
+                .seats(t.seats())
+                .quantity(t.quantity())
+                .depositPrice(t.depositPrice())
+                .totalDeposit(t.depositPrice().multiply(BigDecimal.valueOf(t.quantity())))
+                .build();
+            return bt;
+        })
+        .collect(Collectors.toList());
+
+    booking.setTables(lines);
+
+    repo.save(booking);
+
+    // 5) tạo payUrl (MoMo) - bạn đang dùng orderInfo "dat phong", đổi text cho res
+    String payUrl = momoGateway.createPayment(code, depositAmount, "Dat ban " + booking.getRestaurantName());
+
+    return new RestaurantBookingCreatedDTO(
+        code,
+        booking.getRestaurantName(),
+        booking.getRestaurantSlug(),
+        booking.getReservationDate(),
+        booking.getReservationTime(),
+        booking.getDurationMinutes(),
+        booking.getPeople(),
+        booking.getTablesCount(),
+        "DEPOSIT",
+        booking.getDepositAmount(),
+        booking.getAmountPayable(),
+        booking.getCurrencyCode(),
+        "MOMO",
+        payUrl
+    );
+  }
+
+  @Transactional
+    public void markRestaurantBookingPaidAndConfirm(String bookingCode, Long amount) {
+        if (bookingCode == null || bookingCode.isBlank()) {
+            throw new IllegalArgumentException("bookingCode không hợp lệ");
+        }
+
+        RestaurantBooking b = repo.findByCode(bookingCode)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking: " + bookingCode));
+
+        // idempotent: đã success rồi thì thôi
+        if (b.getPaymentStatus() == BookingBase.PaymentStatus.SUCCESS) return;
+
+        BigDecimal paid = (amount == null)
+            ? (b.getAmountPayable() != null ? b.getAmountPayable() : BigDecimal.ZERO)
+            : BigDecimal.valueOf(amount);
+
+        // 1) commit inventory HELD -> BOOKED bên catalog
+        try {
+            List<TableReq> tables = (b.getTables() == null ? List.<BookingTable>of() : b.getTables()).stream()
+                .filter(x -> x != null && x.getQuantity() != null && x.getQuantity() > 0)
+                .map(x -> new TableReq(x.getTableTypeId(), x.getQuantity()))
+                .collect(Collectors.toList());
+
+            CatalogHoldReq commitReq = new CatalogHoldReq(
+                b.getRestaurantId(),
+                b.getRestaurantSlug(),
+                b.getReservationDate(),
+                b.getReservationTime(),
+                b.getDurationMinutes(),
+                tables
+            );
+
+            invClient.commit(commitReq);
+
+            // 2) update booking trạng thái
+            b.setAmountPaid(paid);
+            b.setPaidAt(Instant.now());
+            b.setPaymentStatus(BookingBase.PaymentStatus.SUCCESS);
+            b.setStatus(BookingBase.BookingStatus.CONFIRMED); // hoặc PAID rồi CONFIRMED tuỳ bạn
+            b.setInventoryDeducted(true);
+            repo.save(b);
+
+        } catch (Exception ex) {
+            // payment OK nhưng commit fail => giữ lại trạng thái để admin xử lý (tối thiểu đừng crash lặng lẽ)
+            b.setAmountPaid(paid);
+            b.setPaidAt(Instant.now());
+            b.setPaymentStatus(BookingBase.PaymentStatus.SUCCESS);
+            b.setStatus(BookingBase.BookingStatus.PAID);
+            repo.save(b);
+
+            throw ex; // hoặc log + không throw nếu bạn muốn redirect vẫn “êm”
+        }
+    }
+
+    @Transactional
+    public int claimGuestRestaurantBookingsToUser(String sid, Long userId) {
+        if (sid == null || sid.isBlank()) return 0;
+        if (userId == null) throw new IllegalArgumentException("userId null");
+
+        var items = repo.findByGuestSessionIdOrderByCreatedAtDesc(sid);
+        int claimed = 0;
+
+        for (var b : items) {
+            // chỉ claim những booking guest (userId null)
+            if (b.getUserId() != null) continue;
+
+            b.setUserId(userId);
+
+            // ✅ khuyến nghị: clear guestSessionId để nó biến mất khỏi tab "Đơn trên thiết bị"
+            b.setGuestSessionId(null);
+
+            claimed++;
+        }
+
+        // JPA dirty checking sẽ tự flush, nhưng saveAll cũng ok:
+        // repo.saveAll(items);
+
+        return claimed;
+    }
+
+  // ===== DTO nội bộ gửi qua catalog-client (typed thay vì Object) =====
+  public record TableReq(String tableTypeId, int quantity) {}
+  public record CatalogTableReq(String restaurantId, java.time.LocalDate reservationDate, java.time.LocalTime reservationTime,
+                                Integer durationMinutes, List<TableReq> tables) {}
+  public record CatalogHoldReq(String restaurantId, String restaurantSlug, java.time.LocalDate reservationDate, java.time.LocalTime reservationTime,
+                               Integer durationMinutes, List<TableReq> tables) {}
+}
