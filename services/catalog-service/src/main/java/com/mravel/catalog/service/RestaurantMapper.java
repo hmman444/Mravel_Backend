@@ -196,6 +196,11 @@ public class RestaurantMapper {
         PublisherDTO publisher = r.getPublisher() == null ? null : toPublisher(r.getPublisher());
         ModerationDTO moderation = r.getModeration() == null ? null : toModeration(r.getModeration());
 
+        List<TableTypeDTO> tableTypes = r.getTableTypes() == null ? List.of()
+        : r.getTableTypes().stream().filter(Objects::nonNull).map(RestaurantMapper::toTableType).toList();
+
+        RestaurantBookingConfigDTO bookingConfig = r.getBookingConfig() == null ? null : toBookingConfig(r.getBookingConfig());
+
         return new RestaurantDetailDTO(
                 r.getId(),
                 r.getName(),
@@ -252,7 +257,10 @@ public class RestaurantMapper {
                 reviewStats,
 
                 publisher,
-                moderation
+                moderation,
+
+                tableTypes,
+                bookingConfig
         );
     }
 
@@ -533,6 +541,41 @@ public class RestaurantMapper {
                 m.getReportCount(),
                 m.getLastActionByAdminId(),
                 lastActionAt
+        );
+    }
+
+    public static TableTypeDTO toTableType(RestaurantDoc.TableType t) {
+        if (t == null) return null;
+        return new TableTypeDTO(
+                t.getId(),
+                t.getName(),
+                t.getSeats(),
+                t.getMinPeople(),
+                t.getMaxPeople(),
+                t.getTotalTables(),
+                t.getDepositPrice(),
+                t.getCurrencyCode(),
+                Boolean.TRUE.equals(t.getVip()),
+                Boolean.TRUE.equals(t.getPrivateRoom()),
+                t.getAllowedDurationsMinutes() == null ? List.of() : t.getAllowedDurationsMinutes(),
+                t.getDefaultDurationMinutes(),
+                t.getNote()
+        );
+    }
+
+    // BookingConfig
+    public static RestaurantBookingConfigDTO toBookingConfig(RestaurantDoc.BookingConfig c) {
+        if (c == null) return null;
+        return new RestaurantBookingConfigDTO(
+                c.getSlotMinutes(),
+                c.getAllowedDurationsMinutes() == null ? List.of() : c.getAllowedDurationsMinutes(),
+                c.getDefaultDurationMinutes(),
+                c.getMinBookingLeadTimeMinutes(),
+                c.getGraceArrivalMinutes(),
+                c.getFreeCancelMinutes(),
+                c.getPendingPaymentExpireMinutes(),
+                Boolean.TRUE.equals(c.getDepositOnly()),
+                c.getMaxTablesPerBooking()
         );
     }
 }

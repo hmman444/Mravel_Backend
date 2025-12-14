@@ -36,6 +36,8 @@ import com.mravel.catalog.model.doc.RestaurantDoc.ReviewStats;
 import com.mravel.catalog.model.doc.RestaurantDoc.SignatureDish;
 import com.mravel.catalog.model.doc.RestaurantDoc.SuitableFor;
 import com.mravel.catalog.repository.RestaurantDocRepository;
+import com.mravel.catalog.model.doc.RestaurantDoc.TableType;
+import com.mravel.catalog.model.doc.RestaurantDoc.BookingConfig;
 
 import static com.mravel.catalog.utils.RestaurantSeedUtils.*;
 
@@ -372,6 +374,86 @@ public class SeedHoiAnRestaurants {
             .lastActionByAdminId("system-seed")
             .lastActionAt(now)
             .build();
+        
+        // ---------- Table types (bàn) ----------
+        List<TableType> tableTypes = List.of(
+            TableType.builder()
+                .id("tb-2")
+                .name("Bàn 2")
+                .seats(2)
+                .minPeople(1)
+                .maxPeople(2)
+                .totalTables(10)
+                .depositPrice(new BigDecimal("100000"))
+                .currencyCode("VND")
+                .vip(false)
+                .privateRoom(false)
+                .defaultDurationMinutes(90)
+                .allowedDurationsMinutes(List.of(60, 90, 120))
+                .note("Phù hợp cặp đôi, nhóm nhỏ.")
+                .build(),
+
+            TableType.builder()
+                .id("tb-4")
+                .name("Bàn 4")
+                .seats(4)
+                .minPeople(3)
+                .maxPeople(4)
+                .totalTables(12)
+                .depositPrice(new BigDecimal("200000"))
+                .currencyCode("VND")
+                .vip(false)
+                .privateRoom(false)
+                .defaultDurationMinutes(90)
+                .allowedDurationsMinutes(List.of(60, 90, 120))
+                .note("Phù hợp gia đình/nhóm bạn.")
+                .build(),
+
+            TableType.builder()
+                .id("tb-6-vip")
+                .name("Bàn 6 VIP")
+                .seats(6)
+                .minPeople(5)
+                .maxPeople(6)
+                .totalTables(3)
+                .depositPrice(new BigDecimal("500000"))
+                .currencyCode("VND")
+                .vip(true)
+                .privateRoom(false)
+                .defaultDurationMinutes(120)
+                .allowedDurationsMinutes(List.of(90, 120))
+                .note("Vị trí đẹp, ưu tiên phục vụ.")
+                .build(),
+
+            TableType.builder()
+                .id("pr-10")
+                .name("Phòng riêng 10 khách")
+                .seats(10)
+                .minPeople(8)
+                .maxPeople(12)
+                .totalTables(2) // coi như 2 phòng riêng
+                .depositPrice(new BigDecimal("1000000"))
+                .currencyCode("VND")
+                .vip(false)
+                .privateRoom(true)
+                .defaultDurationMinutes(120)
+                .allowedDurationsMinutes(List.of(120))
+                .note("Phòng riêng, phù hợp tiếp khách/tiệc nhỏ.")
+                .build()
+        );
+
+        // ---------- Booking config ----------
+        BookingConfig bookingConfig = BookingConfig.builder()
+            .slotMinutes(30)
+            .allowedDurationsMinutes(List.of(60, 90, 120))
+            .defaultDurationMinutes(90)
+            .minBookingLeadTimeMinutes(60)
+            .graceArrivalMinutes(15)
+            .freeCancelMinutes(30)
+            .pendingPaymentExpireMinutes(30)
+            .depositOnly(true)
+            .maxTablesPerBooking(5)
+            .build();
 
         // ---------- Build RestaurantDoc ----------
         return RestaurantDoc.builder()
@@ -422,6 +504,8 @@ public class SeedHoiAnRestaurants {
             .reviewStats(reviewStats)
             .publisher(publisher)
             .moderation(moderation)
+            .tableTypes(tableTypes)
+            .bookingConfig(bookingConfig)
             .build();
     }
 
@@ -890,6 +974,86 @@ public class SeedHoiAnRestaurants {
             .lastActionAt(now)
             .build();
 
+        // ---------- Table types (bàn) ----------
+        List<TableType> tableTypes = List.of(
+            TableType.builder()
+                .id("tb-2-romantic")
+                .name("Bàn 2 (Romantic)")
+                .seats(2)
+                .minPeople(1)
+                .maxPeople(2)
+                .totalTables(8)
+                .depositPrice(new BigDecimal("150000"))
+                .currencyCode("VND")
+                .vip(false)
+                .privateRoom(false)
+                .defaultDurationMinutes(90)
+                .allowedDurationsMinutes(List.of(60, 90, 120))
+                .note("Bàn đôi không gian lãng mạn.")
+                .build(),
+
+            TableType.builder()
+                .id("tb-4")
+                .name("Bàn 4")
+                .seats(4)
+                .minPeople(3)
+                .maxPeople(4)
+                .totalTables(10)
+                .depositPrice(new BigDecimal("250000"))
+                .currencyCode("VND")
+                .vip(false)
+                .privateRoom(false)
+                .defaultDurationMinutes(90)
+                .allowedDurationsMinutes(List.of(60, 90, 120))
+                .note("Phù hợp nhóm bạn/gia đình.")
+                .build(),
+
+            TableType.builder()
+                .id("tb-4-outdoor")
+                .name("Bàn 4 (Ngoài trời)")
+                .seats(4)
+                .minPeople(3)
+                .maxPeople(4)
+                .totalTables(6)
+                .depositPrice(new BigDecimal("250000"))
+                .currencyCode("VND")
+                .vip(false)
+                .privateRoom(false)
+                .defaultDurationMinutes(90)
+                .allowedDurationsMinutes(List.of(60, 90, 120))
+                .note("Khu vực thoáng đãng, ưu tiên buổi tối.")
+                .build(),
+
+            TableType.builder()
+                .id("tb-6-vip")
+                .name("Bàn 6 VIP")
+                .seats(6)
+                .minPeople(5)
+                .maxPeople(6)
+                .totalTables(2)
+                .depositPrice(new BigDecimal("600000"))
+                .currencyCode("VND")
+                .vip(true)
+                .privateRoom(false)
+                .defaultDurationMinutes(120)
+                .allowedDurationsMinutes(List.of(90, 120))
+                .note("Vị trí đẹp, phù hợp dịp đặc biệt.")
+                .build()
+        );
+
+        // ---------- Booking config ----------
+        BookingConfig bookingConfig = BookingConfig.builder()
+            .slotMinutes(30)
+            .allowedDurationsMinutes(List.of(60, 90, 120))
+            .defaultDurationMinutes(90)
+            .minBookingLeadTimeMinutes(90)      // res Âu thường cần chuẩn bị kỹ hơn
+            .graceArrivalMinutes(15)
+            .freeCancelMinutes(30)
+            .pendingPaymentExpireMinutes(25)    // có thể chặt hơn chút
+            .depositOnly(true)
+            .maxTablesPerBooking(4)
+            .build();
+
         // ---------- Build RestaurantDoc ----------
         return RestaurantDoc.builder()
             .active(true)
@@ -940,6 +1104,8 @@ public class SeedHoiAnRestaurants {
             .reviewStats(reviewStats)
             .publisher(publisher)
             .moderation(moderation)
+            .tableTypes(tableTypes)
+            .bookingConfig(bookingConfig)
             .build();
     }
 }

@@ -14,4 +14,6 @@ public interface RestaurantDocRepository
     Optional<RestaurantDoc> findBySlugAndActiveTrue(String slug);
 
     boolean existsBySlug(String slug);
+
+    Optional<RestaurantDoc> findBySlug(String slug);
 }

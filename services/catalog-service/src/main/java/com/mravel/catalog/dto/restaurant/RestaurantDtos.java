@@ -125,7 +125,38 @@ public class RestaurantDtos {
 
         // Đối tác & moderation (dùng cho admin UI)
         PublisherDTO publisher,
-        ModerationDTO moderation
+        ModerationDTO moderation,
+
+        List<TableTypeDTO> tableTypes,
+        RestaurantBookingConfigDTO bookingConfig
+    ) {}
+
+    public record TableTypeDTO(
+        String id,
+        String name,
+        Integer seats,
+        Integer minPeople,
+        Integer maxPeople,
+        Integer totalTables,
+        BigDecimal depositPrice,
+        String currencyCode,
+        Boolean vip,
+        Boolean privateRoom,
+        List<Integer> allowedDurationsMinutes,
+        Integer defaultDurationMinutes,
+        String note
+    ) {}
+
+    public record RestaurantBookingConfigDTO(
+        Integer slotMinutes,
+        List<Integer> allowedDurationsMinutes,
+        Integer defaultDurationMinutes,
+        Integer minBookingLeadTimeMinutes,
+        Integer graceArrivalMinutes,
+        Integer freeCancelMinutes,
+        Integer pendingPaymentExpireMinutes,
+        Boolean depositOnly,
+        Integer maxTablesPerBooking
     ) {}
 
     // ================== SUB-DTOS ==================
