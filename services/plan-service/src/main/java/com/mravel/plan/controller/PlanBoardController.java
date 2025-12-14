@@ -26,11 +26,10 @@ public class PlanBoardController {
         @GetMapping
         public ResponseEntity<ApiResponse<BoardResponse>> getBoard(
                         @PathVariable Long planId,
-                        @RequestParam(defaultValue = "false") boolean isFriend) {
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
                 Long userId = currentUser.getId();
-                BoardResponse board = service.getBoard(planId, userId, isFriend);
-                return ResponseEntity.ok(
-                                ApiResponse.success("Lấy board thành công", board));
+                BoardResponse board = service.getBoard(planId, userId, authorizationHeader);
+                return ResponseEntity.ok(ApiResponse.success("OK", board));
         }
 
         // list

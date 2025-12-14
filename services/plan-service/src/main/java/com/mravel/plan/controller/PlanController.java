@@ -6,6 +6,9 @@ import com.mravel.plan.model.Visibility;
 import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.service.PlanService;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,12 +21,44 @@ public class PlanController {
         private final PlanService planService;
         private final CurrentUserService currentUser;
 
+        @GetMapping("/search")
+        public ResponseEntity<ApiResponse<PlanSearchResponse>> search(
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+                        @RequestParam(name = "q", defaultValue = "") String q,
+                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        @RequestParam(defaultValue = "8") int userLimit) {
+                Long viewerId = currentUser.getId();
+
+                Page<PlanFeedItem> data = planService.searchFeed(page, size, viewerId, authorizationHeader, q);
+
+                PageResponse<PlanFeedItem> pageResponse = PageResponse.<PlanFeedItem>builder()
+                                .items(data.getContent())
+                                .page(page)
+                                .size(size)
+                                .total(data.getTotalElements())
+                                .hasMore(page * size < data.getTotalElements())
+                                .build();
+
+                var users = planService.searchUsersFromUserService(authorizationHeader, q,
+                                Math.max(1, Math.min(userLimit, 30)));
+
+                PlanSearchResponse resp = PlanSearchResponse.builder()
+                                .query(q)
+                                .plans(pageResponse)
+                                .users(users)
+                                .build();
+
+                return ResponseEntity.ok(ApiResponse.success("Tìm kiếm thành công", resp));
+        }
+
         @GetMapping
         public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getFeed(
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                         @RequestParam(defaultValue = "1") int page,
                         @RequestParam(defaultValue = "10") int size) {
                 Long viewerId = currentUser.getId();
-                Page<PlanFeedItem> data = planService.getFeed(page, size, viewerId);
+                Page<PlanFeedItem> data = planService.getFeed(page, size, viewerId, authorizationHeader);
 
                 PageResponse<PlanFeedItem> pageResponse = PageResponse.<PlanFeedItem>builder()
                                 .items(data.getContent())
@@ -40,9 +75,10 @@ public class PlanController {
         @GetMapping("/{id}")
         public ResponseEntity<ApiResponse<PlanFeedItem>> getById(
                         @PathVariable Long id,
-                        @RequestParam(defaultValue = "false") boolean isFriend) {
-                Long viewerId = currentUser.getId();
-                PlanFeedItem item = planService.getById(id, viewerId, isFriend);
+                        @RequestHeader("Authorization") String authorizationHeader) {
+
+                PlanFeedItem item = planService.getById(id, authorizationHeader);
+
                 return ResponseEntity.ok(
                                 ApiResponse.success("Lấy chi tiết plan thành công", item));
         }
@@ -67,10 +103,10 @@ public class PlanController {
         }
 
         @PostMapping("/{id}/copy")
-        public ResponseEntity<ApiResponse<PlanFeedItem>> copyPublicPlan(
+        public ResponseEntity<ApiResponse<PlanFeedItem>> copyPlan(
                         @PathVariable Long id) {
                 Long userId = currentUser.getId();
-                PlanFeedItem copied = planService.copyPublicPlan(id, userId);
+                PlanFeedItem copied = planService.copyPlan(id, userId);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Sao chép plan công khai thành công", copied));
         }
@@ -82,8 +118,6 @@ public class PlanController {
                 PlanFeedItem.Comment comment = planService.addComment(
                                 id,
                                 req.getUserId(),
-                                req.getUserName(),
-                                req.getUserAvatar(),
                                 req.getText(),
                                 req.getParentId());
 
@@ -106,5 +140,71 @@ public class PlanController {
                 planService.increaseView(id);
                 return ResponseEntity.ok(
                                 ApiResponse.success("Tăng lượt xem thành công", null));
+        }
+
+        @GetMapping("/me")
+        public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getMyPlans(
+                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(defaultValue = "10") int size) {
+
+                Long userId = currentUser.getId();
+                Page<PlanFeedItem> data = planService.getUserPlans(userId, userId);
+
+                PageResponse<PlanFeedItem> resp = PageResponse.<PlanFeedItem>builder()
+                                .items(data.getContent())
+                                .page(page)
+                                .size(size)
+                                .total(data.getTotalElements())
+                                .hasMore(page * size < data.getTotalElements())
+                                .build();
+
+                return ResponseEntity.ok(ApiResponse.success("Lấy plan của bản thân thành công", resp));
+        }
+
+        @GetMapping("/user/{userId}")
+        public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getPlansOfUser(
+                        @PathVariable Long userId,
+                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        @RequestParam(defaultValue = "false") boolean isFriend) {
+
+                Long viewerId = currentUser.getId();
+                Page<PlanFeedItem> data = planService.getUserPlans(userId, viewerId, isFriend);
+
+                PageResponse<PlanFeedItem> resp = PageResponse.<PlanFeedItem>builder()
+                                .items(data.getContent())
+                                .page(page)
+                                .size(size)
+                                .total(data.getTotalElements())
+                                .hasMore(page * size < data.getTotalElements())
+                                .build();
+
+                return ResponseEntity.ok(ApiResponse.success("Lấy plan user khác thành công", resp));
+        }
+
+        @GetMapping("/recent")
+        public ResponseEntity<ApiResponse<List<PlanFeedItem>>> getRecentPlans() {
+                Long userId = currentUser.getId();
+                List<PlanFeedItem> items = planService.getRecentPlans(userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.success("Lấy danh sách lịch trình xem gần đây thành công", items));
+        }
+
+        @DeleteMapping("/recent/{planId}")
+        public ResponseEntity<ApiResponse<?>> removeRecentPlan(@PathVariable Long planId) {
+                Long userId = currentUser.getId();
+                planService.removeRecentPlan(planId, userId);
+                return ResponseEntity.ok(
+                                ApiResponse.success("Xoá lịch trình khỏi danh sách xem gần đây thành công", null));
+        }
+
+        @DeleteMapping("/{planId}")
+        public ResponseEntity<ApiResponse<Void>> deletePlan(@PathVariable Long planId) {
+                Long userId = currentUser.getId();
+                planService.deletePlan(planId, userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.success("Plan deleted successfully", null));
         }
 }

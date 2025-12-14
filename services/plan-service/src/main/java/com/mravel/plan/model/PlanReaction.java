@@ -22,8 +22,6 @@ public class PlanReaction {
     private Plan plan;
 
     private Long userId;
-    private String userName;
-    private String userAvatar;
 
     private String type; // like, love, haha...
 

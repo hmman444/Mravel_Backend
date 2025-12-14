@@ -6,8 +6,6 @@ import lombok.Data;
 @Data
 public class AddCommentRequest {
     private Long userId;
-    private String userName;
-    private String userAvatar;
     private String text;
 
     @JsonProperty("parentId")

@@ -19,15 +19,15 @@ public class UserProfile {
     private Long id; // Trùng với id bên auth-service
 
     @Column(nullable = false, unique = true)
-    private String email;     // Email đăng nhập / chính
+    private String email; // Email đăng nhập / chính
 
     private String fullname;
     private String avatar;
-    private String provider;  // local, google, facebook
+    private String provider; // local, google, facebook
 
     // -------- Thông tin cá nhân --------
     @Enumerated(EnumType.STRING)
-    private Gender gender;    // MALE, FEMALE, OTHER, UNKNOWN
+    private Gender gender; // MALE, FEMALE, OTHER, UNKNOWN
 
     private LocalDate dateOfBirth;
 
@@ -48,9 +48,15 @@ public class UserProfile {
     @Enumerated(EnumType.STRING)
     private MembershipTier membershipTier; // BRONZE, SILVER, GOLD, PLATINUM
 
-    private String locale;    // vi-VN, en-US
-    private String timeZone;  // Asia/Ho_Chi_Minh
+    private String locale; // vi-VN, en-US
+    private String timeZone; // Asia/Ho_Chi_Minh
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private String username;
+    private String bio;
+    private String coverImage;
+    private String hometown;
+    private String occupation;
 }
