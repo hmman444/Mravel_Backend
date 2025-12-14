@@ -7,10 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class PlanComment {
 
     @Id
@@ -18,21 +19,22 @@ public class PlanComment {
     private Long id;
 
     private Long userId;
+
+    @Column(columnDefinition = "TEXT")
     private String text;
+
     private Instant createdAt;
 
-    // Liên kết với Plan
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id")
     private Plan plan;
 
-    // Bình luận cha (nếu là reply)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private PlanComment parent;
 
-    // Danh sách các phản hồi con
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
+    @Builder.Default
     private List<PlanComment> replies = new ArrayList<>();
 }

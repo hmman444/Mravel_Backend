@@ -2,6 +2,9 @@ package com.mravel.auth.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.Instant;
 
 @Entity
@@ -12,6 +15,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 public class OutboxEvent {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -23,6 +27,11 @@ public class OutboxEvent {
     private String payload;
 
     private String status; // PENDING, SENT, FAILED
-    private Instant createdAt = Instant.now();
-    private Instant updatedAt = Instant.now();
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    private Instant updatedAt;
 }

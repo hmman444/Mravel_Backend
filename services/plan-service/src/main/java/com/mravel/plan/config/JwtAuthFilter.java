@@ -1,29 +1,33 @@
 package com.mravel.plan.config;
 
+import com.mravel.plan.security.JwtUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import com.mravel.plan.security.JwtUserPrincipal;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     @Value("${mravel.services.auth.base-url}")
     private String authBaseUrl;
@@ -36,15 +40,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // Không có token thì cho qua, controller nào cần auth có thể annotate
-        // @PreAuthorize
+        // Không có token -> cho qua
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -53,76 +56,41 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = header.substring(7);
 
         try {
-            // Gọi auth-service để xác minh token
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + token);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            headers.setBearerAuth(token);
 
             ResponseEntity<AuthValidationResponse> resp = restTemplate.exchange(
-                    authValidateUrl(), HttpMethod.GET, entity, AuthValidationResponse.class);
+                    authValidateUrl(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    AuthValidationResponse.class);
 
-            if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null && resp.getBody().isValid()) {
-                var body = resp.getBody();
-                List<SimpleGrantedAuthority> authorities = Collections
-                        .singletonList(new SimpleGrantedAuthority("ROLE_" + body.getRole()));
+            AuthValidationResponse body = resp.getBody();
+
+            if (resp.getStatusCode() == HttpStatus.OK && body != null && body.isValid()) {
+                var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + body.getRole()));
 
                 JwtUserPrincipal principal = new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole());
 
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(principal, null,
-                        authorities);
-
+                var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
-            } else {
-                response.setStatus(HttpStatus.UNAUTHORIZED.value());
+
+                filterChain.doFilter(request, response);
                 return;
             }
 
-        } catch (Exception e) {
-            log.error("JWT validation error: {}", e.getMessage());
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            return;
+        } catch (RestClientException ex) {
+            log.warn("JWT validation error calling auth-service: {}", ex.getMessage());
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
         }
-
-        filterChain.doFilter(request, response);
     }
 
-    // DTO đại diện phản hồi từ auth-service
+    @Data
     private static class AuthValidationResponse {
         private boolean valid;
         private Long id;
         private String role;
         private String email;
-
-        public boolean isValid() {
-            return valid;
-        }
-
-        public String getEmail() {
-            return email;
-        }
-
-        public void setValid(boolean valid) {
-            this.valid = valid;
-        }
-
-        public void setEmail(String email) {
-            this.email = email;
-        }
-
-        public Long getId() {
-            return id;
-        }
-
-        public void setId(Long id) {
-            this.id = id;
-        }
-
-        public String getRole() {
-            return role;
-        }
-
-        public void setRole(String role) {
-            this.role = role;
-        }
     }
 }
