@@ -19,13 +19,20 @@ public class FriendClient {
 
         private final RestTemplate restTemplate = new RestTemplate();
 
-        @Value("${user.service.url:http://localhost:8082/api/users}")
-        private String userServiceUrl;
+        @Value("${mravel.services.user.base-url}")
+        private String userBaseUrl;
+
+        @Value("${mravel.services.user.userProfiles-path}")
+        private String userApiPath;
+
+        private String userServiceUrl() {
+                return userBaseUrl + userApiPath;
+        }
 
         public RelationshipType getRelationship(
                         String authorizationHeader,
                         Long profileUserId) {
-                String url = userServiceUrl + "/friends/relationship?profileUserId=" + profileUserId;
+                String url = userServiceUrl() + "/friends/relationship?profileUserId=" + profileUserId;
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Authorization", authorizationHeader);
@@ -45,7 +52,7 @@ public class FriendClient {
         }
 
         public List<Long> getFriendIds(String authorizationHeader) {
-                String url = userServiceUrl + "/friends/ids";
+                String url = userServiceUrl() + "/friends/ids";
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Authorization", authorizationHeader);

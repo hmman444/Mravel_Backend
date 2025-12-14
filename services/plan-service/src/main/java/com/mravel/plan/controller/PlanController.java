@@ -21,6 +21,37 @@ public class PlanController {
         private final PlanService planService;
         private final CurrentUserService currentUser;
 
+        @GetMapping("/search")
+        public ResponseEntity<ApiResponse<PlanSearchResponse>> search(
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+                        @RequestParam(name = "q", defaultValue = "") String q,
+                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        @RequestParam(defaultValue = "8") int userLimit) {
+                Long viewerId = currentUser.getId();
+
+                Page<PlanFeedItem> data = planService.searchFeed(page, size, viewerId, authorizationHeader, q);
+
+                PageResponse<PlanFeedItem> pageResponse = PageResponse.<PlanFeedItem>builder()
+                                .items(data.getContent())
+                                .page(page)
+                                .size(size)
+                                .total(data.getTotalElements())
+                                .hasMore(page * size < data.getTotalElements())
+                                .build();
+
+                var users = planService.searchUsersFromUserService(authorizationHeader, q,
+                                Math.max(1, Math.min(userLimit, 30)));
+
+                PlanSearchResponse resp = PlanSearchResponse.builder()
+                                .query(q)
+                                .plans(pageResponse)
+                                .users(users)
+                                .build();
+
+                return ResponseEntity.ok(ApiResponse.success("Tìm kiếm thành công", resp));
+        }
+
         @GetMapping
         public ResponseEntity<ApiResponse<PageResponse<PlanFeedItem>>> getFeed(
                         @RequestHeader(value = "Authorization", required = false) String authorizationHeader,

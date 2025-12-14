@@ -23,10 +23,17 @@ import java.util.List;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    @Value("${auth.service.url:http://localhost:8081/api/auth/validate}")
-    private String authValidateUrl;
-
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${mravel.services.auth.base-url}")
+    private String authBaseUrl;
+
+    @Value("${mravel.services.auth.validate-path}")
+    private String authValidatePath;
+
+    private String authValidateUrl() {
+        return authBaseUrl + authValidatePath;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -52,7 +59,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
             ResponseEntity<AuthValidationResponse> resp = restTemplate.exchange(
-                    authValidateUrl, HttpMethod.GET, entity, AuthValidationResponse.class);
+                    authValidateUrl(), HttpMethod.GET, entity, AuthValidationResponse.class);
 
             if (resp.getStatusCode() == HttpStatus.OK && resp.getBody() != null && resp.getBody().isValid()) {
                 var body = resp.getBody();

@@ -13,6 +13,7 @@ import com.mravel.user.service.AuthTokenClient;
 import com.mravel.user.service.FriendService;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -322,4 +323,48 @@ public class UserController {
             user.setPhone3(request.getPhone3());
     }
 
+    @GetMapping("/search")
+    public List<UserProfileResponse> searchUsers(
+            @RequestParam(name = "q", required = false, defaultValue = "") String q,
+            @RequestParam(defaultValue = "10") int limit) {
+        String keyword = normalize(q);
+        limit = Math.max(1, Math.min(limit, 30));
+
+        List<UserProfile> users = userRepository.searchUsers(keyword, PageRequest.of(0, limit));
+
+        return users.stream().map(this::toMini).toList();
+    }
+
+    private String normalize(String q) {
+        if (q == null)
+            return "";
+        String s = q.trim();
+        if (s.startsWith("@"))
+            s = s.substring(1).trim();
+        return s;
+    }
+
+    // trả minimal để list search (nhẹ payload)
+    private UserProfileResponse toMini(UserProfile u) {
+        return UserProfileResponse.builder()
+                .id(u.getId())
+                .fullname(u.getFullname())
+                .avatar(u.getAvatar())
+                .email(u.getEmail())
+                .provider(u.getProvider())
+                .gender(u.getGender() != null ? u.getGender().name() : null)
+                .dateOfBirth(u.getDateOfBirth())
+                .city(u.getCity())
+                .country(u.getCountry())
+                .addressLine(u.getAddressLine())
+                .secondaryEmail(u.getSecondaryEmail())
+                .tertiaryEmail(u.getTertiaryEmail())
+                .phone1(u.getPhone1())
+                .phone2(u.getPhone2())
+                .phone3(u.getPhone3())
+                .membershipTier(u.getMembershipTier() != null ? u.getMembershipTier().name() : null)
+                .locale(u.getLocale())
+                .timeZone(u.getTimeZone())
+                .build();
+    }
 }

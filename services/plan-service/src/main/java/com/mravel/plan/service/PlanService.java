@@ -57,6 +57,55 @@ public class PlanService {
         @PersistenceContext
         private EntityManager entityManager;
 
+        public Page<PlanFeedItem> searchFeed(int page, int size, Long viewerId, String authorizationHeader, String q) {
+                PageRequest pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+                List<Long> memberPlanIds = memberRepository.findPlanIdsByUserId(viewerId);
+                if (memberPlanIds.isEmpty())
+                        memberPlanIds = List.of(-1L);
+
+                List<Long> friendIds = List.of();
+                if (authorizationHeader != null) {
+                        try {
+                                friendIds = friendClient.getFriendIds(authorizationHeader);
+                        } catch (Exception ignored) {
+                        }
+                }
+                if (friendIds.isEmpty())
+                        friendIds = List.of(-1L);
+
+                String keyword = normalizeSearch(q);
+
+                Page<Plan> pageResult = planRepository.searchFeedForUser(viewerId, memberPlanIds, friendIds, keyword,
+                                pageable);
+
+                List<PlanFeedItem> content = pageResult.getContent().stream()
+                                .map(planMapper::toFeedItem)
+                                .toList();
+
+                return new PageImpl<>(content, pageable, pageResult.getTotalElements());
+        }
+
+        public List<UserProfileResponse> searchUsersFromUserService(String authorizationHeader, String q, int limit) {
+                String keyword = normalizeSearch(q);
+                if (keyword.isBlank())
+                        return List.of();
+                try {
+                        return userProfileClient.searchUsers(authorizationHeader, q, limit);
+                } catch (Exception e) {
+                        return List.of();
+                }
+        }
+
+        private String normalizeSearch(String q) {
+                if (q == null)
+                        return "";
+                String s = q.trim();
+                if (s.startsWith("@"))
+                        s = s.substring(1).trim();
+                return s;
+        }
+
         public Page<PlanFeedItem> getFeed(int page, int size, Long viewerId, String authorizationHeader) {
                 PageRequest pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
