@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -23,23 +24,26 @@ import java.util.List;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
-
-    @Value("${auth.service.url:http://localhost:8081/api/auth/validate}")
-    private String authValidateUrl;
 
     private final RestTemplate restTemplate;
 
-    public JwtAuthFilter(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    @Value("${mravel.services.auth.base-url}")
+    private String authBaseUrl;
+
+    @Value("${mravel.services.auth.validate-path}")
+    private String authValidatePath;
+
+    private String authValidateUrl() {
+        return authBaseUrl + authValidatePath;
     }
 
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
@@ -56,19 +60,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             headers.setBearerAuth(token);
 
             ResponseEntity<AuthValidationResponse> resp = restTemplate.exchange(
-                    authValidateUrl,
+                    authValidateUrl(),
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    AuthValidationResponse.class
-            );
+                    AuthValidationResponse.class);
 
             AuthValidationResponse body = resp.getBody();
 
             if (resp.getStatusCode() == HttpStatus.OK && body != null && body.isValid()) {
                 var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + body.getRole()));
 
-                JwtUserPrincipal principal =
-                        new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole());
+                JwtUserPrincipal principal = new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole());
 
                 var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);

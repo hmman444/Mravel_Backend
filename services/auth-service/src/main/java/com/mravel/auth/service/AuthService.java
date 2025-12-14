@@ -5,6 +5,7 @@ import com.mravel.auth.config.JwtUtil;
 import com.mravel.auth.dto.*;
 import com.mravel.auth.model.OutboxEvent;
 import com.mravel.auth.model.RefreshToken;
+import com.mravel.auth.model.Role;
 import com.mravel.auth.model.User;
 import com.mravel.auth.repository.OutboxRepository;
 import com.mravel.auth.repository.UserRepository;
@@ -30,7 +31,7 @@ public class AuthService {
     private final GoogleAuthService googleAuthService;
     private final FacebookAuthService facebookAuthService;
     private final OutboxRepository outboxRepository;
-    String defaultAvatar = "https://res.cloudinary.com/dqp7k8d4r/image/upload/v1757608869/avatars/y1kuegnpvey9ukpcv5iu.jpg";
+    String defaultAvatar = "https://i.pinimg.com/736x/bc/43/98/bc439871417621836a0eeea768d60944.jpg";
 
     @Transactional
     public void register(RegisterRequest request) {
@@ -43,6 +44,7 @@ public class AuthService {
                         .fullname(request.getFullname())
                         .password(passwordEncoder.encode(request.getPassword()))
                         .provider("local")
+                        .role(Role.USER)
                         .enabled(false)
                         .build());
 
