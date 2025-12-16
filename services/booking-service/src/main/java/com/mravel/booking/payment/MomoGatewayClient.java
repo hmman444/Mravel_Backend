@@ -36,33 +36,35 @@ public class MomoGatewayClient {
     /**
      * Tạo giao dịch MoMo cho 1 booking và trả về payUrl.
      */
-    public String createPayment(String bookingCode, BigDecimal amount, String hotelName) {
-        if (bookingCode == null || bookingCode.isBlank()) {
-            throw new IllegalArgumentException("bookingCode không hợp lệ");
+    public String createPayment(String orderId, BigDecimal amount, String orderInfo) {
+        if (orderId == null || orderId.isBlank()) {
+            throw new IllegalArgumentException("orderId không hợp lệ");
         }
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Amount không hợp lệ");
         }
 
-        // Momo yêu cầu amount là số nguyên VND dạng string
         String amountStr = amount.setScale(0, RoundingMode.HALF_UP).toPlainString();
 
-        String orderId = bookingCode;
-        String requestId = bookingCode;
-        String orderInfo = "Thanh toan dat phong " + (hotelName != null ? hotelName : bookingCode);
+        String requestId = orderId + "-" + System.currentTimeMillis();
+
         String extraData = "";
 
+        if (orderInfo == null || orderInfo.isBlank()) {
+            orderInfo = "Thanh toan " + orderId;
+        }
+
         String rawSignature =
-                "accessKey=" + ACCESS_KEY +
-                        "&amount=" + amountStr +
-                        "&extraData=" + extraData +
-                        "&ipnUrl=" + IPN_URL +
-                        "&orderId=" + orderId +
-                        "&orderInfo=" + orderInfo +
-                        "&partnerCode=" + PARTNER_CODE +
-                        "&redirectUrl=" + REDIRECT_URL +
-                        "&requestId=" + requestId +
-                        "&requestType=" + REQUEST_TYPE;
+            "accessKey=" + ACCESS_KEY +
+            "&amount=" + amountStr +
+            "&extraData=" + extraData +
+            "&ipnUrl=" + IPN_URL +
+            "&orderId=" + orderId +
+            "&orderInfo=" + orderInfo +
+            "&partnerCode=" + PARTNER_CODE +
+            "&redirectUrl=" + REDIRECT_URL +
+            "&requestId=" + requestId +
+            "&requestType=" + REQUEST_TYPE;
 
         String signature = hmacSHA256(SECRET_KEY, rawSignature);
 

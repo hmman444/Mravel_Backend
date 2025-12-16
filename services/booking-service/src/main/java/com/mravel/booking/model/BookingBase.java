@@ -83,6 +83,12 @@ public abstract class BookingBase extends BaseEntity {
     @Column(nullable = false)
     private Boolean inventoryDeducted = false;
 
+    @Column(name = "pending_payment_url", length = 1000)
+    private String pendingPaymentUrl;
+
+    @Column(name = "pending_payment_order_id", length = 64)
+    private String pendingPaymentOrderId;
+
     public enum PayOption { FULL, DEPOSIT }
     public enum BookingStatus { PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, COMPLETED, REFUNDED }
     public enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED, PARTIAL_REFUNDED }
