@@ -14,6 +14,7 @@ import com.mravel.booking.model.BookingBase.PaymentStatus;
 import com.mravel.booking.model.BookingRoom;
 import com.mravel.booking.model.HotelBooking;
 import com.mravel.booking.payment.MomoGatewayClient;
+import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.repository.HotelBookingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -141,13 +142,66 @@ public class HotelBookingService {
 
         HotelBooking saved = hotelBookingRepository.save(booking);
 
+        String attemptId = saved.getCode() + "-" + UUID.randomUUID().toString()
+            .replace("-", "").substring(0, 6).toUpperCase();
+
         String payUrl = momoPaymentService.createPayment(
-                saved.getCode(),
-                saved.getAmountPayable(),
-                saved.getHotelName()
+            attemptId,
+            saved.getAmountPayable(),
+            saved.getHotelName()
         );
 
+        saved.setPendingPaymentUrl(payUrl);
+        saved.setPendingPaymentOrderId(attemptId);
+        hotelBookingRepository.save(saved);
+
         return HotelBookingMapper.toCreatedDTO(saved, "MOMO_WALLET", payUrl);
+    }
+
+    @Transactional
+    public ResumePaymentDTO resumeHotelPaymentForOwner(String code, Long userId, String guestSid) {
+        HotelBooking b = hotelBookingRepository.findByCode(code.trim())
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        // ✅ chỉ cho resume khi còn pending
+        if (b.getStatus() != BookingStatus.PENDING_PAYMENT || b.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
+        }
+
+        // ✅ quyền: nếu booking thuộc account => cần userId đúng
+        if (b.getUserId() != null) {
+            if (userId == null || !userId.equals(b.getUserId())) {
+                throw new IllegalStateException("Bạn không có quyền tiếp tục thanh toán booking này");
+            }
+        } else {
+            // booking guest => cần guestSid đúng
+            if (guestSid == null || guestSid.isBlank() || b.getGuestSessionId() == null || !guestSid.equals(b.getGuestSessionId())) {
+                throw new IllegalStateException("Không có quyền tiếp tục thanh toán booking này");
+            }
+        }
+
+        // ✅ trong 30 phút
+        Instant deadline = b.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
+        Instant now = Instant.now();
+        if (now.isAfter(deadline)) {
+            throw new IllegalStateException("Đơn đã quá hạn thanh toán");
+        }
+
+        long expiresIn = Duration.between(now, deadline).getSeconds();
+
+        String attemptId = b.getCode() + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+
+        String payUrl = momoPaymentService.createPayment(
+            attemptId,                 // ✅ orderId mới, không trùng
+            b.getAmountPayable(),
+            b.getHotelName()
+        );
+
+        b.setPendingPaymentUrl(payUrl);
+        b.setPendingPaymentOrderId(attemptId);
+        hotelBookingRepository.save(b);
+
+        return new ResumePaymentDTO(b.getCode(), payUrl, expiresIn);
     }
 
     @Transactional
@@ -180,6 +234,8 @@ public class HotelBookingService {
         booking.setPaidAt(Instant.now());
         booking.setPaymentStatus(PaymentStatus.SUCCESS);
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setPendingPaymentUrl(null);
+        booking.setPendingPaymentOrderId(null);
 
         return hotelBookingRepository.save(booking);
     }
@@ -243,6 +299,9 @@ public class HotelBookingService {
             }
         }
 
+        booking.setPendingPaymentUrl(null);
+        booking.setPendingPaymentOrderId(null);
+
         return hotelBookingRepository.save(booking);
     }
 
@@ -265,6 +324,8 @@ public class HotelBookingService {
             b.setPaymentStatus(PaymentStatus.FAILED);
             b.setCancelledAt(now);
             b.setCancelReason("AUTO_CANCEL_NOT_PAID_WITHIN_" + PENDING_EXPIRE_MINUTES + "_MIN");
+            b.setPendingPaymentUrl(null);
+            b.setPendingPaymentOrderId(null);
 
             if (Boolean.TRUE.equals(b.getInventoryDeducted())) {
                 List<RoomRequestDTO> roomRequests = buildRoomRequestsFromBooking(b);

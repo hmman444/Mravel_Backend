@@ -24,7 +24,12 @@ public class RestaurantBookingController {
       HttpServletRequest httpReq,
       HttpServletResponse httpResp
   ) {
-    String sid = GuestSessionCookie.ensure(httpReq, httpResp);
+    String sid = null;
+
+    if (req.userId() == null) {
+      sid = GuestSessionCookie.ensure(httpReq, httpResp);
+    }
+
     var dto = service.create(req, sid);
     return ResponseEntity.ok(ApiResponse.success("Tạo booking nhà hàng thành công", dto));
   }

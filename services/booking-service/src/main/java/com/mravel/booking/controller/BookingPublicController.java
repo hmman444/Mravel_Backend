@@ -4,9 +4,14 @@ package com.mravel.booking.controller;
 import com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest;
 import com.mravel.booking.dto.BookingPublicDtos.HotelBookingSummaryDTO;
 import com.mravel.booking.dto.HotelBookingDtos.HotelBookingDetailDTO;
+import com.mravel.booking.dto.ResumePaymentDTO;
+import com.mravel.booking.model.BookingBase.BookingStatus;
+import com.mravel.booking.model.BookingBase.PaymentStatus;
 import com.mravel.booking.model.HotelBooking;
+import com.mravel.booking.payment.MomoGatewayClient;
 import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.service.HotelBookingMapper;
+import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.HotelBookingSummaryMapper;
 import com.mravel.booking.utils.GuestSessionCookie;
 import com.mravel.common.response.ApiResponse;
@@ -17,7 +22,11 @@ import org.springframework.web.bind.annotation.*;
 
 import static com.mravel.booking.service.HotelBookingSummaryMapper.toSummary;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/booking/public")
@@ -25,6 +34,8 @@ import java.util.List;
 public class BookingPublicController {
 
     private final HotelBookingRepository hotelBookingRepository;
+    private final HotelBookingService hotelBookingService;
+    private final MomoGatewayClient momoPaymentService;
 
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<HotelBookingSummaryDTO>>> myBookings(
@@ -64,6 +75,15 @@ public class BookingPublicController {
         }
 
         return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
+    }
+
+    @PostMapping("/my/{code}/resume-payment")
+    public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumeMy(
+        @PathVariable String code,
+        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid
+    ) {
+        var dto = hotelBookingService.resumeHotelPaymentForOwner(code, null, sid);
+        return ResponseEntity.ok(ApiResponse.success("OK", dto));
     }
 
     @PostMapping("/lookup")
@@ -110,28 +130,87 @@ public class BookingPublicController {
     public ResponseEntity<ApiResponse<HotelBookingDetailDTO>> lookupDetail(
         @RequestBody BookingLookupRequest body
     ) {
-    if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
-        throw new IllegalArgumentException("Thiếu bookingCode");
-    }
-    if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
-        throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
-    }
-
-    HotelBooking b = hotelBookingRepository.findWithRoomsByCode(body.bookingCode().trim())
-        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
-
-    String last4 = last4Digits(b.getContactPhone());
-    if (!body.phoneLast4().trim().equals(last4)) {
-        throw new IllegalStateException("Sai 4 số cuối SĐT");
-    }
-
-    if (body.email() != null && !body.email().isBlank()) {
-        String bEmail = b.getContactEmail();
-        if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-        throw new IllegalStateException("Email không khớp");
+        if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
+            throw new IllegalArgumentException("Thiếu bookingCode");
         }
+        if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
+            throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+        }
+
+        HotelBooking b = hotelBookingRepository.findWithRoomsByCode(body.bookingCode().trim())
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        String last4 = last4Digits(b.getContactPhone());
+        if (!body.phoneLast4().trim().equals(last4)) {
+            throw new IllegalStateException("Sai 4 số cuối SĐT");
+        }
+
+        if (body.email() != null && !body.email().isBlank()) {
+            String bEmail = b.getContactEmail();
+            if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
+            throw new IllegalStateException("Email không khớp");
+            }
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
     }
 
-    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
+    @PostMapping("/lookup/resume")
+    public ResponseEntity<ApiResponse<ResumePaymentDTO>> lookupResume(
+        @RequestBody BookingLookupRequest body
+    ) {
+        if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
+            throw new IllegalArgumentException("Thiếu bookingCode");
+        }
+        if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
+            throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+        }
+
+        HotelBooking b = hotelBookingRepository.findByCode(body.bookingCode().trim())
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        // ✅ Nếu bạn muốn LOOKUP RESUME chỉ dành cho GUEST thì đặt đúng ở đây:
+        if (b.getUserId() != null) {
+            throw new IllegalStateException("Booking này thuộc tài khoản");
+        }
+
+        String last4 = last4Digits(b.getContactPhone());
+        if (!body.phoneLast4().trim().equals(last4)) {
+            throw new IllegalStateException("Sai 4 số cuối SĐT");
+        }
+
+        if (body.email() != null && !body.email().isBlank()) {
+            String bEmail = b.getContactEmail();
+            if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
+                throw new IllegalStateException("Email không khớp");
+            }
+        }
+
+        // ✅ chỉ cho resume khi còn pending
+        if (b.getStatus() != BookingStatus.PENDING_PAYMENT || b.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
+        }
+
+        // ✅ trong 30 phút
+        Instant deadline = b.getCreatedAt().plus(30, ChronoUnit.MINUTES);
+        Instant now = Instant.now();
+        if (now.isAfter(deadline)) {
+            throw new IllegalStateException("Đơn đã quá hạn thanh toán");
+        }
+        long expiresIn = Duration.between(now, deadline).getSeconds();
+
+        // ✅ tạo payUrl mới (requestId sẽ unique)
+        String orderInfo = "Thanh toan dat phong " + (b.getHotelName() != null ? b.getHotelName() : b.getCode());
+        String attemptId = b.getCode() + "-" + java.util.UUID.randomUUID().toString()
+            .replace("-", "").substring(0, 6).toUpperCase();
+
+        String payUrl = momoPaymentService.createPayment(attemptId, b.getAmountPayable(), orderInfo);
+
+        b.setPendingPaymentUrl(payUrl);
+        b.setPendingPaymentOrderId(attemptId);
+        hotelBookingRepository.save(b);
+
+        return ResponseEntity.ok(ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), payUrl, expiresIn)));
+
     }
 }
