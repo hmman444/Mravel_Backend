@@ -5,6 +5,8 @@ import com.mravel.admin.dto.amenity.AmenityUpsertRequest;
 import com.mravel.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,12 +17,12 @@ public class AdminAmenityController {
     private final CatalogClient catalogClient;
 
     @PostMapping
-    public ApiResponse<?> create(@RequestBody AmenityUpsertRequest req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<?>> create(@RequestBody AmenityUpsertRequest req, HttpServletRequest request) {
         return catalogClient.createAmenity(req, extractToken(request));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<?> update(
+    public ResponseEntity<ApiResponse<?>> update(
             @PathVariable String id,
             @RequestBody AmenityUpsertRequest req,
             HttpServletRequest request) {
@@ -28,12 +30,12 @@ public class AdminAmenityController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> delete(@PathVariable String id, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<?>> delete(@PathVariable String id, HttpServletRequest request) {
         return catalogClient.deleteAmenity(id, extractToken(request));
     }
 
     @GetMapping
-    public ApiResponse<?> list(
+    public ResponseEntity<ApiResponse<?>> list(
             @RequestParam(required = false) String scope,
             @RequestParam(defaultValue = "true") boolean active,
             @RequestParam(defaultValue = "false") boolean grouped,

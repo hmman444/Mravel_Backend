@@ -42,7 +42,7 @@ public class AmenityCatalogService {
         // check unique code+scope
         repo.findByCodeAndScope(doc.getCode(), doc.getScope())
                 .ifPresent(x -> {
-                    throw new IllegalArgumentException("Amenity code already exists in scope");
+                    throw new IllegalArgumentException("Mã tiện ích đã tồn tại trong phạm vi");
                 });
 
         return repo.save(doc);
@@ -50,7 +50,7 @@ public class AmenityCatalogService {
 
     public AmenityCatalogDoc update(String id, AmenityUpsertRequest req) {
         AmenityCatalogDoc doc = repo.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Amenity not found"));
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy tiện ích"));
 
         if (StringUtils.hasText(req.getCode()))
             doc.setCode(normalizeCode(req.getCode()));
@@ -79,7 +79,7 @@ public class AmenityCatalogService {
         repo.findByCodeAndScope(doc.getCode(), doc.getScope())
                 .filter(x -> !x.getId().equals(doc.getId()))
                 .ifPresent(x -> {
-                    throw new IllegalArgumentException("Amenity code already exists in scope");
+                    throw new IllegalArgumentException("Mã tiện ích đã tồn tại trong phạm vi");
                 });
 
         return repo.save(doc);
@@ -87,7 +87,7 @@ public class AmenityCatalogService {
 
     public void softDelete(String id) {
         AmenityCatalogDoc doc = repo.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Amenity not found"));
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy tiện ích"));
         doc.setActive(false);
         doc.setUpdatedAt(Instant.now());
         repo.save(doc);
@@ -116,7 +116,7 @@ public class AmenityCatalogService {
 
         List<String> missing = normalized.stream().filter(c -> !foundCodes.contains(c)).toList();
         if (!missing.isEmpty()) {
-            throw new IllegalArgumentException("Invalid amenity codes: " + missing);
+            throw new IllegalArgumentException("Mã tiện ích không hợp lệ: " + missing);
         }
         return found;
     }
@@ -167,7 +167,7 @@ public class AmenityCatalogService {
 
     private static String normalizeCode(String code) {
         if (!StringUtils.hasText(code))
-            throw new IllegalArgumentException("code is required");
+            throw new IllegalArgumentException("Mã tiện ích là bắt buộc");
         return code.trim().toUpperCase(Locale.ROOT);
     }
 
