@@ -7,6 +7,7 @@ import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.service.HotelBookingMapper;
 import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.HotelBookingSummaryMapper;
+import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.utils.GuestSessionCookie;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -68,5 +69,23 @@ public class BookingMyController {
 
     int claimed = service.claimGuestBookingsToUser(sid, userId);
     return ResponseEntity.ok(ApiResponse.success("OK", claimed));
+  }
+
+  @PostMapping("/bookings/{code}/resume-payment")
+  public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumePrivate(
+      @PathVariable String code,
+      @AuthenticationPrincipal Jwt jwt
+  ) {
+      Long userId = extractUserId(jwt);
+      var dto = service.resumeHotelPaymentForOwner(code, userId, null);
+      return ResponseEntity.ok(ApiResponse.success("OK", dto));
+  }
+  
+  private static Long extractUserId(Jwt jwt) {
+    Object rawId = jwt.getClaim("id");
+    if (rawId == null) throw new IllegalStateException("JWT thiếu claim id");
+    return (rawId instanceof Number)
+        ? ((Number) rawId).longValue()
+        : Long.valueOf(String.valueOf(rawId));
   }
 }

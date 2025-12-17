@@ -2,6 +2,7 @@ package com.mravel.booking.controller;
 
 import com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest;
 import com.mravel.booking.dto.RestaurantBookingDtos.*;
+import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.repository.RestaurantBookingRepository;
 import com.mravel.booking.service.RestaurantBookingMapper;
 import com.mravel.booking.service.RestaurantBookingService;
@@ -73,23 +74,29 @@ public class RestaurantBookingMyController {
     }
 
     @PostMapping("/lookup")
-  public ResponseEntity<ApiResponse<RestaurantBookingSummaryDTO>> lookup(
-      @RequestBody BookingLookupRequest body,
-      @AuthenticationPrincipal Jwt jwt
-  ) {
-    Long userId = ((Number) jwt.getClaim("id")).longValue();
+    public ResponseEntity<ApiResponse<RestaurantBookingSummaryDTO>> lookup(
+        @RequestBody BookingLookupRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = ((Number) jwt.getClaim("id")).longValue();
 
-    var b = repo.findByCode(body.bookingCode().trim())
-        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+        var b = repo.findByCode(body.bookingCode().trim())
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
-    // booking phải thuộc user đang login
-    if (b.getUserId() == null || !userId.equals(b.getUserId())) {
-      throw new IllegalStateException("Booking này không thuộc tài khoản của bạn");
+        if (b.getUserId() == null || !userId.equals(b.getUserId())) {
+        throw new IllegalStateException("Booking này không thuộc tài khoản của bạn");
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toSummary(b)));
     }
 
-    // vẫn check last4/email nếu bạn muốn
-    // ...
-
-    return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toSummary(b)));
-  }
+    @PostMapping("/{code}/resume-payment")
+    public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumePrivate(
+        @PathVariable String code,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = extractUserId(jwt);
+        var dto = service.resumeRestaurantPaymentForOwner(code, userId, null);
+        return ResponseEntity.ok(ApiResponse.success("OK", dto));
+    }
 }
