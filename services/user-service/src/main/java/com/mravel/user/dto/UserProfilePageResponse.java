@@ -3,7 +3,6 @@ package com.mravel.user.dto;
 import lombok.Builder;
 import lombok.Data;
 
-import com.mravel.user.model.Gender;
 import com.mravel.user.model.RelationshipType;
 import java.time.LocalDate;
 import java.util.List;

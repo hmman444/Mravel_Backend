@@ -1,6 +1,6 @@
 package com.mravel.plan.config;
 
-import com.mravel.plan.security.JwtUserPrincipal;
+import com.mravel.common.security.JwtUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

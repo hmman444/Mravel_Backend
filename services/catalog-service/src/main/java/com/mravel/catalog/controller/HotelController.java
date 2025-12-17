@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.mravel.catalog.dto.SearchRequests.HotelSearchRequest;
+import com.mravel.catalog.dto.amenity.AmenityAttachDetachRequest;
 import com.mravel.catalog.dto.hotel.HotelDtos.HotelDetailDTO;
 import com.mravel.catalog.dto.hotel.HotelDtos.HotelSummaryDTO;
 import com.mravel.catalog.service.HotelService;
@@ -24,29 +25,28 @@ public class HotelController {
 
     /**
      * Tìm kiếm khách sạn.
-     * Body: HotelSearchRequest { location, checkIn, checkOut, adults, children, rooms }
+     * Body: HotelSearchRequest { location, checkIn, checkOut, adults, children,
+     * rooms }
      * Query: page, size, sort...
      *
      * Ví dụ FE:
-     *  POST /api/catalog/hotels/search?page=0&size=10
-     *  {
-     *    "location": "da-nang",
-     *    "checkIn": "2025-12-01",
-     *    "checkOut": "2025-12-03",
-     *    "adults": 2,
-     *    "children": 1,
-     *    "rooms": 1
-     *  }
+     * POST /api/catalog/hotels/search?page=0&size=10
+     * {
+     * "location": "da-nang",
+     * "checkIn": "2025-12-01",
+     * "checkOut": "2025-12-03",
+     * "adults": 2,
+     * "children": 1,
+     * "rooms": 1
+     * }
      */
     @PostMapping("/search")
     public ResponseEntity<ApiResponse<Page<HotelSummaryDTO>>> searchHotels(
             @RequestBody(required = false) HotelSearchRequest request,
-            @ParameterObject Pageable pageable
-    ) {
+            @ParameterObject Pageable pageable) {
         Page<HotelSummaryDTO> result = hotelService.searchHotels(request, pageable);
         return ResponseEntity.ok(
-                ApiResponse.success("Tìm kiếm khách sạn thành công", result)
-        );
+                ApiResponse.success("Tìm kiếm khách sạn thành công", result));
     }
 
     /**
@@ -56,7 +56,22 @@ public class HotelController {
     public ResponseEntity<ApiResponse<HotelDetailDTO>> getHotelDetail(@PathVariable String slug) {
         HotelDetailDTO dto = hotelService.getBySlug(slug);
         return ResponseEntity.ok(
-                ApiResponse.success("Lấy chi tiết khách sạn thành công", dto)
-        );
+                ApiResponse.success("Lấy chi tiết khách sạn thành công", dto));
+    }
+
+    @PostMapping("/{hotelId}/amenities:attach")
+    public ResponseEntity<ApiResponse<Void>> attach(@PathVariable String hotelId,
+            @RequestBody AmenityAttachDetachRequest req) {
+        hotelService.attachHotelAmenities(hotelId, req.getCodes());
+        return ResponseEntity.ok(
+                ApiResponse.success("Gán tiện ích vào khách sạn", null));
+    }
+
+    @PostMapping("/{hotelId}/amenities:detach")
+    public ResponseEntity<ApiResponse<Void>> detach(@PathVariable String hotelId,
+            @RequestBody AmenityAttachDetachRequest req) {
+        hotelService.detachHotelAmenities(hotelId, req.getCodes());
+        return ResponseEntity.ok(
+                ApiResponse.success("Gỡ tiện ích khỏi khách sạn", null));
     }
 }

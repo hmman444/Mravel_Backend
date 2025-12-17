@@ -22,21 +22,12 @@ import lombok.Setter;
 
 @Document(collection = "hotels")
 @CompoundIndexes({
-    // Tìm theo destination + active
-    @CompoundIndex(
-        name = "hotel_active_destination_idx",
-        def = "{'active':1,'destinationSlug':1}"
-    ),
-    // Search theo giá & rating (minNightlyPrice là giá aggregate từ ratePlans)
-    @CompoundIndex(
-        name = "hotel_price_rating_idx",
-        def = "{'active':1,'minNightlyPrice':1,'avgRating':-1}"
-    ),
-    // Lọc theo trạng thái kiểm duyệt + destination
-    @CompoundIndex(
-        name = "hotel_status_destination_idx",
-        def = "{'active':1,'moderation.status':1,'destinationSlug':1}"
-    )
+        // Tìm theo destination + active
+        @CompoundIndex(name = "hotel_active_destination_idx", def = "{'active':1,'destinationSlug':1}"),
+        // Search theo giá & rating (minNightlyPrice là giá aggregate từ ratePlans)
+        @CompoundIndex(name = "hotel_price_rating_idx", def = "{'active':1,'minNightlyPrice':1,'avgRating':-1}"),
+        // Lọc theo trạng thái kiểm duyệt + destination
+        @CompoundIndex(name = "hotel_status_destination_idx", def = "{'active':1,'moderation.status':1,'destinationSlug':1}")
 })
 @Getter
 @Setter
@@ -77,7 +68,7 @@ public class HotelDoc {
     private String name;
 
     @Indexed(unique = true)
-    private String slug;           // dùng cho URL & xem chi tiết
+    private String slug; // dùng cho URL & xem chi tiết
 
     /** Loại hình: khách sạn, homestay, hostel, villa... */
     private HotelType hotelType;
@@ -85,34 +76,37 @@ public class HotelDoc {
     /** Số sao 1–5 (hoặc 0 nếu không xếp hạng) */
     private Integer starRating;
 
-    private String shortDescription;   // đoạn ngắn trên list
-    private String description;        // phần mô tả dài (overview / modal)
+    private String shortDescription; // đoạn ngắn trên list
+    private String description; // phần mô tả dài (overview / modal)
 
     private String phone;
     private String email;
     private String website;
 
     /** Giờ nhận / trả phòng chuẩn (để hiển thị) */
-    private LocalTime defaultCheckInTime;   // vd. 14:00
-    private LocalTime defaultCheckOutTime;  // vd. 12:00
+    private LocalTime defaultCheckInTime; // vd. 14:00
+    private LocalTime defaultCheckOutTime; // vd. 12:00
 
-    /** Có hỗ trợ check-in online không (để show badge "Đã có Check-in Trực Tuyến") */
+    /**
+     * Có hỗ trợ check-in online không (để show badge "Đã có Check-in Trực Tuyến")
+     */
     @Builder.Default
     private Boolean hasOnlineCheckin = false;
 
     // ---------- Rating & review aggregate ----------
 
     @Builder.Default
-    private Double avgRating = 0.0;        // ví dụ 9.1
+    private Double avgRating = 0.0; // ví dụ 9.1
     @Builder.Default
-    private Integer reviewsCount = 0;      // 174 đánh giá
-    private String ratingLabel;            // "Xuất sắc", "Rất tốt"...
+    private Integer reviewsCount = 0; // 174 đánh giá
+    private String ratingLabel; // "Xuất sắc", "Rất tốt"...
 
     // ---------- Giá tổng quan của khách sạn (DENORMALIZED) ----------
 
     /**
      * Giá tối thiểu / đêm trong tất cả roomTypes.ratePlans.
-     * CHỈ dùng để sort/filter nhanh trên list – source of truth vẫn là pricePerNight
+     * CHỈ dùng để sort/filter nhanh trên list – source of truth vẫn là
+     * pricePerNight
      * trong từng RatePlan.
      */
     private BigDecimal minNightlyPrice;
@@ -128,18 +122,21 @@ public class HotelDoc {
 
     /**
      * Phần trăm giảm giá so với referenceNightlyPrice (0–100).
-     * Optional – nếu null thì FE có thể tự tính lại từ referenceNightlyPrice & minNightlyPrice.
+     * Optional – nếu null thì FE có thể tự tính lại từ referenceNightlyPrice &
+     * minNightlyPrice.
      */
     private Integer discountPercent;
 
-    /** Cấu hình thuế & phí mặc định cho khách sạn (có thể override ở từng RatePlan) */
+    /**
+     * Cấu hình thuế & phí mặc định cho khách sạn (có thể override ở từng RatePlan)
+     */
     private TaxAndFeeConfig taxConfig;
 
     /**
      * Cấu hình booking cơ bản cho khách sạn:
-     *  - Cho phép FULL / DEPOSIT
-     *  - % cọc
-     *  - Số phút free-cancel sau khi đặt
+     * - Cho phép FULL / DEPOSIT
+     * - % cọc
+     * - Số phút free-cancel sau khi đặt
      */
     private BookingConfig bookingConfig;
 
@@ -163,7 +160,7 @@ public class HotelDoc {
     // ---------- Tiện ích, phòng, lân cận ----------
 
     /** Tiện ích ở cấp khách sạn: lễ tân 24h, thang máy, wifi... */
-    private List<Amenity> amenities;
+    private List<String> amenityCodes;
 
     /** Các loại phòng của khách sạn */
     private List<RoomType> roomTypes;
@@ -194,7 +191,7 @@ public class HotelDoc {
     private ModerationInfo moderation;
 
     // =====================================================================
-    //                              SUBDOCUMENTS
+    // SUBDOCUMENTS
     // =====================================================================
 
     @Getter
@@ -224,66 +221,17 @@ public class HotelDoc {
 
         /** Section logic để biết block này thuộc phần nào của trang detail */
         public enum ContentSection {
-            OVERVIEW,   // dùng cho modal "Giới thiệu / Xem thêm"
-            STORY,      // bài viết dài cuối trang (lịch sử, kiến trúc, gợi ý trải nghiệm...)
+            OVERVIEW, // dùng cho modal "Giới thiệu / Xem thêm"
+            STORY, // bài viết dài cuối trang (lịch sử, kiến trúc, gợi ý trải nghiệm...)
             OTHER
         }
 
         private BlockType type;
         private ContentSection section;
-        private String text;             // HEADING / PARAGRAPH / QUOTE / INFOBOX
-        private Image image;             // cho IMAGE
-        private List<Image> gallery;     // cho GALLERY
-        private double[] mapLocation;    // cho MAP (lon, lat) nếu khác location chính
-    }
-
-    /** Nhóm tiện ích: Tiện nghi phòng, dịch vụ khách sạn, internet... */
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class Amenity {
-        private String code;            // "wifi", "breakfast", "parking"...
-        private String name;            // label hiển thị
-        private AmenityGroup group;     // ROOM, HOTEL_SERVICE, PUBLIC_AREA, INTERNET, NEARBY...
-
-        /**
-         * Section phục vụ UI: Tính năng phòng bạn thích, Tiện nghi cơ bản, Tiện nghi phòng,
-         * Tiện nghi phòng tắm, Đưa đón / Ẩm thực...
-         */
-        private AmenitySection section;
-
-        /**
-         * Đánh dấu những amenity nổi bật (để render ở box "Tính năng phòng bạn thích").
-         */
-        @Builder.Default
-        private Boolean highlight = false;
-    }
-
-    public enum AmenityGroup {
-        ROOM,            // Tiện nghi phòng
-        HOTEL_SERVICE,   // Dịch vụ khách sạn (lễ tân 24h, đặt tour...)
-        PUBLIC_AREA,     // Khu vực công cộng (thang máy, hồ bơi...)
-        NEARBY,          // Tiện ích lân cận (siêu thị, salon tóc...)
-        INTERNET,        // Kết nối mạng
-        OTHER
-    }
-
-    /**
-     * Phân loại tiện ích theo nhóm hiển thị trên UI.
-     * (phòng tắm, ẩm thực, đưa đón, cơ bản, v.v.)
-     */
-    public enum AmenitySection {
-        HIGHLIGHT_FEATURES,  // Tính năng phòng bạn thích
-        BASIC_FACILITIES,    // Tiện nghi cơ bản
-        ROOM_FACILITIES,     // Tiện nghi phòng
-        BATHROOM,            // Tiện nghi phòng tắm
-        FOOD_AND_DRINK,      // Ẩm thực
-        TRANSPORT,           // Đưa đón / di chuyển
-        INTERNET,
-        ENTERTAINMENT,
-        OTHER
+        private String text; // HEADING / PARAGRAPH / QUOTE / INFOBOX
+        private Image image; // cho IMAGE
+        private List<Image> gallery; // cho GALLERY
+        private double[] mapLocation; // cho MAP (lon, lat) nếu khác location chính
     }
 
     /** Thông tin các điểm lân cận (block "Xung quanh khách sạn có gì") */
@@ -293,9 +241,9 @@ public class HotelDoc {
     @AllArgsConstructor
     @Builder
     public static class NearbyPlace {
-        private String placeSlug;      // tham chiếu sang PlaceDoc (POI) nếu có
+        private String placeSlug; // tham chiếu sang PlaceDoc (POI) nếu có
         private String name;
-        private String category;       // "Địa điểm lân cận", "Trung tâm giao thông", "Giải trí", "Khác"
+        private String category; // "Địa điểm lân cận", "Trung tâm giao thông", "Giải trí", "Khác"
         private Double distanceMeters; // khoảng cách ước tính (chim bay)
     }
 
@@ -306,14 +254,14 @@ public class HotelDoc {
     @AllArgsConstructor
     @Builder
     public static class RoomType {
-        private String id;                // random UUID string
-        private String name;              // "Standard Studio"
-        private String shortDescription;  // mô tả ngắn
-        private String description;       // mô tả chi tiết (optional)
+        private String id; // random UUID string
+        private String name; // "Standard Studio"
+        private String shortDescription; // mô tả ngắn
+        private String description; // mô tả chi tiết (optional)
 
-        private Double areaSqm;           // diện tích, ví dụ 22.0 m²
-        private BedType bedType;          // QUEEN, TWIN, KING... (dùng cho filter)
-        private Integer bedsCount;        // số giường (dùng cho filter)
+        private Double areaSqm; // diện tích, ví dụ 22.0 m²
+        private BedType bedType; // QUEEN, TWIN, KING... (dùng cho filter)
+        private Integer bedsCount; // số giường (dùng cho filter)
 
         /**
          * Mô tả layout giường cho UI, vd: "1 giường King và 2 giường đơn".
@@ -329,8 +277,8 @@ public class HotelDoc {
 
         /** Sức chứa */
         private Integer maxAdults;
-        private Integer maxChildren;      // optional
-        private Integer maxGuests;        // tổng tối đa – dùng filter search
+        private Integer maxChildren; // optional
+        private Integer maxGuests; // tổng tối đa – dùng filter search
 
         /** Tổng số phòng loại này (inventory tĩnh) */
         private Integer totalRooms;
@@ -339,7 +287,7 @@ public class HotelDoc {
         private List<Image> images;
 
         /** Tiện nghi riêng của phòng: nhà bếp mini, vòi tắm đứng... */
-        private List<Amenity> amenities;
+        private List<String> amenityCodes;
 
         /** Các gói giá / rate plan cho loại phòng này */
         private List<RatePlan> ratePlans;
@@ -409,7 +357,10 @@ public class HotelDoc {
         private Boolean showPricePreTax = true;
     }
 
-    /** Cấu hình booking cơ bản của khách sạn (hình thức thanh toán, cọc, free-cancel) */
+    /**
+     * Cấu hình booking cơ bản của khách sạn (hình thức thanh toán, cọc,
+     * free-cancel)
+     */
     @Getter
     @Setter
     @NoArgsConstructor
@@ -455,9 +406,9 @@ public class HotelDoc {
     @AllArgsConstructor
     @Builder
     public static class LengthOfStayDiscount {
-        private Integer minNights;        // số đêm tối thiểu
-        private Integer maxNights;        // có thể null = không giới hạn
-        private Integer discountPercent;  // giảm bao nhiêu % so với pricePerNight
+        private Integer minNights; // số đêm tối thiểu
+        private Integer maxNights; // có thể null = không giới hạn
+        private Integer discountPercent; // giảm bao nhiêu % so với pricePerNight
     }
 
     /**
@@ -488,8 +439,8 @@ public class HotelDoc {
     @Builder
     public static class HotelPolicy {
         /** Giờ nhận phòng / trả phòng chuẩn (dùng cho cả block policy và info) */
-        private LocalTime checkInFrom;    // ví dụ 14:00
-        private LocalTime checkOutUntil;  // ví dụ 12:00
+        private LocalTime checkInFrom; // ví dụ 14:00
+        private LocalTime checkOutUntil; // ví dụ 12:00
 
         /**
          * Các mục policy chi tiết: giấy tờ bắt buộc, hướng dẫn nhận phòng,
@@ -506,8 +457,8 @@ public class HotelDoc {
     @Builder
     public static class PolicyItem {
         private PolicySection section;
-        private String title;    // vd: "Giấy Tờ Bắt Buộc"
-        private String content;  // nội dung chi tiết (đa ngôn ngữ xử lý bên ngoài)
+        private String title; // vd: "Giấy Tờ Bắt Buộc"
+        private String content; // nội dung chi tiết (đa ngôn ngữ xử lý bên ngoài)
     }
 
     /** Thông tin chung (block "Thông tin chung") */
@@ -556,13 +507,15 @@ public class HotelDoc {
     @Builder
     public static class ReviewStats {
         /** Điểm từng hạng mục */
-        private Double cleanlinessScore;      // Vệ sinh
-        private Double roomAmenitiesScore;    // Tiện nghi phòng
-        private Double foodScore;             // Đồ ăn
-        private Double locationScore;         // Vị trí
-        private Double serviceScore;          // Dịch vụ & tiện ích
+        private Double cleanlinessScore; // Vệ sinh
+        private Double roomAmenitiesScore; // Tiện nghi phòng
+        private Double foodScore; // Đồ ăn
+        private Double locationScore; // Vị trí
+        private Double serviceScore; // Dịch vụ & tiện ích
 
-        /** Các keyword người dùng hay nhắc (khoảng cách, wifi, nhân viên thân thiện...) */
+        /**
+         * Các keyword người dùng hay nhắc (khoảng cách, wifi, nhân viên thân thiện...)
+         */
         private List<ReviewKeywordStat> keywords;
     }
 
@@ -573,8 +526,8 @@ public class HotelDoc {
     @AllArgsConstructor
     @Builder
     public static class ReviewKeywordStat {
-        private String code;   // "distance_to_center", "friendly_staff", "wifi"...
-        private String label;  // "Khoảng cách đến trung tâm", "Nhân viên thân thiện"...
+        private String code; // "distance_to_center", "friendly_staff", "wifi"...
+        private String label; // "Khoảng cách đến trung tâm", "Nhân viên thân thiện"...
         private Integer count; // ví dụ 39, 33...
     }
 
@@ -613,7 +566,7 @@ public class HotelDoc {
     @Builder
     public static class ModerationInfo {
         /** Trạng thái hiện tại của hotel */
-        private HotelStatus status;      // DRAFT / PENDING_REVIEW / APPROVED / REJECTED / BLOCKED
+        private HotelStatus status; // DRAFT / PENDING_REVIEW / APPROVED / REJECTED / BLOCKED
 
         /** Lý do reject (admin nhập) */
         private String rejectionReason;
@@ -631,7 +584,7 @@ public class HotelDoc {
     }
 
     // =====================================================================
-    //                                 ENUMS
+    // ENUMS
     // =====================================================================
 
     public enum HotelType {
@@ -656,10 +609,10 @@ public class HotelDoc {
     }
 
     public enum BoardType {
-        ROOM_ONLY,             // Không gồm bữa sáng
-        BREAKFAST_INCLUDED,    // Có bữa sáng
-        HALF_BOARD,            // Sáng + 1 bữa
-        FULL_BOARD,            // 3 bữa
+        ROOM_ONLY, // Không gồm bữa sáng
+        BREAKFAST_INCLUDED, // Có bữa sáng
+        HALF_BOARD, // Sáng + 1 bữa
+        FULL_BOARD, // 3 bữa
         ALL_INCLUSIVE
     }
 
@@ -678,11 +631,11 @@ public class HotelDoc {
 
     /** Trạng thái kiểm duyệt */
     public enum HotelStatus {
-        DRAFT,           // Đối tác tạo nhưng chưa gửi duyệt
-        PENDING_REVIEW,  // Đã gửi, chờ admin duyệt
-        APPROVED,        // Đã duyệt – hiển thị trên web
-        REJECTED,        // Bị từ chối – có lý do
-        BLOCKED          // Từng được hiển thị nhưng đã bị khóa
+        DRAFT, // Đối tác tạo nhưng chưa gửi duyệt
+        PENDING_REVIEW, // Đã gửi, chờ admin duyệt
+        APPROVED, // Đã duyệt – hiển thị trên web
+        REJECTED, // Bị từ chối – có lý do
+        BLOCKED // Từng được hiển thị nhưng đã bị khóa
     }
 
     /** Section của từng policy item để FE render từng block riêng */
