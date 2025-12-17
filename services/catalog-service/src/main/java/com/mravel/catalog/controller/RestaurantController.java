@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.mravel.catalog.dto.SearchRequests.RestaurantSearchRequest;
+import com.mravel.catalog.dto.amenity.AmenityAttachDetachRequest;
 import com.mravel.catalog.dto.restaurant.RestaurantDtos.RestaurantDetailDTO;
 import com.mravel.catalog.dto.restaurant.RestaurantDtos.RestaurantSummaryDTO;
 import com.mravel.catalog.service.RestaurantService;
@@ -25,20 +26,19 @@ public class RestaurantController {
      * Tìm kiếm nhà hàng.
      *
      * Ví dụ FE:
-     *  POST /api/catalog/restaurants/search?page=0&size=10
-     *  {
-     *    "location": "hoi-an",
-     *    "visitDate": "2025-12-01",
-     *    "visitTime": "19:00",
-     *    "people": 4,
-     *    "cuisineSlugs": ["viet-nam", "buffet-viet-a"]
-     *  }
+     * POST /api/catalog/restaurants/search?page=0&size=10
+     * {
+     * "location": "hoi-an",
+     * "visitDate": "2025-12-01",
+     * "visitTime": "19:00",
+     * "people": 4,
+     * "cuisineSlugs": ["viet-nam", "buffet-viet-a"]
+     * }
      */
     @PostMapping("/search")
     public ResponseEntity<ApiResponse<Page<RestaurantSummaryDTO>>> searchRestaurants(
             @RequestBody(required = false) RestaurantSearchRequest request,
-            @ParameterObject Pageable pageable
-    ) {
+            @ParameterObject Pageable pageable) {
         Page<RestaurantSummaryDTO> result = restaurantService.searchRestaurants(request, pageable);
         return ResponseEntity.ok(ApiResponse.success("Tìm kiếm nhà hàng thành công", result));
     }
@@ -50,7 +50,18 @@ public class RestaurantController {
     public ResponseEntity<ApiResponse<RestaurantDetailDTO>> getRestaurantDetail(@PathVariable String slug) {
         RestaurantDetailDTO dto = restaurantService.getBySlug(slug);
         return ResponseEntity.ok(
-                ApiResponse.success("Lấy chi tiết nhà hàng thành công", dto)
-        );
+                ApiResponse.success("Lấy chi tiết nhà hàng thành công", dto));
+    }
+
+    @PostMapping("/{restaurantId}/amenities:attach")
+    public ApiResponse<Void> attach(@PathVariable String restaurantId, @RequestBody AmenityAttachDetachRequest req) {
+        restaurantService.attachRestaurantAmenities(restaurantId, req.getCodes());
+        return ApiResponse.success("Gán tiện ích vào nhà hàng", null);
+    }
+
+    @PostMapping("/{restaurantId}/amenities:detach")
+    public ApiResponse<Void> detach(@PathVariable String restaurantId, @RequestBody AmenityAttachDetachRequest req) {
+        restaurantService.detachRestaurantAmenities(restaurantId, req.getCodes());
+        return ApiResponse.success("Gỡ tiện ích khỏi nhà hàng", null);
     }
 }

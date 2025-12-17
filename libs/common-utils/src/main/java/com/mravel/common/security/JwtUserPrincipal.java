@@ -1,4 +1,4 @@
-package com.mravel.plan.security;
+package com.mravel.common.security;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

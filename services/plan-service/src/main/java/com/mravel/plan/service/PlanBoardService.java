@@ -663,36 +663,45 @@ public class PlanBoardService {
     }
 
     @Transactional
-    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void deleteList(Long planId, Long userId, Long listId) {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         PlanList target = mustLoadList(planId, listId);
-        if (target.getType() == PlanListType.TRASH) {
+        if (target.getType() == PlanListType.TRASH)
             throw new RuntimeException("Cannot delete trash list");
-        }
 
         List<PlanList> dayLists = findDayLists(planId);
-        if (dayLists.size() == 1) {
+        if (dayLists.size() == 1)
             throw new RuntimeException("Cannot delete the last day");
-        }
 
         PlanList trash = findTrash(planId);
 
-        List<PlanCard> cards = cardRepository.findByListIdOrderByPositionAsc(target.getId());
-        int basePos = (int) cardRepository.countByListId(trash.getId());
-
-        for (int i = 0; i < cards.size(); i++) {
-            PlanCard c = cards.get(i);
-            c.setList(trash);
-            c.setPosition(basePos + i);
-        }
-        cardRepository.saveAll(cards);
+        moveCardsToTrash(target, trash);
 
         listRepository.delete(target);
 
         syncDayLists(target.getPlan());
         publishBoard(planId, userId, "DELETE_LIST");
+    }
+
+    public void moveCardsToTrash(PlanList from, PlanList trash) {
+        // copy để tránh ConcurrentModification
+        List<PlanCard> moving = new ArrayList<>(from.getCards());
+
+        int basePos = (int) cardRepository.countByListId(trash.getId());
+
+        for (PlanCard c : moving) {
+            // owning side
+            c.setList(trash);
+            c.setPosition(basePos++);
+
+            // inverse side: remove khỏi list cũ, add vào trash
+            from.getCards().remove(c);
+            trash.getCards().add(c);
+        }
+
+        cardRepository.saveAll(moving);
+        cardRepository.flush(); // ép update list_id xuống DB trước khi delete list
     }
 
     // crud card
@@ -816,8 +825,10 @@ public class PlanBoardService {
 
         PlanList trash = findTrash(planId);
 
-        List<PlanCard> cardsInTrash = cardRepository.findByListIdOrderByPositionAsc(trash.getId());
-        cardRepository.deleteAll(cardsInTrash);
+        cardRepository.deleteByListId(trash.getId());
+        cardRepository.flush();
+
+        trash.getCards().clear();
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);

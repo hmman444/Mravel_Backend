@@ -34,7 +34,7 @@ public class PlanList {
     @JoinColumn(name = "plan_id", nullable = false)
     private Plan plan;
 
-    @OneToMany(mappedBy = "list", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "list", cascade = CascadeType.ALL)
     @OrderBy("position ASC")
     @Builder.Default
     private List<PlanCard> cards = new ArrayList<>();

@@ -156,18 +156,10 @@ public class PlanGeneralService {
             keep.setPosition(0);
             keep.setDayDate(startNew);
 
-            int basePos = (int) cardRepo.countByListId(trash.getId());
             for (int i = 1; i < dayLists.size(); i++) {
                 PlanList rm = dayLists.get(i);
 
-                List<PlanCard> cards = cardRepo.findByListIdOrderByPositionAsc(rm.getId());
-                for (PlanCard c : cards) {
-                    c.setList(trash);
-                    c.setPosition(basePos++);
-                }
-                if (!cards.isEmpty())
-                    cardRepo.saveAll(cards);
-
+                planBoardService.moveCardsToTrash(rm, trash);
                 listRepo.delete(rm);
             }
 
@@ -229,19 +221,10 @@ public class PlanGeneralService {
         // CASE 4 — RÚT NGẮN NGÀY
         if (newCount < oldCount) {
 
-            int basePos = (int) cardRepo.countByListId(trash.getId());
-
             for (int i = newCount; i < oldCount; i++) {
                 PlanList rm = dayLists.get(i);
 
-                List<PlanCard> cards = cardRepo.findByListIdOrderByPositionAsc(rm.getId());
-                for (PlanCard c : cards) {
-                    c.setList(trash);
-                    c.setPosition(basePos++);
-                }
-                if (!cards.isEmpty())
-                    cardRepo.saveAll(cards);
-
+                planBoardService.moveCardsToTrash(rm, trash);
                 listRepo.delete(rm);
             }
 
