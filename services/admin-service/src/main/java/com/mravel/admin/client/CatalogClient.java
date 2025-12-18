@@ -2,6 +2,7 @@ package com.mravel.admin.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mravel.admin.dto.amenity.AmenityUpsertRequest;
+import com.mravel.admin.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
@@ -24,6 +25,7 @@ public class CatalogClient {
     @Value("${mravel.services.catalog.base-url}")
     private String baseUrl;
 
+    // AMENITY
     public ResponseEntity<ApiResponse<?>> createAmenity(AmenityUpsertRequest req, String bearerToken) {
         return exchange("/api/catalog/amenities", HttpMethod.POST, req, bearerToken);
     }
@@ -51,6 +53,47 @@ public class CatalogClient {
         return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
     }
 
+    // PLACE
+    public ResponseEntity<ApiResponse<?>> searchPlaces(String q, Integer page, Integer size, String bearerToken) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(baseUrl + "/api/catalog/places/poi")
+                .queryParamIfPresent("q", (q == null || q.isBlank()) ? Optional.empty() : Optional.of(q))
+                .queryParamIfPresent("page", Optional.ofNullable(page))
+                .queryParamIfPresent("size", Optional.ofNullable(size))
+                .toUriString();
+
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> getPlaceDetailBySlug(String slug, String bearerToken) {
+        return exchange("/api/catalog/places/" + slug, HttpMethod.GET, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> getChildrenByParentSlug(String slug, String kind, Integer page, Integer size,
+            String bearerToken) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(baseUrl + "/api/catalog/places/" + slug + "/children")
+                .queryParamIfPresent("kind", (kind == null || kind.isBlank()) ? Optional.empty() : Optional.of(kind))
+                .queryParamIfPresent("page", Optional.ofNullable(page))
+                .queryParamIfPresent("size", Optional.ofNullable(size))
+                .toUriString();
+
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> createPlace(UpsertPlaceRequest req, String bearerToken) {
+        return exchange("/api/catalog/places", HttpMethod.POST, req, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> updatePlace(String id, UpsertPlaceRequest req, String bearerToken) {
+        return exchange("/api/catalog/places/" + id, HttpMethod.PUT, req, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> softDeletePlace(String id, String bearerToken) {
+        return exchange("/api/catalog/places/" + id, HttpMethod.DELETE, null, bearerToken);
+    }
+
+    // ===== common exchange helpers =====
     private ResponseEntity<ApiResponse<?>> exchange(String path, HttpMethod method, Object body, String bearerToken) {
         return exchangeAbsolute(baseUrl + path, method, body, bearerToken);
     }
@@ -67,7 +110,6 @@ public class CatalogClient {
             ResponseEntity<ApiResponse> resp = restTemplate.exchange(url, method, entity, ApiResponse.class);
             return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
         } catch (HttpStatusCodeException ex) {
-            // Catalog trả 4xx/5xx => parse body ApiResponse để lấy message chuẩn
             ApiResponse<?> api;
             try {
                 String raw = ex.getResponseBodyAsString();

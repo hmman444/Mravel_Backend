@@ -1,4 +1,4 @@
-package com.mravel.admin.enums;
+package com.mravel.admin.enums.amenity;
 
 public enum AmenitySection {
     HIGHLIGHT_FEATURES, // Tính năng phòng bạn thích
