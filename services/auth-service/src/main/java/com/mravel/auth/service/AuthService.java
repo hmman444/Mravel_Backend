@@ -18,9 +18,11 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
     private final UserRepository userRepository;
     private final OtpService otpService;
@@ -55,6 +57,7 @@ public class AuthService {
                     .fullname(request.getFullname())
                     .avatar(defaultAvatar)
                     .provider("local")
+                    .role(user.getRole().name())
                     .build();
 
             String payload = new ObjectMapper().writeValueAsString(event);
@@ -97,13 +100,14 @@ public class AuthService {
                     // gửi event qua Kafka (Outbox pattern)
                     try {
                         UserRegisteredEvent event = UserRegisteredEvent.builder()
-                                .id(newUser.getId())
-                                .email(profile.getEmail())
-                                .fullname(profile.getName())
-                                .avatar(profile.getPicture())
-                                .provider(request.getProvider())
-                                .providerId(profile.getProviderId())
-                                .build();
+                            .id(newUser.getId())
+                            .email(profile.getEmail())
+                            .fullname(profile.getName())
+                            .avatar(profile.getPicture())
+                            .provider(request.getProvider())
+                            .providerId(profile.getProviderId())
+                            .role(newUser.getRole().name())
+                            .build();
 
                         String payload = new ObjectMapper().writeValueAsString(event);
                         outboxRepository.save(OutboxEvent.builder()
@@ -209,5 +213,148 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Transactional
+    public void registerPartner(PartnerRegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail()))
+            throw new RuntimeException("Email đã tồn tại");
+
+        User user = userRepository.save(
+            User.builder()
+                .email(request.getEmail())
+                .fullname(request.getFullname())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .provider("local")
+                .role(Role.PARTNER)     // ✅ IMPORTANT
+                .enabled(false)
+                .build()
+        );
+
+        // ✅ Outbox event tạo profile ở user-service
+        try {
+            UserRegisteredEvent event = UserRegisteredEvent.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullname(user.getFullname())
+                .avatar(defaultAvatar)
+                .provider("local")
+                .role(user.getRole().name()) // ✅ NEW
+                .build();
+
+            String payload = new ObjectMapper().writeValueAsString(event);
+            outboxRepository.save(OutboxEvent.builder()
+                .eventType("USER_REGISTERED")
+                .payload(payload)
+                .status("PENDING")
+                .build());
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi serialize UserRegisteredEvent: " + e.getMessage());
+        }
+
+        String otp = otpService.generateOtp(user.getEmail());
+        try {
+            notificationService.sendOtpEmail(user.getEmail(), otp);
+        } catch (Exception ex) {
+            log.error("SMTP send OTP failed: {}", ex.getMessage(), ex);
+            log.warn("DEV OTP for {} = {}", user.getEmail(), otp); // chỉ dùng local dev
+            throw new RuntimeException("Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
+        }
+    }
+
+    public void verifyOtpPartner(VerifyOtpRequest request) {
+        if (!otpService.validateOtp(request.getEmail(), request.getOtpCode()))
+            throw new RuntimeException("OTP không hợp lệ hoặc đã hết hạn");
+
+        User user = userRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+        if (user.getRole() != Role.PARTNER)
+            throw new RuntimeException("Tài khoản này không phải đối tác");
+
+        user.setEnabled(true);
+        userRepository.save(user);
+    }
+
+    public JwtResponse loginPartner(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+
+        if (user.getRole() != Role.PARTNER)
+            throw new RuntimeException("Tài khoản này không phải đối tác");
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword()))
+            throw new RuntimeException("Sai mật khẩu");
+
+        if (!user.isEnabled())
+            throw new RuntimeException("Tài khoản chưa xác thực OTP");
+
+        refreshTokenService.deleteByEmail(user.getEmail());
+
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
+        RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
+        return new JwtResponse(accessToken, refreshToken.getToken());
+    }
+
+    public JwtResponse partnerSocialLogin(SocialLoginRequest request) {
+        SocialUserProfile profile;
+
+        if ("google".equalsIgnoreCase(request.getProvider())) {
+            profile = googleAuthService.verifyGoogleToken(request.getToken());
+        } else if ("facebook".equalsIgnoreCase(request.getProvider())) {
+            profile = facebookAuthService.verifyFacebookToken(request.getToken());
+        } else {
+            throw new RuntimeException("Nhà cung cấp không hợp lệ");
+        }
+
+        User user = userRepository.findByEmail(profile.getEmail())
+            .orElseGet(() -> {
+                User newUser = User.builder()
+                    .email(profile.getEmail())
+                    .fullname(profile.getName())
+                    .enabled(true)
+                    .provider(request.getProvider())
+                    .providerId(profile.getProviderId())
+                    .role(Role.PARTNER) // ✅ quan trọng
+                    .build();
+
+                userRepository.save(newUser);
+
+                // Outbox tạo profile user-service (nếu bạn muốn đồng bộ)
+                try {
+                    UserRegisteredEvent event = UserRegisteredEvent.builder()
+                        .id(newUser.getId())
+                        .email(newUser.getEmail())
+                        .fullname(newUser.getFullname())
+                        .avatar(profile.getPicture())
+                        .provider(request.getProvider())
+                        .providerId(profile.getProviderId())
+                        // nếu event có role thì set luôn
+                        // .role(newUser.getRole().name())
+                        .build();
+
+                    String payload = new ObjectMapper().writeValueAsString(event);
+                    outboxRepository.save(OutboxEvent.builder()
+                        .eventType("USER_REGISTERED")
+                        .payload(payload)
+                        .status("PENDING")
+                        .build());
+                } catch (Exception e) {
+                    throw new RuntimeException("Lỗi khi serialize UserRegisteredEvent: " + e.getMessage());
+                }
+
+                return newUser;
+            });
+
+        // ✅ Nếu tồn tại nhưng không phải PARTNER -> chặn
+        if (user.getRole() != Role.PARTNER) {
+            throw new RuntimeException("Email này đã tồn tại nhưng không phải tài khoản đối tác");
+        }
+
+        refreshTokenService.deleteByEmail(user.getEmail());
+
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
+        RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
+        return new JwtResponse(accessToken, refreshToken.getToken());
     }
 }

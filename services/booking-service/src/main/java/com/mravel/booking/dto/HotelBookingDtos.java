@@ -29,6 +29,8 @@ public class HotelBookingDtos {
             // Hình thức thanh toán: FULL / DEPOSIT
             String payOption,
 
+            String paymentMethod, // optional: MOMO_WALLET / VNPAY / ZALOPAY
+
             // Danh sách phòng user chọn
             List<SelectedRoom> rooms
     ) {}
@@ -67,7 +69,7 @@ public class HotelBookingDtos {
             String currencyCode,
 
             // Sau này khi tích hợp Momo có thể add:
-            String paymentMethod,     // "MOMO_WALLET"
+            String paymentMethod, // optional: MOMO_WALLET / VNPAY / ZALOPAY
             String paymentUrl         // payUrl redirect tới Momo (hiện tại có thể để null)
     ) {}
 

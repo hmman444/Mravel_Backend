@@ -1,5 +1,5 @@
 // src/main/java/com/mravel/booking/payment/MomoConfirmRequest.java
-package com.mravel.booking.payment;
+package com.mravel.booking.payment.momo;
 
 import java.math.BigDecimal;
 

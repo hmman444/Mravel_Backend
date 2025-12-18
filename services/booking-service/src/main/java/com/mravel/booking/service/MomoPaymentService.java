@@ -1,12 +1,16 @@
 package com.mravel.booking.service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import org.springframework.stereotype.Service;
 
-import com.mravel.booking.payment.MomoIpnRequest;
-import com.mravel.booking.payment.MomoConfirmRequest;
+import com.mravel.booking.model.BookingBase;
+import com.mravel.booking.model.Payment;
+import com.mravel.booking.payment.momo.MomoConfirmRequest;
+import com.mravel.booking.payment.momo.MomoIpnRequest;
 import com.mravel.booking.repository.HotelBookingRepository;
+import com.mravel.booking.repository.PaymentRepository;
 import com.mravel.booking.repository.RestaurantBookingRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,7 @@ public class MomoPaymentService {
 
     private final HotelBookingRepository hotelBookingRepository;
     private final RestaurantBookingRepository restaurantBookingRepository;
+    private final PaymentRepository paymentRepository;
 
     /**
      * 1) IPN từ MoMo
@@ -70,36 +75,41 @@ public class MomoPaymentService {
     }
 
     // ========================= core logic =========================
-
     private void resolveAndMarkPaid(String orderId, BigDecimal paidAmountHotel, Long amountLongForRestaurant) {
+    // 0) ưu tiên PaymentAttempt (Payment) trước
+    var p = paymentRepository.findByProviderRequestId(orderId).orElse(null);
+    if (p != null && p.getBooking() != null) {
+        BookingBase booking = p.getBooking();
 
-        // 1) Try HOTEL: pendingPaymentOrderId (attemptId) -> fallback code (bookingCode cũ)
-        var hb = hotelBookingRepository.findByPendingPaymentOrderId(orderId)
-                .or(() -> hotelBookingRepository.findByCode(orderId))
-                .orElse(null);
+        // mark payment record SUCCESS (optional nhưng nên làm)
+        p.setStatus(Payment.PaymentStatus.SUCCESS);
+        p.setPaidAt(Instant.now());
+        paymentRepository.save(p);
 
-        if (hb != null) {
-            hotelBookingService.markHotelBookingPaidAndConfirm(
-                    hb.getCode(),           // ✅ code thật (BK-XXXX)
-                    paidAmountHotel         // BigDecimal
-            );
-            return;
+        if (booking instanceof com.mravel.booking.model.HotelBooking hb) {
+        hotelBookingService.markHotelBookingPaidAndConfirm(hb.getCode(), paidAmountHotel);
+        return;
         }
-
-        // 2) Try RESTAURANT
-        var rb = restaurantBookingRepository.findByPendingPaymentOrderId(orderId)
-                .or(() -> restaurantBookingRepository.findByCode(orderId))
-                .orElse(null);
-
-        if (rb != null) {
-            restaurantBookingService.markRestaurantBookingPaidAndConfirm(
-                    rb.getCode(),           // ✅ code thật (RB-XXXX)
-                    amountLongForRestaurant // Long (đúng signature hiện tại của bạn)
-            );
-            return;
+        if (booking instanceof com.mravel.booking.model.RestaurantBooking rb) {
+        restaurantBookingService.markRestaurantBookingPaidAndConfirm(rb.getCode(), amountLongForRestaurant);
+        return;
         }
+    }
 
-        throw new IllegalArgumentException("Không tìm thấy booking theo orderId=" + orderId);
+    // 1) fallback tương thích cũ (orderId == BK-/RB-)
+    var hb = hotelBookingRepository.findByCode(orderId).orElse(null);
+    if (hb != null) {
+        hotelBookingService.markHotelBookingPaidAndConfirm(hb.getCode(), paidAmountHotel);
+        return;
+    }
+
+    var rb = restaurantBookingRepository.findByCode(orderId).orElse(null);
+    if (rb != null) {
+        restaurantBookingService.markRestaurantBookingPaidAndConfirm(rb.getCode(), amountLongForRestaurant);
+        return;
+    }
+
+    throw new IllegalArgumentException("Không tìm thấy booking theo orderId=" + orderId);
     }
 
     private static String trim(String s) {

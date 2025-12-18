@@ -14,6 +14,8 @@ public class UserProfileResponse {
     private String avatar;
     private String provider;
 
+    private String role;
+
     private String gender;
     private java.time.LocalDate dateOfBirth;
 

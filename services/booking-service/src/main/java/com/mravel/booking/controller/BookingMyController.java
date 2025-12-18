@@ -8,6 +8,8 @@ import com.mravel.booking.service.HotelBookingMapper;
 import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.HotelBookingSummaryMapper;
 import com.mravel.booking.dto.ResumePaymentDTO;
+import com.mravel.booking.model.Payment;
+import com.mravel.booking.payment.PaymentMethodUtils;
 import com.mravel.booking.utils.GuestSessionCookie;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -74,11 +76,15 @@ public class BookingMyController {
   @PostMapping("/bookings/{code}/resume-payment")
   public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumePrivate(
       @PathVariable String code,
-      @AuthenticationPrincipal Jwt jwt
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body
   ) {
-      Long userId = extractUserId(jwt);
-      var dto = service.resumeHotelPaymentForOwner(code, userId, null);
-      return ResponseEntity.ok(ApiResponse.success("OK", dto));
+    Long userId = extractUserId(jwt);
+
+    Payment.PaymentMethod method = PaymentMethodUtils.parseOrNull(body != null ? body.paymentMethod() : null);
+
+    var dto = service.resumeHotelPaymentForOwner(code, userId, null, method);
+    return ResponseEntity.ok(ApiResponse.success("OK", dto));
   }
   
   private static Long extractUserId(Jwt jwt) {

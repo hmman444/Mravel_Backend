@@ -63,9 +63,13 @@ public class Payment extends BaseEntity {
     @Column(length = 1000)
     private String refundRawResponse;
 
+    private Instant expiresAt;
+
     public enum PaymentMethod {
         MOMO_WALLET,
-        CASH_AT_HOTEL,    // nếu sau này bạn muốn hỗ trợ thanh toán tại KS
+        VNPAY,
+        ZALOPAY,
+        CASH_AT_HOTEL,
         OTHER_GATEWAY
     }
 
@@ -73,6 +77,8 @@ public class Payment extends BaseEntity {
         PENDING,
         SUCCESS,
         FAILED,
+        CANCELLED,
+        EXPIRED,
         REFUNDED,
         PARTIAL_REFUNDED
     }

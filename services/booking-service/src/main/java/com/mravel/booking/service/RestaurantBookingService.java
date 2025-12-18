@@ -5,8 +5,9 @@ import com.mravel.booking.client.CatalogRestaurantInventoryClient;
 import com.mravel.booking.dto.RestaurantBookingDtos.*;
 import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.model.*;
+import com.mravel.booking.payment.PaymentMethodUtils;
 import com.mravel.booking.repository.RestaurantBookingRepository;
-import com.mravel.booking.payment.MomoGatewayClient;
+
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,7 +30,7 @@ public class RestaurantBookingService {
 
   private final RestaurantBookingRepository repo;
   private final CatalogRestaurantInventoryClient invClient;
-  private final MomoGatewayClient momoGateway;
+  private final PaymentAttemptService paymentAttemptService;
 
   @Transactional
   public RestaurantBookingCreatedDTO create(CreateRestaurantBookingRequest req, String guestSessionId) {
@@ -73,7 +74,7 @@ public class RestaurantBookingService {
     RestaurantBooking booking = RestaurantBooking.builder()
         .code(code)
         .userId(req.userId())
-        .guestSessionId(guestSessionId)
+        .guestSessionId(req.userId() == null ? guestSessionId : null)
 
         .contactName(req.contactName())
         .contactPhone(req.contactPhone())
@@ -123,14 +124,14 @@ public class RestaurantBookingService {
     repo.save(booking);
 
     // 5) tạo payUrl (MoMo) - bạn đang dùng orderInfo "dat phong", đổi text cho res
-    String attemptId = code + "-" + UUID.randomUUID().toString()
-        .replace("-", "").substring(0, 6).toUpperCase();
+    Instant deadline = booking.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
 
-    String orderInfo = "Dat ban " + booking.getRestaurantName();
-    String payUrl = momoGateway.createPayment(attemptId, depositAmount, orderInfo);
+    Payment.PaymentMethod method = parsePaymentMethod(req.paymentMethod());
+    Payment attempt = paymentAttemptService.createOrReusePendingAttempt(booking, method, deadline);
 
-    booking.setPendingPaymentUrl(payUrl);
-    booking.setPendingPaymentOrderId(attemptId);
+    booking.setPendingPaymentOrderId(attempt.getProviderRequestId());
+    booking.setPendingPaymentUrl(attempt.getProviderPayUrl());
+    booking.setActivePaymentMethod(attempt.getMethod());
     repo.save(booking);
 
     return new RestaurantBookingCreatedDTO(
@@ -146,8 +147,8 @@ public class RestaurantBookingService {
         booking.getDepositAmount(),
         booking.getAmountPayable(),
         booking.getCurrencyCode(),
-        "MOMO",
-        payUrl
+        method.name(),
+        attempt.getProviderPayUrl()
     );
   }
 
@@ -236,51 +237,57 @@ public class RestaurantBookingService {
     }
 
     @Transactional
-    public ResumePaymentDTO resumeRestaurantPaymentForOwner(String code, Long userId, String guestSid) {
-        var b = repo.findByCode(code.trim())
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+    public ResumePaymentDTO resumeRestaurantPaymentForOwner(
+        String code,
+        Long userId,
+        String guestSid,
+        Payment.PaymentMethod method
+    ) {
+    var b = repo.findByCode(code.trim())
+        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
-        // ✅ chỉ cho resume khi còn pending
-        if (b.getStatus() != BookingBase.BookingStatus.PENDING_PAYMENT
-            || b.getPaymentStatus() != BookingBase.PaymentStatus.PENDING) {
-            throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
+    // chỉ resume khi còn pending
+    if (b.getStatus() != BookingBase.BookingStatus.PENDING_PAYMENT
+        || b.getPaymentStatus() != BookingBase.PaymentStatus.PENDING) {
+        throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
+    }
+
+    // quyền
+    if (b.getUserId() != null) {
+        if (userId == null || !userId.equals(b.getUserId())) {
+        throw new IllegalStateException("Bạn không có quyền tiếp tục thanh toán booking này");
         }
-
-        // ✅ quyền: nếu booking thuộc account => cần userId đúng
-        if (b.getUserId() != null) {
-            if (userId == null || !userId.equals(b.getUserId())) {
-                throw new IllegalStateException("Bạn không có quyền tiếp tục thanh toán booking này");
-            }
-        } else {
-            // booking guest => cần guestSid đúng
-            if (guestSid == null || guestSid.isBlank()
-                || b.getGuestSessionId() == null
-                || !guestSid.equals(b.getGuestSessionId())) {
-                throw new IllegalStateException("Không có quyền tiếp tục thanh toán booking này");
-            }
+    } else {
+        if (guestSid == null || guestSid.isBlank()
+            || b.getGuestSessionId() == null
+            || !guestSid.equals(b.getGuestSessionId())) {
+        throw new IllegalStateException("Không có quyền tiếp tục thanh toán booking này");
         }
+    }
 
-        // ✅ trong 30 phút
-        if (b.getCreatedAt() == null) throw new IllegalStateException("Booking thiếu createdAt");
-        Instant deadline = b.getCreatedAt().plus(30, ChronoUnit.MINUTES);
-        Instant now = Instant.now();
-        if (now.isAfter(deadline)) {
-            throw new IllegalStateException("Đơn đã quá hạn thanh toán");
-        }
+    // trong 30 phút
+    if (b.getCreatedAt() == null) throw new IllegalStateException("Booking thiếu createdAt");
+    Instant deadline = b.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
+    Instant now = Instant.now();
+    if (now.isAfter(deadline)) throw new IllegalStateException("Đơn đã quá hạn thanh toán");
+    long expiresIn = Duration.between(now, deadline).getSeconds();
 
-        long expiresIn = Duration.between(now, deadline).getSeconds();
+    // default method
+    Payment.PaymentMethod finalMethod = method;
+    if (finalMethod == null) {
+        finalMethod = (b.getActivePaymentMethod() != null)
+            ? b.getActivePaymentMethod()
+            : Payment.PaymentMethod.MOMO_WALLET;
+    }
 
-        String attemptId = b.getCode() + "-" + UUID.randomUUID().toString()
-            .replace("-", "").substring(0, 6).toUpperCase();
+    Payment attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
 
-        String orderInfo = "Dat ban " + (b.getRestaurantName() != null ? b.getRestaurantName() : b.getCode());
-        String payUrl = momoGateway.createPayment(attemptId, b.getAmountPayable(), orderInfo);
+    b.setPendingPaymentOrderId(attempt.getProviderRequestId());
+    b.setPendingPaymentUrl(attempt.getProviderPayUrl());
+    b.setActivePaymentMethod(attempt.getMethod());
+    repo.save(b);
 
-        b.setPendingPaymentUrl(payUrl);
-        b.setPendingPaymentOrderId(attemptId);
-        repo.save(b);
-
-        return new ResumePaymentDTO(b.getCode(), payUrl, expiresIn);
+    return new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn);
     }
 
     @Scheduled(fixedDelayString = "${mravel.booking.pending-expire-check-ms:60000}")
@@ -334,6 +341,10 @@ public class RestaurantBookingService {
         }
 
         repo.saveAll(pendings);
+    }
+
+    private Payment.PaymentMethod parsePaymentMethod(String raw) {
+        return PaymentMethodUtils.parseOrDefault(raw, Payment.PaymentMethod.MOMO_WALLET);
     }
 
   // ===== DTO nội bộ gửi qua catalog-client (typed thay vì Object) =====
