@@ -129,7 +129,12 @@ public class AuthService {
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
 
-        return new JwtResponse(accessToken, refreshToken.getToken());
+        return new JwtResponse(
+                accessToken,
+                refreshToken.getToken(),
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name());
     }
 
     public JwtResponse login(LoginRequest request) {
@@ -148,7 +153,12 @@ public class AuthService {
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
 
-        return new JwtResponse(accessToken, refreshToken.getToken());
+        return new JwtResponse(
+                accessToken,
+                refreshToken.getToken(),
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name());
     }
 
     public JwtResponse refreshToken(String refreshToken) {
@@ -165,7 +175,12 @@ public class AuthService {
         String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken newRefreshToken = refreshTokenService.createToken(email);
 
-        return new JwtResponse(newAccessToken, newRefreshToken.getToken());
+        return new JwtResponse(
+                newAccessToken,
+                newRefreshToken.getToken(),
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name());
     }
 
     public void logout(String refreshToken) {
