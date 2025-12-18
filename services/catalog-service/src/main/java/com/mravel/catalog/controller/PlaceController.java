@@ -5,6 +5,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
+import com.mravel.common.response.ApiResponse;
+import com.mravel.catalog.dto.place.PlaceAdminDtos.PlaceAdminResponse;
+import com.mravel.catalog.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
 import com.mravel.catalog.dto.place.PlaceDtos.PlaceDetailDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.PlaceSummaryDTO;
 import com.mravel.catalog.model.enums.PlaceKind;
@@ -19,27 +22,46 @@ public class PlaceController {
 
     private final PlaceService placeService;
 
-    // Địa điểm (1 field: q)
+    // Search POI (q optional)
     @GetMapping("/poi")
-    public Page<PlaceSummaryDTO> searchPlaces(
+    public ApiResponse<Page<PlaceSummaryDTO>> searchPlaces(
             @RequestParam(required = false) String q,
-            @ParameterObject Pageable pageable
-    ) {
-        return placeService.searchPlaces(q, pageable);
+            @ParameterObject Pageable pageable) {
+
+        Page<PlaceSummaryDTO> page = placeService.searchPlaces(q, pageable);
+        return ApiResponse.success("OK", page);
     }
 
-    // Xem chi tiết theo slug
+    // Public detail by slug
     @GetMapping("/{slug}")
-    public PlaceDetailDTO getDetail(@PathVariable String slug) {
-        return placeService.getBySlug(slug);
+    public ApiResponse<PlaceDetailDTO> getDetail(@PathVariable String slug) {
+        return ApiResponse.success("OK", placeService.getBySlug(slug));
     }
 
     @GetMapping("/{slug}/children")
-    public Page<PlaceSummaryDTO> children(
-        @PathVariable String slug,
-        @ParameterObject Pageable pageable,
-        @RequestParam(required = false, defaultValue = "POI") PlaceKind kind
-    ) {
-    return placeService.findChildrenByParentSlug(slug, kind, pageable);
+    public ApiResponse<Page<PlaceSummaryDTO>> children(
+            @PathVariable String slug,
+            @ParameterObject Pageable pageable,
+            @RequestParam(required = false, defaultValue = "POI") PlaceKind kind) {
+
+        Page<PlaceSummaryDTO> page = placeService.findChildrenByParentSlug(slug, kind, pageable);
+        return ApiResponse.success("OK", page);
+    }
+
+    @PostMapping
+    public ApiResponse<PlaceAdminResponse> create(@RequestBody UpsertPlaceRequest req) {
+        return ApiResponse.success("Tạo địa điểm thành công", placeService.create(req));
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<PlaceAdminResponse> update(@PathVariable String id, @RequestBody UpsertPlaceRequest req) {
+        return ApiResponse.success("Cập nhật địa điểm thành công", placeService.update(id, req));
+    }
+
+    // soft delete
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> softDelete(@PathVariable String id) {
+        placeService.softDelete(id);
+        return ApiResponse.success("Xóa địa điểm (mềm) thành công", null);
     }
 }

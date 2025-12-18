@@ -1,4 +1,4 @@
-package com.mravel.admin.enums;
+package com.mravel.admin.enums.amenity;
 
 public enum AmenityGroup {
     ROOM, // Tiện nghi phòng

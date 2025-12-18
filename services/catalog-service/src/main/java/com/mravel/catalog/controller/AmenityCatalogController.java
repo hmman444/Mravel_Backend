@@ -14,7 +14,7 @@ import com.mravel.catalog.service.AmenityCatalogService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/amenities")
+@RequestMapping("/api/catalog/amenities")
 @RequiredArgsConstructor
 public class AmenityCatalogController {
 

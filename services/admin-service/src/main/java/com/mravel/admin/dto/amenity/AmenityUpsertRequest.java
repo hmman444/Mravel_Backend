@@ -1,7 +1,10 @@
 package com.mravel.admin.dto.amenity;
 
 import java.util.List;
-import com.mravel.admin.enums.*;
+import com.mravel.admin.enums.amenity.AmenityGroup;
+import com.mravel.admin.enums.amenity.AmenityScope;
+import com.mravel.admin.enums.amenity.AmenitySection;
+
 import lombok.Data;
 
 @Data
