@@ -45,7 +45,8 @@ public class PlaceMapper {
         p.getPriceLevel(),
         p.getAvgRating(),
         p.getReviewsCount(),
-        cover);
+        cover,
+        Boolean.TRUE.equals(p.getActive()));
   }
 
   public static ImageDTO toImage(PlaceDoc.Image img) {

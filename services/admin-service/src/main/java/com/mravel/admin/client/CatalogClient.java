@@ -54,10 +54,10 @@ public class CatalogClient {
     }
 
     // PLACE
-    public ResponseEntity<ApiResponse<?>> searchPlaces(String q, Integer page, Integer size, String bearerToken) {
+    public ResponseEntity<ApiResponse<?>> listAllPlaces(String kind, Integer page, Integer size, String bearerToken) {
         String url = UriComponentsBuilder
-                .fromHttpUrl(baseUrl + "/api/catalog/places/poi")
-                .queryParamIfPresent("q", (q == null || q.isBlank()) ? Optional.empty() : Optional.of(q))
+                .fromHttpUrl(baseUrl + "/api/catalog/places/all")
+                .queryParamIfPresent("kind", (kind == null || kind.isBlank()) ? Optional.empty() : Optional.of(kind))
                 .queryParamIfPresent("page", Optional.ofNullable(page))
                 .queryParamIfPresent("size", Optional.ofNullable(size))
                 .toUriString();
@@ -69,10 +69,11 @@ public class CatalogClient {
         return exchange("/api/catalog/places/" + slug, HttpMethod.GET, null, bearerToken);
     }
 
-    public ResponseEntity<ApiResponse<?>> getChildrenByParentSlug(String slug, String kind, Integer page, Integer size,
-            String bearerToken) {
+    public ResponseEntity<ApiResponse<?>> getChildrenAllByParentSlug(
+            String slug, String kind, Integer page, Integer size, String bearerToken) {
+
         String url = UriComponentsBuilder
-                .fromHttpUrl(baseUrl + "/api/catalog/places/" + slug + "/children")
+                .fromHttpUrl(baseUrl + "/api/catalog/places/" + slug + "/children/all")
                 .queryParamIfPresent("kind", (kind == null || kind.isBlank()) ? Optional.empty() : Optional.of(kind))
                 .queryParamIfPresent("page", Optional.ofNullable(page))
                 .queryParamIfPresent("size", Optional.ofNullable(size))
@@ -89,7 +90,15 @@ public class CatalogClient {
         return exchange("/api/catalog/places/" + id, HttpMethod.PUT, req, bearerToken);
     }
 
-    public ResponseEntity<ApiResponse<?>> softDeletePlace(String id, String bearerToken) {
+    public ResponseEntity<ApiResponse<?>> lockPlace(String id, String bearerToken) {
+        return exchange("/api/catalog/places/" + id + "/lock", HttpMethod.PATCH, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> unlockPlace(String id, String bearerToken) {
+        return exchange("/api/catalog/places/" + id + "/unlock", HttpMethod.PATCH, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> hardDeletePlace(String id, String bearerToken) {
         return exchange("/api/catalog/places/" + id, HttpMethod.DELETE, null, bearerToken);
     }
 

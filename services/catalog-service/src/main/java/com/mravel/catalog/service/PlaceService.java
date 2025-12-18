@@ -54,6 +54,11 @@ public class PlaceService {
         .map(PlaceMapper::toSummary);
   }
 
+  public Page<PlaceSummaryDTO> findChildrenByParentSlugAll(String slug, PlaceKind kind, Pageable pageable) {
+    return repo.findChildrenByParentSlugIncludeInactive(slug, kind, pageable)
+        .map(PlaceMapper::toSummary);
+  }
+
   @Transactional
   public PlaceAdminResponse create(UpsertPlaceRequest req) {
     validateUpsert(req, null);
@@ -185,9 +190,8 @@ public class PlaceService {
     return toAdminResponse(saved);
   }
 
-  // ===================== SOFT DELETE =====================
   @Transactional
-  public void softDelete(String id) {
+  public void lock(String id) {
     PlaceDoc existing = repo.findById(id)
         .orElseThrow(() -> new IllegalArgumentException("Place not found: " + id));
 
@@ -202,7 +206,44 @@ public class PlaceService {
     }
   }
 
-  // ===================== HELPERS =====================
+  public Page<PlaceAdminResponse> findAllByKind(PlaceKind kind, Pageable pageable) {
+    return repo.findAllByKind(kind, pageable).map(this::toAdminResponse);
+  }
+
+  @Transactional
+  public void unlock(String id) {
+    PlaceDoc existing = repo.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("Place not found: " + id));
+
+    if (Boolean.TRUE.equals(existing.getActive()))
+      return;
+
+    existing.setActive(true);
+    repo.save(existing);
+
+    if (existing.getParentSlug() != null) {
+      refreshChildrenCount(existing.getParentSlug());
+    }
+  }
+
+  @Transactional
+  public void hardDelete(String id) {
+    PlaceDoc existing = repo.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy địa điểm: " + id));
+
+    long children = repo.countByParentSlug(existing.getSlug());
+    if (children > 0) {
+      throw new IllegalArgumentException("Không thể xóa, còn địa điểm con trong điểm đến: " + children);
+    }
+
+    String parentSlug = existing.getParentSlug();
+
+    repo.delete(existing);
+
+    if (parentSlug != null) {
+      refreshChildrenCount(parentSlug);
+    }
+  }
 
   private void validateUpsert(UpsertPlaceRequest req, String idForUpdate) {
     if (req == null)
@@ -215,7 +256,7 @@ public class PlaceService {
     // kind rules
     if (req.kind() == PlaceKind.DESTINATION) {
       if (req.parentSlug() != null && !req.parentSlug().isBlank())
-        throw new IllegalArgumentException("DESTINATION must not have parentSlug");
+        throw new IllegalArgumentException("Địa điểm phải bảo gồm slug điểm đến cha");
       if (req.venueType() != null)
         throw new IllegalArgumentException("DESTINATION must not have venueType");
     }
@@ -251,7 +292,8 @@ public class PlaceService {
 
     // Quy ước theo seed: POI/VENUE thường nằm dưới DESTINATION
     if (parent.getKind() != PlaceKind.DESTINATION) {
-      throw new IllegalArgumentException("Parent must be DESTINATION (current: " + parent.getKind() + ")");
+      throw new IllegalArgumentException(
+          "Điểm đến cha phải là một điểm đến (DESTINATION): hiện tại: " + parent.getKind());
     }
     return parent;
   }
@@ -269,7 +311,7 @@ public class PlaceService {
   private double[] buildLocation(Double lon, Double lat) {
     if (lon == null || lat == null)
       return null;
-    return new double[] { lon, lat }; // ✅ [lon, lat]
+    return new double[] { lon, lat };
   }
 
   private void refreshChildrenCount(String parentSlug) {

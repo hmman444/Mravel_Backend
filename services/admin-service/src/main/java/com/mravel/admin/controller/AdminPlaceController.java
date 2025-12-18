@@ -19,11 +19,12 @@ public class AdminPlaceController {
     @GetMapping
     public ResponseEntity<ApiResponse<?>> search(
             @RequestHeader("Authorization") String authorization,
-            @RequestParam(required = false) String q,
+            @RequestParam(required = false, defaultValue = "POI") String kind,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
+
         String bearer = extractBearer(authorization);
-        return catalogClient.searchPlaces(q, page, size, bearer);
+        return catalogClient.listAllPlaces(kind, page, size, bearer);
     }
 
     @GetMapping("/{slug}")
@@ -41,8 +42,9 @@ public class AdminPlaceController {
             @RequestParam(required = false, defaultValue = "POI") String kind,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
+
         String bearer = extractBearer(authorization);
-        return catalogClient.getChildrenByParentSlug(slug, kind, page, size, bearer);
+        return catalogClient.getChildrenAllByParentSlug(slug, kind, page, size, bearer);
     }
 
     @PostMapping
@@ -62,12 +64,28 @@ public class AdminPlaceController {
         return catalogClient.updatePlace(id, req, bearer);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<?>> softDelete(
+    @PatchMapping("/{id}/lock")
+    public ResponseEntity<ApiResponse<?>> lock(
             @RequestHeader("Authorization") String authorization,
             @PathVariable String id) {
         String bearer = extractBearer(authorization);
-        return catalogClient.softDeletePlace(id, bearer);
+        return catalogClient.lockPlace(id, bearer);
+    }
+
+    @PatchMapping("/{id}/unlock")
+    public ResponseEntity<ApiResponse<?>> unlock(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable String id) {
+        String bearer = extractBearer(authorization);
+        return catalogClient.unlockPlace(id, bearer);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<?>> hardDelete(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable String id) {
+        String bearer = extractBearer(authorization);
+        return catalogClient.hardDeletePlace(id, bearer);
     }
 
     private String extractBearer(String authorizationHeader) {
