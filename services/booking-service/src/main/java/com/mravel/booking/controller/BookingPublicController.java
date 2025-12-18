@@ -8,11 +8,13 @@ import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.model.BookingBase.BookingStatus;
 import com.mravel.booking.model.BookingBase.PaymentStatus;
 import com.mravel.booking.model.HotelBooking;
-import com.mravel.booking.payment.MomoGatewayClient;
+import com.mravel.booking.model.Payment;
+import com.mravel.booking.payment.PaymentMethodUtils;
 import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.service.HotelBookingMapper;
 import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.HotelBookingSummaryMapper;
+import com.mravel.booking.service.PaymentAttemptService;
 import com.mravel.booking.utils.GuestSessionCookie;
 import com.mravel.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,7 +37,7 @@ public class BookingPublicController {
 
     private final HotelBookingRepository hotelBookingRepository;
     private final HotelBookingService hotelBookingService;
-    private final MomoGatewayClient momoPaymentService;
+    private final PaymentAttemptService paymentAttemptService;
 
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<HotelBookingSummaryDTO>>> myBookings(
@@ -80,13 +82,16 @@ public class BookingPublicController {
     @PostMapping("/my/{code}/resume-payment")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumeMy(
         @PathVariable String code,
-        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid
+        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
+        @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body
     ) {
-        var dto = hotelBookingService.resumeHotelPaymentForOwner(code, null, sid);
+        Payment.PaymentMethod method = PaymentMethodUtils.parseOrNull(body != null ? body.paymentMethod() : null);
+
+        var dto = hotelBookingService.resumeHotelPaymentForOwner(code, null, sid, method);
         return ResponseEntity.ok(ApiResponse.success("OK", dto));
     }
 
-    @PostMapping("/lookup")
+        @PostMapping("/lookup")
     public ResponseEntity<ApiResponse<HotelBookingSummaryDTO>> lookup(@RequestBody BookingLookupRequest body) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
             throw new IllegalArgumentException("Thiếu bookingCode");
@@ -157,7 +162,7 @@ public class BookingPublicController {
 
     @PostMapping("/lookup/resume")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> lookupResume(
-        @RequestBody BookingLookupRequest body
+        @RequestBody LookupResumeRequest body
     ) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
             throw new IllegalArgumentException("Thiếu bookingCode");
@@ -169,7 +174,7 @@ public class BookingPublicController {
         HotelBooking b = hotelBookingRepository.findByCode(body.bookingCode().trim())
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
-        // ✅ Nếu bạn muốn LOOKUP RESUME chỉ dành cho GUEST thì đặt đúng ở đây:
+        // lookup resume chỉ dành cho GUEST
         if (b.getUserId() != null) {
             throw new IllegalStateException("Booking này thuộc tài khoản");
         }
@@ -182,16 +187,16 @@ public class BookingPublicController {
         if (body.email() != null && !body.email().isBlank()) {
             String bEmail = b.getContactEmail();
             if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-                throw new IllegalStateException("Email không khớp");
+            throw new IllegalStateException("Email không khớp");
             }
         }
 
-        // ✅ chỉ cho resume khi còn pending
+        // pending
         if (b.getStatus() != BookingStatus.PENDING_PAYMENT || b.getPaymentStatus() != PaymentStatus.PENDING) {
             throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
         }
 
-        // ✅ trong 30 phút
+        // còn hạn 30 phút
         Instant deadline = b.getCreatedAt().plus(30, ChronoUnit.MINUTES);
         Instant now = Instant.now();
         if (now.isAfter(deadline)) {
@@ -199,18 +204,25 @@ public class BookingPublicController {
         }
         long expiresIn = Duration.between(now, deadline).getSeconds();
 
-        // ✅ tạo payUrl mới (requestId sẽ unique)
-        String orderInfo = "Thanh toan dat phong " + (b.getHotelName() != null ? b.getHotelName() : b.getCode());
-        String attemptId = b.getCode() + "-" + java.util.UUID.randomUUID().toString()
-            .replace("-", "").substring(0, 6).toUpperCase();
+        var requested = com.mravel.booking.payment.PaymentMethodUtils.parseOrNull(body.paymentMethod());
+        var finalMethod = (requested != null)
+            ? requested
+            : (b.getActivePaymentMethod() != null ? b.getActivePaymentMethod() : com.mravel.booking.model.Payment.PaymentMethod.MOMO_WALLET);
 
-        String payUrl = momoPaymentService.createPayment(attemptId, b.getAmountPayable(), orderInfo);
+        var attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
 
-        b.setPendingPaymentUrl(payUrl);
-        b.setPendingPaymentOrderId(attemptId);
+        b.setPendingPaymentUrl(attempt.getProviderPayUrl());
+        b.setPendingPaymentOrderId(attempt.getProviderRequestId());
+        b.setActivePaymentMethod(attempt.getMethod());
         hotelBookingRepository.save(b);
 
-        return ResponseEntity.ok(ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), payUrl, expiresIn)));
-
+        return ResponseEntity.ok(ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn)));
     }
+
+    public record LookupResumeRequest(
+        String bookingCode,
+        String phoneLast4,
+        String email,
+        String paymentMethod // optional
+    ) {}
 }

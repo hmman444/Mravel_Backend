@@ -212,6 +212,7 @@ public class UserController {
                 .fullname(user.getFullname())
                 .avatar(user.getAvatar())
                 .provider(user.getProvider())
+                .role(user.getRole())
                 .gender(user.getGender() != null ? user.getGender().name() : null)
                 .dateOfBirth(user.getDateOfBirth())
                 .city(user.getCity())

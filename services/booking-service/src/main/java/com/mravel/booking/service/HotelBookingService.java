@@ -13,7 +13,9 @@ import com.mravel.booking.model.BookingBase.PayOption;
 import com.mravel.booking.model.BookingBase.PaymentStatus;
 import com.mravel.booking.model.BookingRoom;
 import com.mravel.booking.model.HotelBooking;
-import com.mravel.booking.payment.MomoGatewayClient;
+import com.mravel.booking.model.Payment;
+import com.mravel.booking.payment.PaymentMethodUtils;
+import com.mravel.booking.payment.momo.MomoGatewayClient;
 import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.repository.HotelBookingRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ public class HotelBookingService {
     private final HotelBookingRepository hotelBookingRepository;
     private final CatalogInventoryClient catalogInventoryClient;
     private final MomoGatewayClient momoPaymentService;
+    private final PaymentAttemptService paymentAttemptService;
 
     @Transactional
     public HotelBookingCreatedDTO createHotelBooking(CreateHotelBookingRequest req, String guestSid) {
@@ -142,24 +145,22 @@ public class HotelBookingService {
 
         HotelBooking saved = hotelBookingRepository.save(booking);
 
-        String attemptId = saved.getCode() + "-" + UUID.randomUUID().toString()
-            .replace("-", "").substring(0, 6).toUpperCase();
+        Instant deadline = saved.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
 
-        String payUrl = momoPaymentService.createPayment(
-            attemptId,
-            saved.getAmountPayable(),
-            saved.getHotelName()
-        );
+        Payment.PaymentMethod method = parsePaymentMethod(req.paymentMethod());
 
-        saved.setPendingPaymentUrl(payUrl);
-        saved.setPendingPaymentOrderId(attemptId);
+        Payment attempt = paymentAttemptService.createOrReusePendingAttempt(saved, method, deadline);
+
+        saved.setPendingPaymentOrderId(attempt.getProviderRequestId());
+        saved.setPendingPaymentUrl(attempt.getProviderPayUrl());
+        saved.setActivePaymentMethod(attempt.getMethod());
         hotelBookingRepository.save(saved);
 
-        return HotelBookingMapper.toCreatedDTO(saved, "MOMO_WALLET", payUrl);
+        return HotelBookingMapper.toCreatedDTO(saved, method.name(), attempt.getProviderPayUrl());
     }
 
     @Transactional
-    public ResumePaymentDTO resumeHotelPaymentForOwner(String code, Long userId, String guestSid) {
+    public ResumePaymentDTO resumeHotelPaymentForOwner(String code, Long userId, String guestSid, Payment.PaymentMethod method){
         HotelBooking b = hotelBookingRepository.findByCode(code.trim())
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
@@ -183,25 +184,25 @@ public class HotelBookingService {
         // ✅ trong 30 phút
         Instant deadline = b.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
         Instant now = Instant.now();
-        if (now.isAfter(deadline)) {
-            throw new IllegalStateException("Đơn đã quá hạn thanh toán");
-        }
-
+        if (now.isAfter(deadline)) throw new IllegalStateException("Đơn đã quá hạn thanh toán");
         long expiresIn = Duration.between(now, deadline).getSeconds();
 
-        String attemptId = b.getCode() + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        // default method: nếu FE không gửi thì dùng method gần nhất, không có thì MOMO
+        Payment.PaymentMethod finalMethod = method;
+        if (finalMethod == null) {
+        finalMethod = (b.getActivePaymentMethod() != null) ? b.getActivePaymentMethod() : Payment.PaymentMethod.MOMO_WALLET;
+        }
 
-        String payUrl = momoPaymentService.createPayment(
-            attemptId,                 // ✅ orderId mới, không trùng
-            b.getAmountPayable(),
-            b.getHotelName()
-        );
+        Payment attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
 
-        b.setPendingPaymentUrl(payUrl);
-        b.setPendingPaymentOrderId(attemptId);
+        // update active attempt on booking
+        b.setPendingPaymentOrderId(attempt.getProviderRequestId());
+        b.setPendingPaymentUrl(attempt.getProviderPayUrl());
+        b.setActivePaymentMethod(attempt.getMethod());
+
         hotelBookingRepository.save(b);
 
-        return new ResumePaymentDTO(b.getCode(), payUrl, expiresIn);
+        return new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn);
     }
 
     @Transactional
@@ -343,6 +344,10 @@ public class HotelBookingService {
     }
 
     // ========================= Helpers =========================
+
+    private Payment.PaymentMethod parsePaymentMethod(String raw) {
+        return PaymentMethodUtils.parseOrDefault(raw, Payment.PaymentMethod.MOMO_WALLET);
+    }
 
     private void validateRequest(CreateHotelBookingRequest req) {
         if (req == null) throw new IllegalArgumentException("Request không được null");

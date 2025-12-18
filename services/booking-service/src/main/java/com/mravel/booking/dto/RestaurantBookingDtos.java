@@ -33,6 +33,8 @@ public class RestaurantBookingDtos {
         Integer durationMinutes,
         Integer people,
 
+        String paymentMethod,
+
         List<SelectedTable> tables
     ) {}
 

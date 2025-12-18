@@ -18,10 +18,11 @@ public interface RestaurantBookingRepository extends JpaRepository<RestaurantBoo
   List<RestaurantBooking> findByGuestSessionIdOrderByCreatedAtDesc(String guestSessionId);
 
   List<RestaurantBooking> findByPaymentStatusAndStatusAndCreatedAtBefore(
-      RestaurantBooking.PaymentStatus paymentStatus,
-      RestaurantBooking.BookingStatus status,
+      BookingBase.PaymentStatus paymentStatus,
+      BookingBase.BookingStatus status,
       Instant before
   );
+  
   @Query("""
     select b from RestaurantBooking b
     left join fetch b.tables t

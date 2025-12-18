@@ -1,23 +1,35 @@
 package com.mravel.auth.controller;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.mravel.auth.config.JwtUtil;
+import com.mravel.auth.dto.ForgotPasswordRequest;
+import com.mravel.auth.dto.JwtResponse;
+import com.mravel.auth.dto.LoginRequest;
+import com.mravel.auth.dto.PartnerRegisterRequest;
+import com.mravel.auth.dto.RefreshTokenRequest;
+import com.mravel.auth.dto.RegisterRequest;
+import com.mravel.auth.dto.ResetPasswordRequest;
+import com.mravel.auth.dto.SocialLoginRequest;
+import com.mravel.auth.dto.VerifyOtpRequest;
+import com.mravel.auth.service.AuthService;
+import com.mravel.auth.service.UserProfileClient;
 import com.mravel.common.response.ApiResponse;
 import com.mravel.common.response.UserProfileResponse;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletRequest;
-
-import com.mravel.auth.config.JwtUtil;
-import com.mravel.auth.dto.*;
-import com.mravel.auth.service.AuthService;
-import com.mravel.auth.service.UserProfileClient;
-
 import lombok.RequiredArgsConstructor;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -105,5 +117,29 @@ public class AuthController {
         return ResponseEntity
                 .status(401)
                 .body(ApiResponse.error("JWT expired"));
+    }
+
+    @PostMapping("/partner/register")
+    public ResponseEntity<ApiResponse<?>> partnerRegister(@RequestBody PartnerRegisterRequest req) {
+        authService.registerPartner(req);
+        return ResponseEntity.ok(ApiResponse.success("Đăng ký đối tác thành công, vui lòng kiểm tra email OTP.", null));
+    }
+
+    @PostMapping("/partner/verify-otp")
+    public ResponseEntity<ApiResponse<?>> partnerVerifyOtp(@RequestBody VerifyOtpRequest req) {
+        authService.verifyOtpPartner(req);
+        return ResponseEntity.ok(ApiResponse.success("Xác thực thành công. Bạn có thể đăng nhập đối tác.", null));
+    }
+
+    @PostMapping("/partner/login")
+    public ResponseEntity<ApiResponse<JwtResponse>> partnerLogin(@RequestBody LoginRequest req) {
+        JwtResponse jwt = authService.loginPartner(req);
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập đối tác thành công", jwt));
+    }
+
+    @PostMapping("/partner/social-login")
+    public ResponseEntity<ApiResponse<JwtResponse>> partnerSocialLogin(@RequestBody SocialLoginRequest request) {
+        JwtResponse jwt = authService.partnerSocialLogin(request);
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập đối tác mạng xã hội thành công", jwt));
     }
 }
