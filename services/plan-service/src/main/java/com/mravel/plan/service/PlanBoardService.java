@@ -43,6 +43,7 @@ public class PlanBoardService {
     private final PlanRecentViewRepository planRecentViewRepository;
     private final ObjectMapper objectMapper;
     private final FriendClient friendClient;
+    private final PlanCardPaymentRepository cardPaymentRepository;
     // helper loaders
 
     private void validateMemberIds(Long planId, Collection<Long> userIds) {
@@ -818,12 +819,15 @@ public class PlanBoardService {
     @Transactional
     @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void clearTrash(Long planId, Long userId) {
+
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
         PlanList trash = findTrash(planId);
+
+        cardPaymentRepository.deleteByCardListId(trash.getId());
 
         cardRepository.deleteByListId(trash.getId());
         cardRepository.flush();
@@ -832,6 +836,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+
         publishBoard(planId, userId, "CLEAR_TRASH");
     }
 
