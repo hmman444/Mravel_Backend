@@ -489,9 +489,9 @@ public class SeedHoiAnHoaThuHomestay {
                 Instant now = Instant.parse("2024-01-01T00:00:00Z");
 
                 PublisherInfo publisher = PublisherInfo.builder()
-                                .partnerId("partner-hoa-thu-homestay")
-                                .partnerName("Hoa Thu Homestay")
-                                .partnerEmail("contact@hoa-thu-homestay.local")
+                                .partnerId("11")
+                                .partnerName("Ông Trùm Bất Động Sản")
+                                .partnerEmail("22110377@student.hcmute.edu.vn")
                                 .partnerType(PartnerType.HOTEL_OWNER)
                                 .createdAt(now)
                                 .lastUpdatedAt(now)

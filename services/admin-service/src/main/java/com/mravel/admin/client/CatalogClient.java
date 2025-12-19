@@ -5,15 +5,14 @@ import com.mravel.admin.dto.amenity.AmenityUpsertRequest;
 import com.mravel.admin.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
-
-import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -38,47 +37,46 @@ public class CatalogClient {
         return exchange("/api/catalog/amenities/" + id, HttpMethod.DELETE, null, bearerToken);
     }
 
-    public ResponseEntity<ApiResponse<?>> listAmenities(String scope, boolean active, boolean grouped,
-            String bearerToken) {
-        String url = UriComponentsBuilder
-                .fromHttpUrl(baseUrl + "/api/catalog/amenities")
+    public ResponseEntity<ApiResponse<?>> listAmenities(String scope, boolean active, boolean grouped, String bearerToken) {
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + "/api/catalog/amenities")
                 .queryParam("active", active)
-                .queryParam("grouped", grouped)
-                .queryParamIfPresent("scope",
-                        (scope == null || scope.isBlank())
-                                ? Optional.empty()
-                                : Optional.of(scope))
-                .toUriString();
+                .queryParam("grouped", grouped);
 
-        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+        if (scope != null && !scope.isBlank()) {
+            b.queryParam("scope", scope);
+        }
+
+        return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
     }
 
     // PLACE
     public ResponseEntity<ApiResponse<?>> searchPlaces(String q, Integer page, Integer size, String bearerToken) {
-        String url = UriComponentsBuilder
-                .fromHttpUrl(baseUrl + "/api/catalog/places/poi")
-                .queryParamIfPresent("q", (q == null || q.isBlank()) ? Optional.empty() : Optional.of(q))
-                .queryParamIfPresent("page", Optional.ofNullable(page))
-                .queryParamIfPresent("size", Optional.ofNullable(size))
-                .toUriString();
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + "/api/catalog/places/poi");
 
-        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+        if (q != null && !q.isBlank()) b.queryParam("q", q);
+        if (page != null) b.queryParam("page", page);
+        if (size != null) b.queryParam("size", size);
+
+        return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
     }
 
     public ResponseEntity<ApiResponse<?>> getPlaceDetailBySlug(String slug, String bearerToken) {
         return exchange("/api/catalog/places/" + slug, HttpMethod.GET, null, bearerToken);
     }
 
-    public ResponseEntity<ApiResponse<?>> getChildrenByParentSlug(String slug, String kind, Integer page, Integer size,
-            String bearerToken) {
-        String url = UriComponentsBuilder
-                .fromHttpUrl(baseUrl + "/api/catalog/places/" + slug + "/children")
-                .queryParamIfPresent("kind", (kind == null || kind.isBlank()) ? Optional.empty() : Optional.of(kind))
-                .queryParamIfPresent("page", Optional.ofNullable(page))
-                .queryParamIfPresent("size", Optional.ofNullable(size))
-                .toUriString();
+    public ResponseEntity<ApiResponse<?>> getChildrenByParentSlug(
+            String slug, String kind, Integer page, Integer size, String bearerToken
+    ) {
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + "/api/catalog/places/" + slug + "/children");
 
-        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+        if (kind != null && !kind.isBlank()) b.queryParam("kind", kind);
+        if (page != null) b.queryParam("page", page);
+        if (size != null) b.queryParam("size", size);
+
+        return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
     }
 
     public ResponseEntity<ApiResponse<?>> createPlace(UpsertPlaceRequest req, String bearerToken) {
@@ -95,19 +93,28 @@ public class CatalogClient {
 
     // ===== common exchange helpers =====
     private ResponseEntity<ApiResponse<?>> exchange(String path, HttpMethod method, Object body, String bearerToken) {
-        return exchangeAbsolute(baseUrl + path, method, body, bearerToken);
+        String url = requireBaseUrl() + Objects.requireNonNull(path, "path must not be null");
+        return exchangeAbsolute(url, method, body, bearerToken);
     }
 
-    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body,
-            String bearerToken) {
+    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body, String bearerToken) {
+        final String safeUrl = Objects.requireNonNull(url, "url must not be null");
+        final HttpMethod safeMethod = Objects.requireNonNull(method, "method must not be null");
+        final String safeToken = Objects.requireNonNull(bearerToken, "bearerToken must not be null");
+
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(bearerToken);
+        headers.setBearerAuth(safeToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Object> entity = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<ApiResponse> resp = restTemplate.exchange(url, method, entity, ApiResponse.class);
+            ResponseEntity<ApiResponse<?>> resp = restTemplate.exchange(
+                    safeUrl,
+                    safeMethod,
+                    entity,
+                    new org.springframework.core.ParameterizedTypeReference<ApiResponse<?>>() {}
+            );
             return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
         } catch (HttpStatusCodeException ex) {
             ApiResponse<?> api;
@@ -119,5 +126,9 @@ public class CatalogClient {
             }
             return ResponseEntity.status(ex.getStatusCode()).body(api);
         }
+    }
+
+    private String requireBaseUrl() {
+        return Objects.requireNonNull(baseUrl, "mravel.services.catalog.base-url must not be null");
     }
 }

@@ -12,6 +12,7 @@ import com.mravel.booking.payment.gateway.PaymentGateway;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -83,6 +84,6 @@ public class PaymentAttemptService {
         .expiresAt(expiresAt)
         .build();
 
-    return paymentRepo.save(attempt);
+    return paymentRepo.save(Objects.requireNonNull(attempt, "attempt must not be null"));
   }
 }

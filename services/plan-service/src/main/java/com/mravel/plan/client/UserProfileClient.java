@@ -38,7 +38,6 @@ public class UserProfileClient {
         return res.getBody();
     }
 
-    @SuppressWarnings("unchecked")
     public List<UserProfileResponse> searchUsers(String authorizationHeader, String q, int limit) {
         String keyword = q == null ? "" : q.trim();
         String encoded = URLEncoder.encode(keyword, StandardCharsets.UTF_8);

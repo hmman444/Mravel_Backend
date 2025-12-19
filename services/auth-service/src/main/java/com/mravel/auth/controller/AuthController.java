@@ -43,14 +43,31 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> validateToken(@RequestHeader("Authorization") String header) {
         String token = header.replace("Bearer ", "");
         boolean valid = jwtUtils.validateToken(token);
-        Map<String, Object> body = new HashMap<>();
 
+        Map<String, Object> body = new HashMap<>();
         body.put("valid", valid);
-        if (valid) {
-            body.put("id", jwtUtils.extractUserId(token));
-            body.put("email", jwtUtils.extractEmail(token));
-            body.put("role", jwtUtils.extractRole(token));
+
+        if (!valid) return ResponseEntity.ok(body);
+
+        Long id = jwtUtils.extractUserId(token);
+        String email = jwtUtils.extractEmail(token);
+        String role = jwtUtils.extractRole(token);
+
+        body.put("id", id);
+        body.put("email", email);
+        body.put("role", role);
+
+        try {
+            UserProfileResponse profile = userProfileClient.getUserByEmail(email);
+            if (profile != null) {
+                body.put("fullname", profile.getFullname());
+                body.put("avatar", profile.getAvatar());
+            }
+        } catch (Exception ignored) {
+            body.put("fullname", null);
+            body.put("avatar", null);
         }
+
         return ResponseEntity.ok(body);
     }
 

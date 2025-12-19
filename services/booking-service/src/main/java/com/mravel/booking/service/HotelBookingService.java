@@ -15,7 +15,6 @@ import com.mravel.booking.model.BookingRoom;
 import com.mravel.booking.model.HotelBooking;
 import com.mravel.booking.model.Payment;
 import com.mravel.booking.payment.PaymentMethodUtils;
-import com.mravel.booking.payment.momo.MomoGatewayClient;
 import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.repository.HotelBookingRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +44,6 @@ public class HotelBookingService {
 
     private final HotelBookingRepository hotelBookingRepository;
     private final CatalogInventoryClient catalogInventoryClient;
-    private final MomoGatewayClient momoPaymentService;
     private final PaymentAttemptService paymentAttemptService;
 
     @Transactional

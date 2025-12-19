@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/payment/vnpay")
@@ -37,7 +38,7 @@ public class VnpayPaymentController {
     } catch (Exception ignore) {}
 
     return ResponseEntity.status(HttpStatus.FOUND)
-      .location(URI.create("http://localhost:5173/my-bookings"))
+      .location(Objects.requireNonNull(URI.create("http://localhost:5173/my-bookings")))
       .build();
   }
 

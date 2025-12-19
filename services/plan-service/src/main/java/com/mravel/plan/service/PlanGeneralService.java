@@ -4,7 +4,6 @@ import com.mravel.plan.dto.board.UpdateBudgetRequest;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
-import com.mravel.plan.repository.PlanCardRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -22,7 +21,6 @@ public class PlanGeneralService {
     private final PlanRepository planRepo;
     private final PlanPermissionService permission;
     private final PlanListRepository listRepo;
-    private final PlanCardRepository cardRepo;
     private final PlanBoardService planBoardService;
 
     // helper
