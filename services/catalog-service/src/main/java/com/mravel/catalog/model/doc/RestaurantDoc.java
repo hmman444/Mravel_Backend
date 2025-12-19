@@ -49,6 +49,8 @@ public class RestaurantDoc {
     @Builder.Default
     private Boolean active = true;
 
+    private Instant deletedAt;
+
     // ---------- Liên kết & vị trí ----------
 
     /** Destination cha – slug trong collection places (PlaceKind.DESTINATION) */
@@ -635,6 +637,9 @@ public class RestaurantDoc {
         /** Admin xử lý lần gần nhất */
         private String lastActionByAdminId;
         private Instant lastActionAt;
+
+        private Instant unlockRequestedAt;
+        private String unlockRequestReason;
     }
 
     // =====================================================================

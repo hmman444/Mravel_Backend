@@ -680,9 +680,9 @@ public class SeedHoiAnHotelsNearChuaCau {
                 Instant now = Instant.parse("2024-01-01T00:00:00Z");
 
                 PublisherInfo publisher = PublisherInfo.builder()
-                                .partnerId("partner-bespoke-villa-hoi-an")
-                                .partnerName("Bespoke Villa Hoi An")
-                                .partnerEmail("bespokevillahoian@gmail.com")
+                                .partnerId("11")
+                                .partnerName("Ông Trùm Bất Động Sản")
+                                .partnerEmail("22110377@student.hcmute.edu.vn")
                                 .partnerType(PartnerType.HOTEL_OWNER)
                                 .createdAt(now)
                                 .lastUpdatedAt(now)

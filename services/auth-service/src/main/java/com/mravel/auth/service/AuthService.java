@@ -293,7 +293,13 @@ public class AuthService {
 
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
-        return new JwtResponse(accessToken, refreshToken.getToken());
+        return new JwtResponse(
+            accessToken,
+            refreshToken.getToken(),
+            user.getId(),
+            user.getEmail(),
+            user.getRole().name()
+        );
     }
 
     public JwtResponse partnerSocialLogin(SocialLoginRequest request) {
@@ -355,6 +361,12 @@ public class AuthService {
 
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         RefreshToken refreshToken = refreshTokenService.createToken(user.getEmail());
-        return new JwtResponse(accessToken, refreshToken.getToken());
+        return new JwtResponse(
+            accessToken,
+            refreshToken.getToken(),
+            user.getId(),
+            user.getEmail(),
+            user.getRole().name()
+        );
     }
 }

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -112,7 +113,7 @@ public class MomoPaymentController {
 
         String feUrl = "http://localhost:5173/my-bookings";
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create(feUrl))
+                .location(Objects.requireNonNull(URI.create(feUrl)))
                 .build();
     }
 }

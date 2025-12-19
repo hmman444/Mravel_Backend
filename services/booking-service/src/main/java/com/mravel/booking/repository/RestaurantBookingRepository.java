@@ -44,4 +44,11 @@ public interface RestaurantBookingRepository extends JpaRepository<RestaurantBoo
   );
 
   Optional<RestaurantBooking> findByPendingPaymentOrderId(String orderId);
+
+  List<RestaurantBooking> findByRestaurantIdInOrderByCreatedAtDesc(List<String> restaurantIds);
+
+  List<RestaurantBooking> findByRestaurantIdInAndStatusOrderByCreatedAtDesc(
+      List<String> restaurantIds,
+      BookingBase.BookingStatus status
+  );
 }

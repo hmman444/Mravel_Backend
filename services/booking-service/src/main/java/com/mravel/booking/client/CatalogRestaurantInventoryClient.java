@@ -33,9 +33,10 @@ public class CatalogRestaurantInventoryClient {
     public void check(Object req) { post("/api/catalog/restaurants/inventory/check", req); }
 
     private void post(String path, Object req) {
+        Object safeReq = java.util.Objects.requireNonNull(req, "request must not be null");
         String url = catalogBaseUrl + path;
         try {
-            restTemplate.postForEntity(url, new HttpEntity<>(req), String.class);
+            restTemplate.postForEntity(url, new HttpEntity<>(safeReq), String.class);
         } catch (HttpStatusCodeException ex) {
             throw new IllegalStateException(extractMessage(ex), ex);
         }
