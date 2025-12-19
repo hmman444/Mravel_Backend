@@ -1,6 +1,7 @@
 package com.mravel.user.service;
 
 import com.mravel.user.model.RelationshipType;
+import com.mravel.user.client.NotificationClient;
 import com.mravel.user.model.Friendship;
 import com.mravel.user.model.FriendshipStatus;
 import com.mravel.user.repository.FriendshipRepository;
@@ -16,6 +17,7 @@ import java.util.*;
 public class FriendService {
 
     private final FriendshipRepository friendshipRepository;
+    private final NotificationClient notificationClient;
 
     private Long[] normalizePair(Long a, Long b) {
         if (a < b)
@@ -39,11 +41,18 @@ public class FriendService {
                 throw new RuntimeException("Hai bạn đã là bạn bè rồi");
             }
             if (existing.getStatus() == FriendshipStatus.PENDING) {
-                // nếu phía kia gửi trước → có thể convert thành ACCEPTED
+                // phía kia gửi trước -> accept luôn
                 if (!Objects.equals(existing.getRequestedById(), currentUserId)) {
                     existing.setStatus(FriendshipStatus.ACCEPTED);
                     existing.setUpdatedAt(LocalDateTime.now());
                     friendshipRepository.save(existing);
+
+                    notifyFriendAccepted(currentUserId, targetUserId);
+
+                    Long requesterId = existing.getRequestedById(); // người gửi trước
+
+                    // notify lưu DB (notification-service)
+                    notifyFriendAccepted(currentUserId, requesterId);
                     return;
                 } else {
                     throw new RuntimeException("Bạn đã gửi lời mời trước đó");
@@ -61,6 +70,7 @@ public class FriendService {
                 .build();
 
         friendshipRepository.save(friendship);
+        notifyFriendRequest(currentUserId, targetUserId);
     }
 
     @Transactional
@@ -70,7 +80,6 @@ public class FriendService {
                 .findByUser1IdAndUser2Id(pair[0], pair[1])
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lời mời bạn bè"));
 
-        // currentUser phải là người nhận, không phải requestedBy
         if (Objects.equals(friendship.getRequestedById(), currentUserId)) {
             throw new RuntimeException("Bạn không thể tự accept lời mời của chính mình");
         }
@@ -78,6 +87,40 @@ public class FriendService {
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         friendship.setUpdatedAt(LocalDateTime.now());
         friendshipRepository.save(friendship);
+
+        notifyFriendAccepted(currentUserId, otherUserId);
+    }
+
+    private void notifyFriendRequest(Long actorId, Long recipientId) {
+        try {
+            notificationClient.createNotification(
+                    recipientId,
+                    actorId,
+                    "FRIEND_REQUEST",
+                    "Lời mời kết bạn",
+                    "đã gửi cho bạn yêu cầu kết bạn",
+                    Map.of(
+                            "actorId", actorId,
+                            "deepLink", "/profile/" + actorId));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void notifyFriendAccepted(Long accepterId, Long otherUserId) {
+        // accepterId: người bấm accept
+        // otherUserId: người còn lại (thường là người gửi request)
+        try {
+            notificationClient.createNotification(
+                    otherUserId,
+                    accepterId,
+                    "FRIEND_ACCEPTED",
+                    "Chấp nhận kết bạn",
+                    "đã chấp nhận lời mời kết bạn của bạn",
+                    Map.of(
+                            "actorId", accepterId,
+                            "deepLink", "/profile/" + accepterId));
+        } catch (Exception ignored) {
+        }
     }
 
     @Transactional

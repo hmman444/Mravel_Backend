@@ -4,6 +4,7 @@ import com.mravel.common.request.UpdateUserProfileRequest;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.user.client.PlanProfileClient;
 import com.mravel.user.dto.PlanFeedItem;
+import com.mravel.user.dto.UserMiniResponse;
 import com.mravel.user.dto.UserProfilePageResponse;
 import com.mravel.user.model.Gender;
 import com.mravel.user.model.RelationshipType;
@@ -51,8 +52,23 @@ public class UserController {
                 .orElseThrow(() -> new RuntimeException("User not found: " + id));
     }
 
-    // ---------------------------------- update APIs
-    // ----------------------------------
+    @PostMapping("/batch-mini")
+    public List<UserMiniResponse> batchMini(@RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty())
+            return List.of();
+
+        // unique + limit để tránh abuse
+        List<Long> uniq = ids.stream().distinct().limit(200).toList();
+        List<UserProfile> users = userRepository.findAllById(uniq);
+
+        return users.stream()
+                .map(u -> UserMiniResponse.builder()
+                        .id(u.getId())
+                        .fullname(u.getFullname())
+                        .avatar(u.getAvatar())
+                        .build())
+                .toList();
+    }
 
     // dùng cho hệ thống nội bộ, ví dụ admin / service khác
     @PutMapping("/by-email")
