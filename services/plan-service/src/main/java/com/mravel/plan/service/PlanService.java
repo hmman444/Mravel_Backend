@@ -52,6 +52,7 @@ public class PlanService {
         private final PlanInviteTokenRepository inviteTokenRepository;
         private final CurrentUserService currentUser;
         private final FriendClient friendClient;
+        private final PlanNotificationService planNotificationService;
 
         // EntityManager để truy vấn trực tiếp cho comment
         @PersistenceContext
@@ -372,6 +373,23 @@ public class PlanService {
                 entityManager.persist(comment);
                 entityManager.flush();
 
+                Long commentId = comment.getId();
+                if (parent == null) {
+                        // comment root -> notify owner plan
+                        planNotificationService.notifyPlanComment(
+                                        userId,
+                                        plan.getAuthorId(),
+                                        planId,
+                                        commentId);
+                } else {
+                        // reply -> notify chủ comment cha
+                        planNotificationService.notifyPlanReplyComment(
+                                        userId,
+                                        parent.getUserId(),
+                                        planId,
+                                        parent.getId(),
+                                        commentId);
+                }
                 // cache profile
                 UserProfileResponse profile = null;
                 try {
@@ -403,7 +421,7 @@ public class PlanService {
                         throw new RuntimeException("User not found: " + userId);
 
                 Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
-
+                boolean created = false;
                 if (existingOpt.isPresent()) {
                         PlanReaction existing = existingOpt.get();
                         plan.getReactions().remove(existing);
@@ -418,9 +436,15 @@ public class PlanService {
 
                         plan.getReactions().add(newReact);
                         reactionRepository.save(newReact);
+                        created = true;
                 }
 
                 planRepository.save(plan);
+                if (created) {
+                        Long ownerId = plan.getAuthorId();
+                        planNotificationService.notifyPlanReact(userId, ownerId, planId, key);
+                }
+
                 return planMapper.toFeedItem(plan);
         }
 

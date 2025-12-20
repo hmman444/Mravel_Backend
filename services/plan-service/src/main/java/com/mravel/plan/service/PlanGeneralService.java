@@ -22,7 +22,6 @@ public class PlanGeneralService {
     private final PlanRepository planRepo;
     private final PlanPermissionService permission;
     private final PlanListRepository listRepo;
-    private final PlanCardRepository cardRepo;
     private final PlanBoardService planBoardService;
 
     // helper
