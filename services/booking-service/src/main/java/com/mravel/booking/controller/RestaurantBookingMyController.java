@@ -3,6 +3,8 @@ package com.mravel.booking.controller;
 import com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest;
 import com.mravel.booking.dto.RestaurantBookingDtos.*;
 import com.mravel.booking.dto.ResumePaymentDTO;
+import com.mravel.booking.model.Payment;
+import com.mravel.booking.payment.PaymentMethodUtils;
 import com.mravel.booking.repository.RestaurantBookingRepository;
 import com.mravel.booking.service.RestaurantBookingMapper;
 import com.mravel.booking.service.RestaurantBookingService;
@@ -93,10 +95,14 @@ public class RestaurantBookingMyController {
     @PostMapping("/{code}/resume-payment")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumePrivate(
         @PathVariable String code,
-        @AuthenticationPrincipal Jwt jwt
+        @AuthenticationPrincipal Jwt jwt,
+        @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body
     ) {
         Long userId = extractUserId(jwt);
-        var dto = service.resumeRestaurantPaymentForOwner(code, userId, null);
+
+        Payment.PaymentMethod method = PaymentMethodUtils.parseOrNull(body != null ? body.paymentMethod() : null);
+
+        var dto = service.resumeRestaurantPaymentForOwner(code, userId, null, method);
         return ResponseEntity.ok(ApiResponse.success("OK", dto));
     }
 }

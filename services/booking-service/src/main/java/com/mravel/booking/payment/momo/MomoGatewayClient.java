@@ -1,10 +1,11 @@
-package com.mravel.booking.payment;
+package com.mravel.booking.payment.momo;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -89,10 +90,11 @@ public class MomoGatewayClient {
 
         log.info("[MoMo] createPayment request: orderId={}, amount={}", orderId, amountStr);
 
-        ResponseEntity<Map> resp = restTemplate.postForEntity(
-                ENDPOINT,
-                new HttpEntity<>(body, headers),
-                Map.class
+        ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+            ENDPOINT,
+            Objects.requireNonNull(HttpMethod.POST),
+            new HttpEntity<>(body, headers),
+            new ParameterizedTypeReference<Map<String, Object>>() {}
         );
 
         if (!resp.getStatusCode().is2xxSuccessful()) {
@@ -100,11 +102,7 @@ public class MomoGatewayClient {
         }
 
         // resp.getBody() có thể null theo null-analysis => bắt buộc requireNonNull
-        @SuppressWarnings("unchecked")
-        Map<String, Object> respBody = (Map<String, Object>) Objects.requireNonNull(
-                resp.getBody(),
-                "MoMo response body is null"
-        );
+        Map<String, Object> respBody = Objects.requireNonNull(resp.getBody(), "MoMo response body is null");
 
         int resultCode = asInt(respBody.get("resultCode"), -999);
         Object message = respBody.get("message");

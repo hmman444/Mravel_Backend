@@ -1,4 +1,4 @@
-package com.mravel.booking.payment;
+package com.mravel.booking.payment.momo;
 
 import lombok.Getter;
 import lombok.Setter;

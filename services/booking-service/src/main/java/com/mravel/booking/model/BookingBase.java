@@ -89,7 +89,11 @@ public abstract class BookingBase extends BaseEntity {
     @Column(name = "pending_payment_order_id", length = 64)
     private String pendingPaymentOrderId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "active_payment_method", length = 30)
+    private Payment.PaymentMethod activePaymentMethod;
+
     public enum PayOption { FULL, DEPOSIT }
-    public enum BookingStatus { PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, COMPLETED, REFUNDED }
+    public enum BookingStatus {PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, CANCELLED_BY_PARTNER, COMPLETED, REFUNDED}
     public enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED, PARTIAL_REFUNDED }
 }

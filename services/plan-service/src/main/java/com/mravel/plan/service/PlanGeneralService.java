@@ -4,7 +4,6 @@ import com.mravel.plan.dto.board.UpdateBudgetRequest;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
-import com.mravel.plan.repository.PlanCardRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.cache.annotation.CacheEvict;

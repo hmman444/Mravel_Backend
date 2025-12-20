@@ -59,7 +59,7 @@ public class CatalogInventoryClient {
         Objects.requireNonNull(path, "path must not be null");
         Objects.requireNonNull(req, "request must not be null");
 
-        String url = buildUrl(path);
+        final String url = Objects.requireNonNull(buildUrl(path), "url must not be null");
         try {
             restTemplate.postForEntity(url, new HttpEntity<>(req), String.class);
         } catch (HttpStatusCodeException ex) {

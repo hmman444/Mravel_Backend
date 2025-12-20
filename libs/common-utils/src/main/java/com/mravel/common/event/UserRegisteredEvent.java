@@ -15,6 +15,8 @@ public class UserRegisteredEvent {
     private String provider;
     private String providerId;
 
+    private String role;
+
     @Builder.Default
     private String version = "v1";
 }

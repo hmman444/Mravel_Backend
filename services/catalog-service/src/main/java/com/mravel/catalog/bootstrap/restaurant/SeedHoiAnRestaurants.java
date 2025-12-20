@@ -358,13 +358,13 @@ public class SeedHoiAnRestaurants {
         Instant now = Instant.parse("2024-01-01T00:00:00Z");
 
         PublisherInfo publisher = PublisherInfo.builder()
-            .partnerId("partner-red-bean-hoian")
-            .partnerName("Red Bean Hoi An - Hùng Vương")
-            .partnerEmail("info@redbeanhoian.com")
-            .partnerType(PartnerType.RESTAURANT_OWNER)
-            .createdAt(now)
-            .lastUpdatedAt(now)
-            .build();
+                                .partnerId("11")
+                                .partnerName("Ông Trùm Bất Động Sản")
+                                .partnerEmail("22110377@student.hcmute.edu.vn")
+                                .partnerType(PartnerType.RESTAURANT_OWNER)
+                                .createdAt(now)
+                                .lastUpdatedAt(now)
+                                .build();
 
         ModerationInfo moderation = ModerationInfo.builder()
             .status(RestaurantStatus.APPROVED)
@@ -957,13 +957,13 @@ public class SeedHoiAnRestaurants {
         Instant now = Instant.parse("2024-01-01T00:00:00Z");
 
         PublisherInfo publisher = PublisherInfo.builder()
-            .partnerId("partner-the-temple-hoian")
-            .partnerName("The Temple Restaurant & Lounge - Hùng Vương")
-            .partnerEmail("info@thetemplehoian.com")
-            .partnerType(PartnerType.RESTAURANT_OWNER)
-            .createdAt(now)
-            .lastUpdatedAt(now)
-            .build();
+                                .partnerId("11")
+                                .partnerName("Ông Trùm Bất Động Sản")
+                                .partnerEmail("22110377@student.hcmute.edu.vn")
+                                .partnerType(PartnerType.RESTAURANT_OWNER)
+                                .createdAt(now)
+                                .lastUpdatedAt(now)
+                                .build();
 
         ModerationInfo moderation = ModerationInfo.builder()
             .status(RestaurantStatus.APPROVED)

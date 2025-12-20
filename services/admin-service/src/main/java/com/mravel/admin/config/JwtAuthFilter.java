@@ -1,23 +1,27 @@
 package com.mravel.admin.config;
 
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.filter.OncePerRequestFilter;
 import com.mravel.common.security.JwtUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.List;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.List;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -33,9 +37,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws IOException, ServletException {
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws IOException, ServletException {
 
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
@@ -45,17 +50,27 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(header.substring(7));
+            String base = Objects.requireNonNull(authBaseUrl, "mravel.services.auth.base-url must not be null");
+            String path = Objects.requireNonNull(validatePath, "mravel.services.auth.validate-path must not be null");
 
-            ResponseEntity<AuthResponse> resp = restTemplate.exchange(
-                    authBaseUrl + validatePath,
-                    HttpMethod.GET,
-                    new HttpEntity<>(headers),
-                    AuthResponse.class);
+            URI uri = UriComponentsBuilder.fromHttpUrl(Objects.requireNonNull(base))
+                    .path(path)
+                    .build(true)
+                    .toUri();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(Objects.requireNonNull(header.substring(7), "token must not be null"));
+
+            // ✅ Cách chuẩn để gửi header bằng RestTemplate:
+            RequestEntity<Void> req = new RequestEntity<>(
+                headers,
+                Objects.requireNonNull(HttpMethod.GET),
+                Objects.requireNonNull(uri)
+            );
+
+            ResponseEntity<AuthResponse> resp = restTemplate.exchange(req, AuthResponse.class);
 
             AuthResponse body = resp.getBody();
-
             if (body == null || !body.isValid()) {
                 response.setStatus(HttpStatus.UNAUTHORIZED.value());
                 return;
@@ -70,7 +85,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             var auth = new UsernamePasswordAuthenticationToken(
                     new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole()),
                     null,
-                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+            );
 
             SecurityContextHolder.getContext().setAuthentication(auth);
             filterChain.doFilter(request, response);
@@ -86,5 +102,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         private Long id;
         private String email;
         private String role;
+        private String fullname;
+        private String avatar;
     }
 }

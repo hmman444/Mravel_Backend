@@ -38,7 +38,7 @@ public class UserRegisteredConsumer {
                     .fullname(event.getFullname())
                     .avatar(event.getAvatar())
                     .provider(event.getProvider())
-                    // default cho profile mới
+                    .role(event.getRole() != null ? event.getRole() : "USER")
                     .gender(Gender.UNKNOWN)
                     .membershipTier(MembershipTier.BRONZE)
                     .locale("vi-VN")

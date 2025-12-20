@@ -31,4 +31,11 @@ public interface HotelBookingRepository extends JpaRepository<HotelBooking, Long
     List<HotelBooking> findByGuestSessionIdAndUserIdIsNullOrderByCreatedAtDesc(String guestSessionId);
 
     Optional<HotelBooking> findByPendingPaymentOrderId(String orderId);
+
+    List<HotelBooking> findByHotelIdInOrderByCreatedAtDesc(List<String> hotelIds);
+
+    List<HotelBooking> findByHotelIdInAndStatusOrderByCreatedAtDesc(
+        List<String> hotelIds,
+        BookingBase.BookingStatus status
+    );
 }

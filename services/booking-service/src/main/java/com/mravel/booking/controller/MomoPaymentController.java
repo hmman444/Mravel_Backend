@@ -5,17 +5,18 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.mravel.booking.payment.MomoIpnRequest;
-import com.mravel.booking.payment.MomoConfirmRequest;
 import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.RestaurantBookingService;
 import com.mravel.booking.service.MomoPaymentService;
 import com.mravel.common.response.ApiResponse;
+import com.mravel.booking.payment.momo.MomoConfirmRequest;
+import com.mravel.booking.payment.momo.MomoIpnRequest;
 import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.repository.RestaurantBookingRepository;
 
@@ -112,7 +113,7 @@ public class MomoPaymentController {
 
         String feUrl = "http://localhost:5173/my-bookings";
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create(feUrl))
+                .location(Objects.requireNonNull(URI.create(feUrl)))
                 .build();
     }
 }

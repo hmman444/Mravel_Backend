@@ -44,6 +44,9 @@ public class HotelDoc {
     @Builder.Default
     private Boolean active = true;
 
+    // soft delete
+    private Instant deletedAt;
+
     // ---------- Liên kết & vị trí ----------
 
     /** Destination cha – slug trong collection places (PlaceKind.DESTINATION) */
@@ -581,6 +584,9 @@ public class HotelDoc {
         /** Admin xử lý lần gần nhất */
         private String lastActionByAdminId;
         private Instant lastActionAt;
+
+        private Instant unlockRequestedAt;
+        private String unlockRequestReason;
     }
 
     // =====================================================================

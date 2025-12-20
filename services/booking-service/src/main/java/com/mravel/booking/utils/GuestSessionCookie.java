@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 
 import java.util.UUID;
+import java.util.Objects;
 
 public final class GuestSessionCookie {
 
@@ -32,13 +33,13 @@ public final class GuestSessionCookie {
         String sid = get(req);
         if (sid == null) sid = UUID.randomUUID().toString();
 
-        ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, sid)
-                .httpOnly(true)
-                .secure(false)          // prod => true (https)
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(MAX_AGE_SECONDS)
-                .build();
+        ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, Objects.requireNonNull(sid, "sid must not be null"))
+            .httpOnly(true)
+            .secure(false)
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(MAX_AGE_SECONDS)
+            .build();
 
         resp.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         return sid;

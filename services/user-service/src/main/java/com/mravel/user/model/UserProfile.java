@@ -59,4 +59,6 @@ public class UserProfile {
     private String coverImage;
     private String hometown;
     private String occupation;
+
+    private String role; 
 }

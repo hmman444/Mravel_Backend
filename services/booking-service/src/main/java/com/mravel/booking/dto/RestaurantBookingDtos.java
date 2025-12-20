@@ -1,4 +1,3 @@
-// src/main/java/com/mravel/booking/dto/restaurant/RestaurantBookingDtos.java
 package com.mravel.booking.dto;
 
 import java.math.BigDecimal;
@@ -33,22 +32,73 @@ public class RestaurantBookingDtos {
         Integer durationMinutes,
         Integer people,
 
+        String paymentMethod,
+
         List<SelectedTable> tables
     ) {}
 
+    /**
+     * SUMMARY cho list booking restaurant (dùng cho Partner/User list).
+     * ✅ Canonical constructor (đầy đủ) khớp mapper mới.
+     * ✅ Có thêm constructor "cũ" để tương thích code cũ.
+     */
     public record RestaurantBookingSummaryDTO(
         String code,
+
+        String restaurantId,
         String restaurantName,
         String restaurantSlug,
+
         LocalDate reservationDate,
         LocalTime reservationTime,
+        Integer durationMinutes,
         Integer people,
         Integer tablesCount,
+
+        String contactName,
+        String contactPhone,
+        String contactEmail,
+
+        BigDecimal totalAmount,
+        BigDecimal depositAmount,
+        BigDecimal amountPayable,
+        BigDecimal amountPaid,
+        String currencyCode,
+
         String status,
         String paymentStatus,
+
         Instant createdAt,
-        Instant paidAt
-    ) {}
+        Instant paidAt,
+        Instant cancelledAt,
+        String cancelReason
+    ) {
+        // ✅ Constructor cũ (giữ cho những chỗ đang dùng signature 11 params)
+        public RestaurantBookingSummaryDTO(
+            String code,
+            String restaurantName,
+            String restaurantSlug,
+            LocalDate reservationDate,
+            LocalTime reservationTime,
+            Integer people,
+            Integer tablesCount,
+            String status,
+            String paymentStatus,
+            Instant createdAt,
+            Instant paidAt
+        ) {
+            this(
+                code,
+                null, restaurantName, restaurantSlug,
+                reservationDate, reservationTime, null, people, tablesCount,
+                null, null, null,
+                null, null, null, null, null,
+                status, paymentStatus,
+                createdAt, paidAt,
+                null, null
+            );
+        }
+    }
 
     public record RestaurantBookingCreatedDTO(
         String bookingCode,
