@@ -26,7 +26,8 @@ public class PlaceDtos {
                         PriceLevel priceLevel,
                         Double avgRating,
                         Integer reviewsCount,
-                        String coverImageUrl) {
+                        String coverImageUrl,
+                        Boolean active) {
         }
 
         public record ImageDTO(String url, String caption, boolean cover, Integer sortOrder) {

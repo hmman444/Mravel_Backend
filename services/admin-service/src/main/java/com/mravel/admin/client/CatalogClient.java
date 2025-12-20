@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Objects;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -37,7 +38,8 @@ public class CatalogClient {
         return exchange("/api/catalog/amenities/" + id, HttpMethod.DELETE, null, bearerToken);
     }
 
-    public ResponseEntity<ApiResponse<?>> listAmenities(String scope, boolean active, boolean grouped, String bearerToken) {
+    public ResponseEntity<ApiResponse<?>> listAmenities(String scope, boolean active, boolean grouped,
+            String bearerToken) {
         UriComponentsBuilder b = UriComponentsBuilder
                 .fromHttpUrl(requireBaseUrl() + "/api/catalog/amenities")
                 .queryParam("active", active)
@@ -51,15 +53,15 @@ public class CatalogClient {
     }
 
     // PLACE
-    public ResponseEntity<ApiResponse<?>> searchPlaces(String q, Integer page, Integer size, String bearerToken) {
-        UriComponentsBuilder b = UriComponentsBuilder
-                .fromHttpUrl(requireBaseUrl() + "/api/catalog/places/poi");
+    public ResponseEntity<ApiResponse<?>> listAllPlaces(String kind, Integer page, Integer size, String bearerToken) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(baseUrl + "/api/catalog/places/all")
+                .queryParamIfPresent("kind", (kind == null || kind.isBlank()) ? Optional.empty() : Optional.of(kind))
+                .queryParamIfPresent("page", Optional.ofNullable(page))
+                .queryParamIfPresent("size", Optional.ofNullable(size))
+                .toUriString();
 
-        if (q != null && !q.isBlank()) b.queryParam("q", q);
-        if (page != null) b.queryParam("page", page);
-        if (size != null) b.queryParam("size", size);
-
-        return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
     }
 
     public ResponseEntity<ApiResponse<?>> getPlaceDetailBySlug(String slug, String bearerToken) {
@@ -67,16 +69,31 @@ public class CatalogClient {
     }
 
     public ResponseEntity<ApiResponse<?>> getChildrenByParentSlug(
-            String slug, String kind, Integer page, Integer size, String bearerToken
-    ) {
+            String slug, String kind, Integer page, Integer size, String bearerToken) {
         UriComponentsBuilder b = UriComponentsBuilder
                 .fromHttpUrl(requireBaseUrl() + "/api/catalog/places/" + slug + "/children");
 
-        if (kind != null && !kind.isBlank()) b.queryParam("kind", kind);
-        if (page != null) b.queryParam("page", page);
-        if (size != null) b.queryParam("size", size);
+        if (kind != null && !kind.isBlank())
+            b.queryParam("kind", kind);
+        if (page != null)
+            b.queryParam("page", page);
+        if (size != null)
+            b.queryParam("size", size);
 
         return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> getChildrenAllByParentSlug(
+            String slug, String kind, Integer page, Integer size, String bearerToken) {
+
+        String url = UriComponentsBuilder
+                .fromHttpUrl(baseUrl + "/api/catalog/places/" + slug + "/children/all")
+                .queryParamIfPresent("kind", (kind == null || kind.isBlank()) ? Optional.empty() : Optional.of(kind))
+                .queryParamIfPresent("page", Optional.ofNullable(page))
+                .queryParamIfPresent("size", Optional.ofNullable(size))
+                .toUriString();
+
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
     }
 
     public ResponseEntity<ApiResponse<?>> createPlace(UpsertPlaceRequest req, String bearerToken) {
@@ -87,7 +104,15 @@ public class CatalogClient {
         return exchange("/api/catalog/places/" + id, HttpMethod.PUT, req, bearerToken);
     }
 
-    public ResponseEntity<ApiResponse<?>> softDeletePlace(String id, String bearerToken) {
+    public ResponseEntity<ApiResponse<?>> lockPlace(String id, String bearerToken) {
+        return exchange("/api/catalog/places/" + id + "/lock", HttpMethod.PATCH, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> unlockPlace(String id, String bearerToken) {
+        return exchange("/api/catalog/places/" + id + "/unlock", HttpMethod.PATCH, null, bearerToken);
+    }
+
+    public ResponseEntity<ApiResponse<?>> hardDeletePlace(String id, String bearerToken) {
         return exchange("/api/catalog/places/" + id, HttpMethod.DELETE, null, bearerToken);
     }
 
@@ -97,7 +122,8 @@ public class CatalogClient {
         return exchangeAbsolute(url, method, body, bearerToken);
     }
 
-    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body, String bearerToken) {
+    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body,
+            String bearerToken) {
         final String safeUrl = Objects.requireNonNull(url, "url must not be null");
         final HttpMethod safeMethod = Objects.requireNonNull(method, "method must not be null");
         final String safeToken = Objects.requireNonNull(bearerToken, "bearerToken must not be null");
@@ -113,8 +139,8 @@ public class CatalogClient {
                     safeUrl,
                     safeMethod,
                     entity,
-                    new org.springframework.core.ParameterizedTypeReference<ApiResponse<?>>() {}
-            );
+                    new org.springframework.core.ParameterizedTypeReference<ApiResponse<?>>() {
+                    });
             return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
         } catch (HttpStatusCodeException ex) {
             ApiResponse<?> api;

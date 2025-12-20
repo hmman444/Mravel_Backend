@@ -2,8 +2,8 @@ package com.mravel.catalog.repository;
 
 import java.util.Optional;
 
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -21,9 +21,11 @@ public interface PlaceDocRepository extends MongoRepository<PlaceDoc, String>, P
 
   boolean existsBySlug(String slug);
 
-  long countByParentSlugAndActiveTrue(String parentSlug);
-
   boolean existsBySlugAndIdNot(String slug, String id);
 
-  Page<PlaceDoc> findByKindAndActiveTrue(PlaceKind kind, Pageable pageable);
+  long countByParentSlugAndActiveTrue(String parentSlug);
+
+  Page<PlaceDoc> findAllByKind(PlaceKind kind, Pageable pageable);
+
+  long countByParentSlug(String parentSlug);
 }

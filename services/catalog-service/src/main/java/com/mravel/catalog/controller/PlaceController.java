@@ -48,6 +48,16 @@ public class PlaceController {
         return ApiResponse.success("OK", page);
     }
 
+    @GetMapping("/{slug}/children/all")
+    public ApiResponse<Page<PlaceSummaryDTO>> childrenAll(
+            @PathVariable String slug,
+            @ParameterObject Pageable pageable,
+            @RequestParam(required = false, defaultValue = "POI") PlaceKind kind) {
+
+        Page<PlaceSummaryDTO> page = placeService.findChildrenByParentSlugAll(slug, kind, pageable);
+        return ApiResponse.success("OK", page);
+    }
+
     @PostMapping
     public ApiResponse<PlaceAdminResponse> create(@RequestBody UpsertPlaceRequest req) {
         return ApiResponse.success("Tạo địa điểm thành công", placeService.create(req));
@@ -58,10 +68,30 @@ public class PlaceController {
         return ApiResponse.success("Cập nhật địa điểm thành công", placeService.update(id, req));
     }
 
-    // soft delete
+    @GetMapping("/all")
+    public ApiResponse<Page<PlaceAdminResponse>> listAllForAdmin(
+            @RequestParam(defaultValue = "POI") PlaceKind kind,
+            @ParameterObject Pageable pageable) {
+
+        Page<PlaceAdminResponse> page = placeService.findAllByKind(kind, pageable);
+        return ApiResponse.success("OK", page);
+    }
+
+    @PatchMapping("/{id}/lock")
+    public ApiResponse<Void> lock(@PathVariable String id) {
+        placeService.lock(id);
+        return ApiResponse.success("Khóa địa điểm thành công", null);
+    }
+
+    @PatchMapping("/{id}/unlock")
+    public ApiResponse<Void> unlock(@PathVariable String id) {
+        placeService.unlock(id);
+        return ApiResponse.success("Mở khóa địa điểm thành công", null);
+    }
+
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> softDelete(@PathVariable String id) {
-        placeService.softDelete(id);
-        return ApiResponse.success("Xóa địa điểm (mềm) thành công", null);
+    public ApiResponse<Void> hardDelete(@PathVariable String id) {
+        placeService.hardDelete(id);
+        return ApiResponse.success("Xóa địa điểm (cứng) thành công", null);
     }
 }

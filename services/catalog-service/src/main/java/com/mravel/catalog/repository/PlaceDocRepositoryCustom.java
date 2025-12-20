@@ -8,5 +8,8 @@ import com.mravel.catalog.model.enums.PlaceKind;
 
 public interface PlaceDocRepositoryCustom {
   Page<PlaceDoc> searchPlaces(String q, Pageable pageable);
+
   Page<PlaceDoc> findChildrenByParentSlug(String parentSlug, PlaceKind kind, Pageable pageable);
+
+  Page<PlaceDoc> findChildrenByParentSlugIncludeInactive(String parentSlug, PlaceKind kind, Pageable pageable);
 }
