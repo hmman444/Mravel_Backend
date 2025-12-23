@@ -39,8 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws IOException, ServletException {
+            @NonNull FilterChain filterChain) throws IOException, ServletException {
 
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
@@ -61,12 +60,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(Objects.requireNonNull(header.substring(7), "token must not be null"));
 
-            // ✅ Cách chuẩn để gửi header bằng RestTemplate:
             RequestEntity<Void> req = new RequestEntity<>(
-                headers,
-                Objects.requireNonNull(HttpMethod.GET),
-                Objects.requireNonNull(uri)
-            );
+                    headers,
+                    Objects.requireNonNull(HttpMethod.GET),
+                    Objects.requireNonNull(uri));
 
             ResponseEntity<AuthResponse> resp = restTemplate.exchange(req, AuthResponse.class);
 
@@ -76,17 +73,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // 🔒 CHỐT CHẶN
-            if (!"ADMIN".equalsIgnoreCase(body.getRole())) {
-                response.setStatus(HttpStatus.FORBIDDEN.value());
-                return;
-            }
-
+            // if (!"ADMIN".equalsIgnoreCase(body.getRole())) {
+            // response.setStatus(HttpStatus.FORBIDDEN.value());
+            // return;
+            // }
             var auth = new UsernamePasswordAuthenticationToken(
                     new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole()),
                     null,
-                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
-            );
+                    List.of(new SimpleGrantedAuthority("ROLE_" + body.getRole().toUpperCase())));
 
             SecurityContextHolder.getContext().setAuthentication(auth);
             filterChain.doFilter(request, response);

@@ -72,6 +72,15 @@ public class PlanController {
                                 ApiResponse.success("Lấy danh sách plan thành công", pageResponse));
         }
 
+        @GetMapping("/{id}/feed")
+        public ResponseEntity<ApiResponse<PlanFeedItem>> getFeedDetail(
+                        @PathVariable Long id,
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+
+                PlanFeedItem item = planService.getById(id, authorizationHeader);
+                return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết feed thành công", item));
+        }
+
         @GetMapping("/{id}")
         public ResponseEntity<ApiResponse<PlanFeedItem>> getById(
                         @PathVariable Long id,
