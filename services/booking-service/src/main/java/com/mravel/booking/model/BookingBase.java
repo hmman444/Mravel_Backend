@@ -94,6 +94,6 @@ public abstract class BookingBase extends BaseEntity {
     private Payment.PaymentMethod activePaymentMethod;
 
     public enum PayOption { FULL, DEPOSIT }
-    public enum BookingStatus {PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, CANCELLED_BY_PARTNER, COMPLETED, REFUNDED}
+    public enum BookingStatus {PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, CANCELLED_BY_PARTNER, CANCELLED_BY_GUEST, COMPLETED, REFUNDED}
     public enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED, PARTIAL_REFUNDED }
 }

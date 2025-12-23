@@ -6,6 +6,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.web.client.HttpStatusCodeException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -45,7 +46,8 @@ public class MomoGatewayClient {
             throw new IllegalArgumentException("Amount không hợp lệ");
         }
 
-        String amountStr = amount.setScale(0, RoundingMode.HALF_UP).toPlainString();
+        long amountLong = amount.setScale(0, RoundingMode.HALF_UP).longValueExact();
+        String amountStr = String.valueOf(amountLong);
 
         String requestId = orderId + "-" + System.currentTimeMillis();
 
@@ -71,10 +73,11 @@ public class MomoGatewayClient {
 
         Map<String, Object> body = new HashMap<>();
         body.put("partnerCode", PARTNER_CODE);
+        body.put("accessKey", ACCESS_KEY);
         body.put("partnerName", "Mravel");
         body.put("storeId", "MravelStore");
         body.put("requestId", requestId);
-        body.put("amount", amountStr);
+        body.put("amount", amountLong);
         body.put("orderId", orderId);
         body.put("orderInfo", orderInfo);
         body.put("redirectUrl", REDIRECT_URL);
@@ -90,35 +93,36 @@ public class MomoGatewayClient {
 
         log.info("[MoMo] createPayment request: orderId={}, amount={}", orderId, amountStr);
 
-        ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
-            ENDPOINT,
-            Objects.requireNonNull(HttpMethod.POST),
-            new HttpEntity<>(body, headers),
-            new ParameterizedTypeReference<Map<String, Object>>() {}
-        );
+         try {
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                ENDPOINT,
+                HttpMethod.POST,
+                new HttpEntity<>(body, headers),
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
 
-        if (!resp.getStatusCode().is2xxSuccessful()) {
-            throw new IllegalStateException("MoMo create payment thất bại: " + resp.getStatusCode());
+            Map<String, Object> respBody = Objects.requireNonNull(resp.getBody(), "MoMo response body is null");
+
+            int resultCode = asInt(respBody.get("resultCode"), -999);
+            Object message = respBody.get("message");
+            log.info("[MoMo] response resultCode={}, message={}", resultCode, message);
+
+            if (resultCode != 0) {
+                throw new IllegalStateException("MoMo từ chối giao dịch: " + message);
+            }
+
+            String payUrl = Objects.toString(respBody.get("payUrl"), null);
+            if (payUrl == null || payUrl.isBlank()) {
+                throw new IllegalStateException("MoMo trả về payUrl rỗng");
+            }
+            return payUrl;
+
+        } catch (HttpStatusCodeException ex) {
+            // ✅ MoMo trả 4xx/5xx → đọc được body JSON ở đây
+            String momoBody = ex.getResponseBodyAsString();
+            log.error("[MoMo] error status={}, body={}", ex.getStatusCode(), momoBody);
+            throw new IllegalStateException("MoMo declined: " + momoBody, ex);
         }
-
-        // resp.getBody() có thể null theo null-analysis => bắt buộc requireNonNull
-        Map<String, Object> respBody = Objects.requireNonNull(resp.getBody(), "MoMo response body is null");
-
-        int resultCode = asInt(respBody.get("resultCode"), -999);
-        Object message = respBody.get("message");
-
-        log.info("[MoMo] response resultCode={}, message={}", resultCode, message);
-
-        if (resultCode != 0) {
-            throw new IllegalStateException("MoMo từ chối giao dịch: " + message);
-        }
-
-        String payUrl = Objects.toString(respBody.get("payUrl"), null);
-        if (payUrl == null || payUrl.isBlank()) {
-            throw new IllegalStateException("MoMo trả về payUrl rỗng");
-        }
-
-        return payUrl;
     }
 
     private static int asInt(Object obj, int defaultVal) {

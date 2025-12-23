@@ -225,4 +225,51 @@ public class BookingPublicController {
         String email,
         String paymentMethod // optional
     ) {}
+
+    public record CancelReq(String reason) {}
+
+    @PostMapping("/my/{code}/cancel")
+    public ResponseEntity<ApiResponse<?>> cancelGuestHotel(
+        @PathVariable String code,
+        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
+        @RequestBody(required = false) CancelReq body
+    ) {
+    if (sid == null || sid.isBlank()) throw new IllegalStateException("Thiếu guest session");
+    String reason = body == null ? null : body.reason();
+    var b = hotelBookingService.cancelHotelBooking(code, null, sid, reason);
+    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
+    }
+
+    public record LookupCancelRequest(
+        String bookingCode,
+        String phoneLast4,
+        String email,
+        String reason
+    ) {}
+
+    @PostMapping("/lookup/cancel")
+    public ResponseEntity<ApiResponse<?>> lookupCancel(@RequestBody LookupCancelRequest body) {
+    if (body == null || body.bookingCode() == null || body.bookingCode().isBlank())
+        throw new IllegalArgumentException("Thiếu bookingCode");
+    if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4)
+        throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+
+    HotelBooking b = hotelBookingRepository.findByCode(body.bookingCode().trim())
+        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+    // lookup cancel chỉ dành cho GUEST (đúng logic lookup hiện tại của bạn)
+    if (b.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
+
+    String last4 = last4Digits(b.getContactPhone());
+    if (!body.phoneLast4().trim().equals(last4)) throw new IllegalStateException("Sai 4 số cuối SĐT");
+
+    if (body.email() != null && !body.email().isBlank()) {
+        String bEmail = b.getContactEmail();
+        if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim()))
+        throw new IllegalStateException("Email không khớp");
+    }
+
+    var cancelled = hotelBookingService.cancelHotelBookingByLookup(b.getCode(), body.reason());
+    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(cancelled)));
+    }
 }

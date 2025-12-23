@@ -105,4 +105,20 @@ public class RestaurantBookingMyController {
         var dto = service.resumeRestaurantPaymentForOwner(code, userId, null, method);
         return ResponseEntity.ok(ApiResponse.success("OK", dto));
     }
+
+    public record CancelReq(String reason) {}
+
+    @PostMapping("/{code}/cancel")
+    public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> cancelMyRestaurant(
+        @PathVariable String code,
+        @AuthenticationPrincipal Jwt jwt,
+        @RequestBody(required = false) CancelReq body
+    ) {
+        Long userId = extractUserId(jwt);
+        String reason = (body == null) ? null : body.reason();
+
+        var b = service.cancelRestaurantBooking(code, userId, null, reason);
+
+        return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toDetailDTO(b)));
+    }
 }
