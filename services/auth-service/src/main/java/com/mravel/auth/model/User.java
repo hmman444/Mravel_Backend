@@ -23,7 +23,7 @@ public class User {
     private String password;
 
     @Builder.Default
-    private boolean enabled = false;
+    private boolean enabled = false; // OTP verified
 
     private String provider;
     private String providerId;
@@ -32,4 +32,9 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private Role role = Role.USER;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private AccountStatus status = AccountStatus.ACTIVE;
 }

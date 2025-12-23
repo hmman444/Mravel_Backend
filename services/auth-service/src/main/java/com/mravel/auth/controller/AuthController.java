@@ -22,6 +22,9 @@ import com.mravel.auth.dto.RegisterRequest;
 import com.mravel.auth.dto.ResetPasswordRequest;
 import com.mravel.auth.dto.SocialLoginRequest;
 import com.mravel.auth.dto.VerifyOtpRequest;
+import com.mravel.auth.model.AccountStatus;
+import com.mravel.auth.model.User;
+import com.mravel.auth.repository.UserRepository;
 import com.mravel.auth.service.AuthService;
 import com.mravel.auth.service.UserProfileClient;
 import com.mravel.common.response.ApiResponse;
@@ -38,6 +41,7 @@ public class AuthController {
     private final AuthService authService;
     private final JwtUtil jwtUtils;
     private final UserProfileClient userProfileClient;
+    private final UserRepository userRepository;
 
     @GetMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateToken(@RequestHeader("Authorization") String header) {
@@ -47,18 +51,22 @@ public class AuthController {
         Map<String, Object> body = new HashMap<>();
         body.put("valid", valid);
 
-        if (!valid) return ResponseEntity.ok(body);
+        if (!valid)
+            return ResponseEntity.ok(body);
 
         Long id = jwtUtils.extractUserId(token);
-        String email = jwtUtils.extractEmail(token);
-        String role = jwtUtils.extractRole(token);
+        User u = userRepository.findById(id).orElse(null);
+        if (u == null || u.getStatus() == AccountStatus.LOCKED || !u.isEnabled()) {
+            body.put("valid", false);
+            return ResponseEntity.ok(body);
+        }
 
         body.put("id", id);
-        body.put("email", email);
-        body.put("role", role);
+        body.put("email", u.getEmail());
+        body.put("role", u.getRole().name());
 
         try {
-            UserProfileResponse profile = userProfileClient.getUserByEmail(email);
+            UserProfileResponse profile = userProfileClient.getUserByEmail(u.getEmail());
             if (profile != null) {
                 body.put("fullname", profile.getFullname());
                 body.put("avatar", profile.getAvatar());
