@@ -94,4 +94,18 @@ public class BookingMyController {
         ? ((Number) rawId).longValue()
         : Long.valueOf(String.valueOf(rawId));
   }
+
+  public record CancelReq(String reason) {}
+
+  @PostMapping("/bookings/{code}/cancel")
+  public ResponseEntity<ApiResponse<?>> cancelMyHotel(
+      @PathVariable String code,
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody(required = false) CancelReq body
+  ) {
+    Long userId = extractUserId(jwt);
+    String reason = body == null ? null : body.reason();
+    var b = service.cancelHotelBooking(code, userId, null, reason);
+    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
+  }
 }

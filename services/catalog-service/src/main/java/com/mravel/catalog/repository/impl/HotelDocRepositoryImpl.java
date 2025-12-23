@@ -29,7 +29,12 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
             Integer requiredRooms,
             Pageable pageable
     ) {
-        Query q = new Query().with(pageable);
+        Query q = new Query();
+
+        if (pageable != null) {
+            if (pageable.isPaged()) q.with(pageable);
+            else q.with(pageable.getSort());
+        }
 
         List<Criteria> cs = new ArrayList<>();
         cs.add(where("active").is(true));
@@ -68,10 +73,14 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
 
         q.addCriteria(and(cs));
 
-        long total = mongo.count(q, HotelDoc.class);
+        // count phải bỏ limit/skip
+        Query countQ = Query.of(q).limit(-1).skip(-1);
+
+        long total = mongo.count(countQ, HotelDoc.class);
         List<HotelDoc> data = mongo.find(q, HotelDoc.class);
 
-        return new PageImpl<>(data, pageable, total);
+        Pageable pb = (pageable != null) ? pageable : Pageable.unpaged();
+        return new PageImpl<>(data, pb, total);
     }
 
     // ===== helpers =====

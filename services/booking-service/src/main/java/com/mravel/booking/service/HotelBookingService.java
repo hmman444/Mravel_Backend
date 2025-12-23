@@ -240,68 +240,96 @@ public class HotelBookingService {
     }
 
     @Transactional
-    public HotelBooking cancelHotelBooking(String bookingCode, Long userId, String reason) {
-        HotelBooking booking = hotelBookingRepository.findByCode(bookingCode)
-                .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
+    public HotelBooking cancelHotelBooking(String bookingCode, Long userId, String guestSid, String reason) {
+    HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
+        .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
 
-        if (userId != null && !userId.equals(booking.getUserId())) {
-            throw new IllegalStateException("Bạn không có quyền hủy booking này");
-        }
+    // ✅ quyền: user booking
+    if (booking.getUserId() != null) {
+        if (userId == null || !userId.equals(booking.getUserId()))
+        throw new IllegalStateException("Bạn không có quyền hủy booking này");
+    } else {
+        // ✅ quyền: guest booking
+        if (guestSid == null || guestSid.isBlank()
+            || booking.getGuestSessionId() == null
+            || !guestSid.equals(booking.getGuestSessionId()))
+        throw new IllegalStateException("Không có quyền hủy booking này");
+    }
 
+    return cancelHotelBookingInternal(booking, reason);
+    }
+
+    @Transactional
+    public HotelBooking cancelHotelBookingByLookup(String bookingCode, String reason) {
+    HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
+        .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
+
+    // lookup chỉ cho guest
+    if (booking.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
+
+    return cancelHotelBookingInternal(booking, reason);
+    }
+
+    private HotelBooking cancelHotelBookingInternal(HotelBooking booking, String reason) {
         if (booking.getStatus() == BookingStatus.CANCELLED
-                || booking.getStatus() == BookingStatus.REFUNDED
-                || booking.getStatus() == BookingStatus.COMPLETED) {
-            return booking;
+            || booking.getStatus() == BookingStatus.CANCELLED_BY_GUEST
+            || booking.getStatus() == BookingStatus.CANCELLED_BY_PARTNER
+            || booking.getStatus() == BookingStatus.REFUNDED
+            || booking.getStatus() == BookingStatus.COMPLETED) {
+        return booking;
+    }
+
+    BookingStatus oldStatus = booking.getStatus();
+    long minutesFromCreate = Duration.between(booking.getCreatedAt(), Instant.now()).toMinutes();
+
+    booking.setCancelReason(reason);
+    booking.setCancelledAt(Instant.now());
+
+    // ✅ status nói “ai huỷ”
+    booking.setStatus(BookingStatus.CANCELLED_BY_GUEST);
+
+    // ✅ paymentStatus nói “hoàn tiền hay không”
+    boolean shouldRefund;
+    if (minutesFromCreate <= FREE_CANCEL_MINUTES) {
+        shouldRefund = true;
+    } else {
+        // sau 30p: DEPOSIT không hoàn, FULL hoàn (đúng rule bạn đang dùng)
+        shouldRefund = booking.getPayOption() == PayOption.FULL;
+    }
+
+    if (shouldRefund) {
+        booking.setPaymentStatus(PaymentStatus.REFUNDED);
+    } else {
+        booking.setPaymentStatus(PaymentStatus.FAILED);
+    }
+
+    // inventory rollback/release giữ nguyên như bạn viết
+    if (Boolean.TRUE.equals(booking.getInventoryDeducted())) {
+        List<RoomRequestDTO> roomRequests = buildRoomRequestsFromBooking(booking);
+
+        if (oldStatus == BookingStatus.PENDING_PAYMENT) {
+        catalogInventoryClient.releaseHold(new RollbackInventoryRequest(
+            booking.getHotelId(),
+            booking.getCheckInDate(),
+            booking.getCheckOutDate(),
+            roomRequests
+        ));
+        booking.setInventoryDeducted(false);
+        } else if (oldStatus == BookingStatus.CONFIRMED || oldStatus == BookingStatus.PAID) {
+        catalogInventoryClient.rollbackInventory(new RollbackInventoryRequest(
+            booking.getHotelId(),
+            booking.getCheckInDate(),
+            booking.getCheckOutDate(),
+            roomRequests
+        ));
+        booking.setInventoryDeducted(false);
         }
+    }
 
-        BookingStatus oldStatus = booking.getStatus();
-        long minutesFromCreate = Duration.between(booking.getCreatedAt(), Instant.now()).toMinutes();
+    booking.setPendingPaymentUrl(null);
+    booking.setPendingPaymentOrderId(null);
 
-        booking.setCancelReason(reason);
-        booking.setCancelledAt(Instant.now());
-
-        // Rule hoàn/không hoàn (giữ y như bạn)
-        if (minutesFromCreate <= FREE_CANCEL_MINUTES) {
-            booking.setStatus(BookingStatus.REFUNDED);
-            booking.setPaymentStatus(PaymentStatus.REFUNDED);
-        } else {
-            if (booking.getPayOption() == PayOption.DEPOSIT) {
-                booking.setStatus(BookingStatus.CANCELLED);
-                // paymentStatus tuỳ bạn; tạm để FAILED cho rõ nghĩa là không hoàn
-                booking.setPaymentStatus(PaymentStatus.FAILED);
-            } else {
-                booking.setStatus(BookingStatus.REFUNDED);
-                booking.setPaymentStatus(PaymentStatus.REFUNDED);
-            }
-        }
-
-        // Release/Rollback inventory theo OLD status
-        if (Boolean.TRUE.equals(booking.getInventoryDeducted())) {
-            List<RoomRequestDTO> roomRequests = buildRoomRequestsFromBooking(booking);
-
-            if (oldStatus == BookingStatus.PENDING_PAYMENT) {
-                catalogInventoryClient.releaseHold(new RollbackInventoryRequest(
-                        booking.getHotelId(),
-                        booking.getCheckInDate(),
-                        booking.getCheckOutDate(),
-                        roomRequests
-                ));
-                booking.setInventoryDeducted(false);
-            } else if (oldStatus == BookingStatus.CONFIRMED || oldStatus == BookingStatus.PAID) {
-                catalogInventoryClient.rollbackInventory(new RollbackInventoryRequest(
-                        booking.getHotelId(),
-                        booking.getCheckInDate(),
-                        booking.getCheckOutDate(),
-                        roomRequests
-                ));
-                booking.setInventoryDeducted(false);
-            }
-        }
-
-        booking.setPendingPaymentUrl(null);
-        booking.setPendingPaymentOrderId(null);
-
-        return hotelBookingRepository.save(booking);
+    return hotelBookingRepository.save(booking);
     }
 
     @Scheduled(fixedDelayString = "${mravel.booking.pending-expire-check-ms:60000}")

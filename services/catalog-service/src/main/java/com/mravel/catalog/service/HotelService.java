@@ -1,6 +1,7 @@
 // src/main/java/com/mravel/catalog/service/HotelService.java
 package com.mravel.catalog.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -31,15 +33,14 @@ import lombok.RequiredArgsConstructor;
 public class HotelService {
 
     private final AmenityCatalogService amenityCatalogService;
+    private final HotelInventoryService inventoryService;
     private final HotelDocRepository hotelRepo;
     private final MongoTemplate mongoTemplate;
     private final AmenityCatalogRepository amenityCatalogRepo;
 
     public Page<HotelSummaryDTO> searchHotels(HotelSearchRequest request, Pageable pageable) {
         if (request == null) {
-            // không có bộ lọc gì, chỉ location = null, capacity = null
-            return hotelRepo.searchHotels(null, null, null, pageable)
-                    .map(HotelMapper::toSummary);
+            return hotelRepo.searchHotels(null, null, null, pageable).map(HotelMapper::toSummary);
         }
 
         String location = request.location();
@@ -47,27 +48,83 @@ public class HotelService {
         Integer children = safeInt(request.children());
         Integer rooms = safeInt(request.rooms());
 
-        // ----- Quy đổi trẻ em -----
-        // 2 trẻ em = 1 người lớn, dùng ceil(children / 2.0)
         int childEquivalent = (children <= 0) ? 0 : (int) Math.ceil(children / 2.0);
         int guestsNormalized = adults + childEquivalent;
 
-        Integer minGuestsPerRoom = null;
         Integer requiredRooms = (rooms != null && rooms > 0) ? rooms : null;
 
-        if (guestsNormalized > 0 && rooms != null && rooms > 0) {
-            // chia đều số khách cho số phòng, làm tròn lên
-            minGuestsPerRoom = (int) Math.ceil(guestsNormalized * 1.0 / rooms);
-        } else if (guestsNormalized > 0) {
-            // không chọn số phòng => giả sử 1 phòng
-            minGuestsPerRoom = guestsNormalized;
+        Integer minGuestsPerRoom =
+                (guestsNormalized > 0)
+                        ? ((requiredRooms != null)
+                                ? (int) Math.ceil(guestsNormalized * 1.0 / requiredRooms)
+                                : guestsNormalized)
+                        : null;
+
+        // ==== NEW: availability filter nếu có ngày ====
+        var checkIn = request.checkIn();
+        var checkOut = request.checkOut();
+
+        if (checkIn != null && checkOut != null && checkOut.isAfter(checkIn)) {
+            // 1) Lấy ALL candidates (unpaged) rồi tự paginate sau khi filter
+            Page<HotelDoc> all = hotelRepo.searchHotels(location, minGuestsPerRoom, requiredRooms, Pageable.unpaged());
+
+            int roomsNeeded = (requiredRooms != null && requiredRooms > 0) ? requiredRooms : 1;
+
+            List<HotelDoc> available = all.getContent().stream()
+                    .filter(h -> hasAnyRoomTypeAvailable(h, checkIn, checkOut, roomsNeeded, minGuestsPerRoom))
+                    .toList();
+
+            // 2) paginate thủ công theo pageable hiện tại
+            int page = pageable.getPageNumber();
+            int size = pageable.getPageSize();
+            int from = Math.min(page * size, available.size());
+            int to = Math.min(from + size, available.size());
+
+            List<HotelSummaryDTO> slice = new ArrayList<>(
+                    available.subList(from, to).stream()
+                            .map(HotelMapper::toSummary)
+                            .toList()
+            );
+            return new PageImpl<>(slice, pageable, available.size());
         }
 
-        // checkIn / checkOut hiện tại CHƯA dùng lọc, để dành cho later
-        // (booking-service)
-
+        // fallback: như cũ
         return hotelRepo.searchHotels(location, minGuestsPerRoom, requiredRooms, pageable)
                 .map(HotelMapper::toSummary);
+    }
+
+    private boolean hasAnyRoomTypeAvailable(
+            HotelDoc hotel,
+            LocalDate checkIn,
+            LocalDate checkOut,
+            int roomsNeeded,
+            Integer minGuestsPerRoom
+    ) {
+        if (hotel.getRoomTypes() == null || hotel.getRoomTypes().isEmpty()) return false;
+
+        for (HotelDoc.RoomType rt : hotel.getRoomTypes()) {
+            if (rt == null || rt.getId() == null) continue;
+
+            Integer maxGuests = rt.getMaxGuests();
+            Integer totalRooms = rt.getTotalRooms();
+
+            // giữ logic khớp với search (đừng check lung tung)
+            if (minGuestsPerRoom != null && (maxGuests == null || maxGuests < minGuestsPerRoom)) continue;
+            if (totalRooms != null && totalRooms < roomsNeeded) continue;
+
+            var av = inventoryService.getAvailability(
+                    hotel.getId(),
+                    hotel.getSlug(),
+                    rt.getId(),
+                    checkIn,
+                    checkOut,
+                    roomsNeeded
+            );
+
+            if (Boolean.TRUE.equals(av.isEnough())) return true;
+        }
+
+        return false;
     }
 
     public HotelDetailDTO getBySlug(String slug) {
