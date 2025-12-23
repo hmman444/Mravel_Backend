@@ -90,6 +90,12 @@ public class PartnerBookingController {
 
         b.setStatus(BookingBase.BookingStatus.CANCELLED_BY_PARTNER);
 
+        if (b.getPaymentStatus() == BookingBase.PaymentStatus.SUCCESS) {
+            b.setPaymentStatus(BookingBase.PaymentStatus.REFUNDED);
+        } else if (b.getPaymentStatus() == BookingBase.PaymentStatus.PENDING) {
+            b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
+        }
+
         // --- FIX #3: set reason + cancelledAt (nếu entity có field/setter) ---
         String reason = (body == null) ? null : body.reason();
         try {
@@ -159,6 +165,12 @@ public class PartnerBookingController {
         }
 
         b.setStatus(BookingBase.BookingStatus.CANCELLED_BY_PARTNER);
+
+        if (b.getPaymentStatus() == BookingBase.PaymentStatus.SUCCESS) {
+            b.setPaymentStatus(BookingBase.PaymentStatus.REFUNDED);
+        } else if (b.getPaymentStatus() == BookingBase.PaymentStatus.PENDING) {
+            b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
+        }
 
         // --- FIX #3: set reason + cancelledAt (nếu entity có field/setter) ---
         String reason = (body == null) ? null : body.reason();

@@ -290,6 +290,99 @@ public class RestaurantBookingService {
     return new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn);
     }
 
+    private static final int FREE_CANCEL_MINUTES = 30;
+
+    @Transactional
+    public RestaurantBooking cancelRestaurantBooking(String code, Long userId, String guestSid, String reason) {
+        // fetch kèm tables để release inventory chắc chắn
+        RestaurantBooking b = repo.findWithTablesByCode(code.trim())
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        // ✅ quyền: user booking
+        if (b.getUserId() != null) {
+            if (userId == null || !userId.equals(b.getUserId()))
+                throw new IllegalStateException("Bạn không có quyền hủy booking này");
+        } else {
+            // ✅ quyền: guest booking
+            if (guestSid == null || guestSid.isBlank()
+                || b.getGuestSessionId() == null
+                || !guestSid.equals(b.getGuestSessionId()))
+                throw new IllegalStateException("Không có quyền hủy booking này");
+        }
+
+        return cancelRestaurantBookingInternal(b, reason);
+    }
+
+    @Transactional
+    public RestaurantBooking cancelRestaurantBookingByLookup(String code, String reason) {
+        RestaurantBooking b = repo.findWithTablesByCode(code.trim())
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        // lookup chỉ cho guest
+        if (b.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
+
+        return cancelRestaurantBookingInternal(b, reason);
+    }
+
+    private RestaurantBooking cancelRestaurantBookingInternal(RestaurantBooking b, String reason) {
+        // idempotent
+        if (b.getStatus() == BookingBase.BookingStatus.CANCELLED
+            || b.getStatus() == BookingBase.BookingStatus.CANCELLED_BY_GUEST
+            || b.getStatus() == BookingBase.BookingStatus.CANCELLED_BY_PARTNER
+            || b.getStatus() == BookingBase.BookingStatus.REFUNDED // legacy
+            || b.getStatus() == BookingBase.BookingStatus.COMPLETED) {
+        return b;
+        }
+
+        BookingBase.BookingStatus oldStatus = b.getStatus();
+
+        if (b.getCreatedAt() == null) throw new IllegalStateException("Booking thiếu createdAt");
+        long minutesFromCreate = Duration.between(b.getCreatedAt(), Instant.now()).toMinutes();
+
+        b.setCancelReason(reason);
+        b.setCancelledAt(Instant.now());
+
+        // rule hoàn/không hoàn (giống hotel)
+        b.setStatus(BookingBase.BookingStatus.CANCELLED_BY_GUEST);
+
+        if (minutesFromCreate <= FREE_CANCEL_MINUTES) {
+            b.setPaymentStatus(BookingBase.PaymentStatus.REFUNDED);
+        } else {
+            b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
+        }
+
+        // clear pending pay info
+        b.setPendingPaymentUrl(null);
+        b.setPendingPaymentOrderId(null);
+
+        // ✅ release inventory theo đúng client của bạn
+        if (Boolean.TRUE.equals(b.getInventoryDeducted())) {
+            var tables = (b.getTables() == null ? List.<BookingTable>of() : b.getTables()).stream()
+                .filter(x -> x != null && x.getQuantity() != null && x.getQuantity() > 0)
+                .map(x -> new TableReq(x.getTableTypeId(), x.getQuantity()))
+                .toList();
+
+            // nếu không có tables thì thôi, tránh gọi catalog vô nghĩa
+            if (!tables.isEmpty()) {
+                CatalogHoldReq releaseReq = new CatalogHoldReq(
+                    b.getRestaurantId(),
+                    b.getRestaurantSlug(),
+                    b.getReservationDate(),
+                    b.getReservationTime(),
+                    b.getDurationMinutes(),
+                    tables
+                );
+
+                // oldStatus pending/confirmed/paid đều release (vì bạn đang dùng release để nhả tồn)
+                invClient.release(releaseReq);
+            }
+
+            b.setInventoryDeducted(false);
+        }
+
+        return repo.save(b);
+    }
+
     @Scheduled(fixedDelayString = "${mravel.booking.pending-expire-check-ms:60000}")
     @Transactional
     public void autoCancelPendingRestaurantBookings() {
