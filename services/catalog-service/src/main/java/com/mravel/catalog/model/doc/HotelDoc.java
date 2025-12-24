@@ -587,6 +587,22 @@ public class HotelDoc {
 
         private Instant unlockRequestedAt;
         private String unlockRequestReason;
+
+        public String getLastActionByAdminId() {
+            return lastActionByAdminId;
+        }
+
+        public void setLastActionByAdminId(String lastActionByAdminId) {
+            this.lastActionByAdminId = lastActionByAdminId;
+        }
+
+        public Instant getLastActionAt() {
+            return lastActionAt;
+        }
+
+        public void setLastActionAt(Instant lastActionAt) {
+            this.lastActionAt = lastActionAt;
+        }
     }
 
     // =====================================================================

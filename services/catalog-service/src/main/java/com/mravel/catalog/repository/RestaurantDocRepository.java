@@ -22,15 +22,17 @@ public interface RestaurantDocRepository extends MongoRepository<RestaurantDoc, 
     Optional<RestaurantDoc> findByIdAndDeletedAtIsNull(String id);
 
     Page<RestaurantDoc> findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-        String partnerId,
-        RestaurantDoc.RestaurantStatus status,
-        Pageable pageable
-    );
+            String partnerId,
+            RestaurantDoc.RestaurantStatus status,
+            Pageable pageable);
 
     Page<RestaurantDoc> findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
-        String partnerId,
-        RestaurantDoc.RestaurantStatus status,
-        boolean active,
-        Pageable pageable
-    );
+            String partnerId,
+            RestaurantDoc.RestaurantStatus status,
+            boolean active,
+            Pageable pageable);
+
+    Optional<RestaurantDoc> findBySlugAndActiveTrueAndModeration_Status(String slug,
+            RestaurantDoc.RestaurantStatus status);
+
 }
