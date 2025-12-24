@@ -128,18 +128,19 @@ public class HotelService {
         return false;
     }
 
-    public HotelDetailDTO getBySlug(String slug) {
-        HotelDoc h = hotelRepo.findBySlugAndActiveTrueAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
-                .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+    public HotelDetailDTO getBySlug(String slug, boolean includeInactive) {
 
+        HotelDoc h = (includeInactive
+                ? hotelRepo.findBySlugAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
+                : hotelRepo.findBySlugAndActiveTrueAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
+        ).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+
+        // phần map amenity giữ nguyên như bạn đang làm...
         Set<String> codes = new HashSet<>();
-        if (h.getAmenityCodes() != null)
-            codes.addAll(h.getAmenityCodes());
+        if (h.getAmenityCodes() != null) codes.addAll(h.getAmenityCodes());
         if (h.getRoomTypes() != null) {
             for (var rt : h.getRoomTypes()) {
-                if (rt != null && rt.getAmenityCodes() != null) {
-                    codes.addAll(rt.getAmenityCodes());
-                }
+                if (rt != null && rt.getAmenityCodes() != null) codes.addAll(rt.getAmenityCodes());
             }
         }
 

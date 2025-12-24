@@ -47,11 +47,13 @@ public class RestaurantController {
      * Xem chi tiết nhà hàng theo slug.
      */
     @GetMapping("/{slug}")
-    public ResponseEntity<ApiResponse<RestaurantDetailDTO>> getRestaurantDetail(@PathVariable String slug) {
-        RestaurantDetailDTO dto = restaurantService.getBySlug(slug);
-        return ResponseEntity.ok(
-                ApiResponse.success("Lấy chi tiết nhà hàng thành công", dto));
-    }
+    public ResponseEntity<ApiResponse<RestaurantDetailDTO>> getRestaurantDetail(
+            @PathVariable String slug,
+            @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive
+    ) {
+        RestaurantDetailDTO dto = restaurantService.getBySlug(slug, includeInactive);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết nhà hàng thành công", dto));
+}
 
     @PostMapping("/{restaurantId}/amenities:attach")
     public ApiResponse<Void> attach(@PathVariable String restaurantId, @RequestBody AmenityAttachDetachRequest req) {

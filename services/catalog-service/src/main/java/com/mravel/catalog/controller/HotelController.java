@@ -53,11 +53,13 @@ public class HotelController {
      * Xem chi tiết khách sạn theo slug.
      */
     @GetMapping("/{slug}")
-    public ResponseEntity<ApiResponse<HotelDetailDTO>> getHotelDetail(@PathVariable String slug) {
-        HotelDetailDTO dto = hotelService.getBySlug(slug);
-        return ResponseEntity.ok(
-                ApiResponse.success("Lấy chi tiết khách sạn thành công", dto));
-    }
+        public ResponseEntity<ApiResponse<HotelDetailDTO>> getHotelDetail(
+                @PathVariable String slug,
+                @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive
+        ) {
+        HotelDetailDTO dto = hotelService.getBySlug(slug, includeInactive);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết khách sạn thành công", dto));
+        }
 
     @PostMapping("/{hotelId}/amenities:attach")
     public ResponseEntity<ApiResponse<Void>> attach(@PathVariable String hotelId,

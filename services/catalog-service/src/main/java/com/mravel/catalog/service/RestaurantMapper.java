@@ -70,6 +70,7 @@ public class RestaurantMapper {
                                 r.getId(),
                                 r.getName(),
                                 r.getSlug(),
+                                r.getActive(),
                                 r.getRestaurantType() == null ? null : r.getRestaurantType().name(),
 
                                 r.getDestinationSlug(),
@@ -218,6 +219,7 @@ public class RestaurantMapper {
                                 r.getId(),
                                 r.getName(),
                                 r.getSlug(),
+                                r.getActive(),
                                 r.getRestaurantType() == null ? null : r.getRestaurantType().name(),
 
                                 cuisines,

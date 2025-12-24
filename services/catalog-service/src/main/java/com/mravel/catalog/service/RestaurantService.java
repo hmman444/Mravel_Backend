@@ -102,14 +102,15 @@ public class RestaurantService {
         return new org.springframework.data.domain.PageImpl<>(dto, pageable, opened.size());
     }
 
-    public RestaurantDetailDTO getBySlug(String slug) {
-        RestaurantDoc r = restaurantRepo
-                .findBySlugAndActiveTrueAndModeration_Status(slug, RestaurantDoc.RestaurantStatus.APPROVED)
-                .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
+    public RestaurantDetailDTO getBySlug(String slug, boolean includeInactive) {
+
+        RestaurantDoc r = (includeInactive
+                ? restaurantRepo.findBySlugAndModeration_Status(slug, RestaurantDoc.RestaurantStatus.APPROVED) // ✅ bỏ active
+                : restaurantRepo.findBySlugAndActiveTrueAndModeration_Status(slug, RestaurantDoc.RestaurantStatus.APPROVED)
+        ).orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
 
         Set<String> codes = new HashSet<>();
-        if (r.getAmenityCodes() != null)
-            codes.addAll(r.getAmenityCodes());
+        if (r.getAmenityCodes() != null) codes.addAll(r.getAmenityCodes());
 
         List<AmenityCatalogDoc> catalog = codes.isEmpty()
                 ? List.of()
@@ -118,11 +119,8 @@ public class RestaurantService {
                         new ArrayList<>(codes));
 
         Map<String, AmenityCatalogDoc> catalogMap = HotelMapper.toCatalogMap(catalog);
-        // dùng lại helper map code->doc của bạn cũng được
-
         return RestaurantMapper.toDetail(r, catalogMap);
     }
-
     public void attachRestaurantAmenities(String restaurantId, List<String> codes) {
         restaurantRepo.findById(restaurantId).orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
         amenityCatalogService.validateCodes(AmenityScope.RESTAURANT, codes);

@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface RestaurantDocRepository extends MongoRepository<RestaurantDoc, String>, RestaurantDocRepositoryCustom {
 
     Optional<RestaurantDoc> findBySlugAndActiveTrue(String slug);
+    Optional<RestaurantDoc> findBySlugAndModeration_Status(String slug, RestaurantDoc.RestaurantStatus status);
 
     boolean existsBySlug(String slug);
 
