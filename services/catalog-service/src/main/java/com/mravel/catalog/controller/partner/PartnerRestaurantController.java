@@ -28,21 +28,32 @@ public class PartnerRestaurantController {
         return ResponseEntity.ok(ApiResponse.success("OK", data));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<RestaurantDoc>> getByIdForPartner(
+            @PathVariable String id,
+            @RequestParam Long partnerId
+    ) {
+        var doc = service.getByIdForPartner(id, partnerId);
+        return ResponseEntity.ok(ApiResponse.success("OK", doc));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<RestaurantDoc>> create(
-            @RequestBody @Valid PartnerCatalogDtos.UpsertWrapper<PartnerCatalogDtos.UpsertRestaurantReq> body
+        @RequestHeader(value = "Authorization", required = false) String bearer,
+        @RequestBody @Valid PartnerCatalogDtos.UpsertWrapper<PartnerCatalogDtos.UpsertRestaurantReq> body
     ) {
-        var data = service.create(body.partnerId(), body.pendingReason(), body.payload());
-        return ResponseEntity.ok(ApiResponse.success("OK", data));
+        var data = service.create(body.partnerId(), body.pendingReason(), body.payload(), bearer);
+        return ResponseEntity.ok(ApiResponse.<RestaurantDoc>success("OK", data));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<RestaurantDoc>> update(
-            @PathVariable String id,
-            @RequestBody @Valid PartnerCatalogDtos.UpsertWrapper<PartnerCatalogDtos.UpsertRestaurantReq> body
+        @RequestHeader(value = "Authorization", required = false) String bearer,
+        @PathVariable String id,
+        @RequestBody @Valid PartnerCatalogDtos.UpsertWrapper<PartnerCatalogDtos.UpsertRestaurantReq> body
     ) {
-        var data = service.update(id, body.partnerId(), body.pendingReason(), body.payload());
-        return ResponseEntity.ok(ApiResponse.success("OK", data));
+        var data = service.update(id, body.partnerId(), body.pendingReason(), body.payload(), bearer);
+        return ResponseEntity.ok(ApiResponse.<RestaurantDoc>success("OK", data));
     }
 
     @DeleteMapping("/{id}")

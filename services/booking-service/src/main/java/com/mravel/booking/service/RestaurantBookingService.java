@@ -334,8 +334,6 @@ public class RestaurantBookingService {
         return b;
         }
 
-        BookingBase.BookingStatus oldStatus = b.getStatus();
-
         if (b.getCreatedAt() == null) throw new IllegalStateException("Booking thiếu createdAt");
         long minutesFromCreate = Duration.between(b.getCreatedAt(), Instant.now()).toMinutes();
 
