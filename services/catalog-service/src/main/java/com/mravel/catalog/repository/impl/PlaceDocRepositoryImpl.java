@@ -4,6 +4,7 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
@@ -23,58 +24,76 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
 
   @Override
   public Page<PlaceDoc> searchPlaces(String qtext, Pageable pageable) {
-    Query q = new Query().with(pageable);
+    final Pageable pb = (pageable != null) ? pageable : Pageable.unpaged();
+
+    Query q = new Query().with(pb);
+
     List<Criteria> cs = new ArrayList<>();
     cs.add(where("active").is(true));
+
     // “Địa điểm” & “điểm tham quan” (POI)
-    cs.add(where("kind").in(List.of(PlaceKind.DESTINATION, PlaceKind.POI)));
-    if (has(qtext)) {
+    final List<PlaceKind> kinds = List.of(PlaceKind.DESTINATION, PlaceKind.POI);
+    cs.add(where("kind").in(Objects.requireNonNull(kinds)));
+
+    // inline check để JDT hiểu qtext non-null
+    if (qtext != null && !qtext.isBlank()) {
+      final String kw = qtext; // non-null here
+
       cs.add(new Criteria().orOperator(
-          where("name").regex(qtext, "i"),
-          where("slug").regex(qtext, "i"),
-          where("addressLine").regex(qtext, "i"),
-          where("provinceName").regex(qtext, "i"),
-          where("districtName").regex(qtext, "i"),
-          where("wardName").regex(qtext, "i")));
+          where("name").regex(kw, "i"),
+          where("slug").regex(kw, "i"),
+          where("addressLine").regex(kw, "i"),
+          where("provinceName").regex(kw, "i"),
+          where("districtName").regex(kw, "i"),
+          where("wardName").regex(kw, "i")));
     }
-    q.addCriteria(and(cs));
-    long total = mongo.count(q, PlaceDoc.class);
+
+    q.addCriteria(Objects.requireNonNull(and(cs)));
+
+    // count phải bỏ limit/skip (giữ logic đúng paging total)
+    long total = mongo.count(Query.of(q).limit(-1).skip(-1), PlaceDoc.class);
     List<PlaceDoc> data = mongo.find(q, PlaceDoc.class);
-    return new PageImpl<>(data, pageable, total);
-  }
-
-  // ===== helpers =====
-  private static boolean has(String s) {
-    return s != null && !s.isBlank();
-  }
-
-  private static Criteria and(List<Criteria> cs) {
-    return new Criteria().andOperator(cs.toArray(new Criteria[0]));
+    return new PageImpl<>(data, pb, total);
   }
 
   @Override
   public Page<PlaceDoc> findChildrenByParentSlug(String parentSlug, PlaceKind kind, Pageable pageable) {
-    Query q = new Query().with(pageable);
-    List<Criteria> cs = new ArrayList<>();
-    cs.add(where("active").is(true));
-    if (kind != null)
-      cs.add(where("kind").is(kind)); // POI mặc định
-    cs.add(where("parentSlug").is(parentSlug)); // ràng theo destination
-    q.addCriteria(new Criteria().andOperator(cs.toArray(new Criteria[0])));
+    final Pageable pb = (pageable != null) ? pageable : Pageable.unpaged();
 
-    long total = mongo.count(q, PlaceDoc.class);
+    Query q = new Query().with(pb);
+    List<Criteria> cs = new ArrayList<>();
+
+    cs.add(where("active").is(true));
+    if (kind != null) cs.add(where("kind").is(kind)); // POI mặc định
+    cs.add(where("parentSlug").is(parentSlug)); // ràng theo destination
+
+    final Criteria[] arr = cs.toArray(Criteria[]::new);
+    Objects.requireNonNull(arr);
+
+    q.addCriteria(new Criteria().andOperator(arr));
+
+    long total = mongo.count(Query.of(q).limit(-1).skip(-1), PlaceDoc.class);
     List<PlaceDoc> data = mongo.find(q, PlaceDoc.class);
-    return new PageImpl<>(data, pageable, total);
+    return new PageImpl<>(data, pb, total);
   }
 
   @Override
   public Page<PlaceDoc> findChildrenByParentSlugIncludeInactive(String parentSlug, PlaceKind kind, Pageable pageable) {
+    final Pageable pb = (pageable != null) ? pageable : Pageable.unpaged();
+
     Query q = new Query()
         .addCriteria(Criteria.where("parentSlug").is(parentSlug))
         .addCriteria(Criteria.where("kind").is(kind))
-        .with(pageable);
+        .with(pb);
 
     long total = mongo.count(Query.of(q).limit(-1).skip(-1), PlaceDoc.class);
-    return new PageImpl<>(mongo.find(q, PlaceDoc.class), pageable, total);
+    return new PageImpl<>(mongo.find(q, PlaceDoc.class), pb, total);
+  }
+
+  // ===== helpers =====
+  private static Criteria and(List<Criteria> cs) {
+    final Criteria[] arr = cs.toArray(Criteria[]::new);
+    Objects.requireNonNull(arr, "criteria array must not be null");
+    return new Criteria().andOperator(arr);
   }
 }
