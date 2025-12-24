@@ -1,5 +1,6 @@
 package com.mravel.catalog.repository;
 
+import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

@@ -5,8 +5,6 @@ import com.mravel.catalog.repository.HotelDocRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-
 @Service
 @RequiredArgsConstructor
 public class AdminHotelModerationService {
@@ -28,6 +26,11 @@ public class AdminHotelModerationService {
 
         touchAdmin(doc, adminId);
         return repo.save(doc);
+    }
+
+    public HotelDoc getByIdForAdmin(String id) {
+        return repo.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
     }
 
     public HotelDoc reject(String id, Long adminId, String reason) {

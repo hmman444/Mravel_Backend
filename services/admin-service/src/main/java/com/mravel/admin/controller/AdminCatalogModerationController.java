@@ -34,6 +34,13 @@ public class AdminCatalogModerationController {
                 extractToken(request));
     }
 
+    @GetMapping("/hotels/{id}")
+    public ResponseEntity<ApiResponse<?>> getHotelDetail(
+            @PathVariable String id,
+            HttpServletRequest request) {
+        return catalogClient.adminGetHotelDetail(id, extractToken(request));
+    }
+
     @GetMapping("/restaurants")
     public ResponseEntity<ApiResponse<?>> listRestaurants(
             @RequestParam(required = false) String status,

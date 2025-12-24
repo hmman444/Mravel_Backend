@@ -649,6 +649,8 @@ public class RestaurantDoc {
         private Instant unlockRequestedAt;
         private String unlockRequestReason;
 
+        private String pendingReason;
+
         public String getLastActionByAdminId() {
             return lastActionByAdminId;
         }

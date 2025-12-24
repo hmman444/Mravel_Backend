@@ -34,6 +34,12 @@ public class AdminHotelController {
         return ResponseEntity.ok(ApiResponse.success("OK", data));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<HotelDoc>> getDetail(@PathVariable String id) {
+        var doc = moderationService.getByIdForAdmin(id);
+        return ResponseEntity.ok(ApiResponse.success("OK", doc));
+    }
+
     @PostMapping("/{id}:approve")
     public ResponseEntity<ApiResponse<HotelDoc>> approve(
             @PathVariable String id,

@@ -142,6 +142,14 @@ public class CatalogClient {
         return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
     }
 
+    public ResponseEntity<ApiResponse<?>> adminGetHotelDetail(String id, String bearerToken) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + "/api/catalog/admin/hotels/" + id)
+                .toUriString();
+
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+    }
+
     public ResponseEntity<ApiResponse<?>> adminApproveHotel(String id, Long adminId, String bearerToken) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(requireBaseUrl() + "/api/catalog/admin/hotels/" + id + ":approve")

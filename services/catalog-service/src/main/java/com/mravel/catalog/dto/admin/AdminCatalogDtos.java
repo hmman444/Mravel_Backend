@@ -15,6 +15,7 @@ public class AdminCatalogDtos {
 
             String partnerId,
             String partnerName,
+            String partnerEmail,
             Instant partnerLastUpdatedAt,
 
             String moderationStatus,

@@ -120,6 +120,7 @@ public class AdminCatalogQueryService {
 
                 pub != null ? pub.getPartnerId() : null,
                 pub != null ? pub.getPartnerName() : null,
+                pub != null ? pub.getPartnerEmail() : null,
                 pub != null ? pub.getLastUpdatedAt() : null,
 
                 mod != null && mod.getStatus() != null ? mod.getStatus().name() : null,
@@ -146,6 +147,7 @@ public class AdminCatalogQueryService {
 
                 pub != null ? pub.getPartnerId() : null,
                 pub != null ? pub.getPartnerName() : null,
+                pub != null ? pub.getPartnerEmail() : null,
                 pub != null ? pub.getLastUpdatedAt() : null,
 
                 mod != null && mod.getStatus() != null ? mod.getStatus().name() : null,
