@@ -640,6 +640,8 @@ public class RestaurantDoc {
 
         private Instant unlockRequestedAt;
         private String unlockRequestReason;
+
+        private String pendingReason;
     }
 
     // =====================================================================
