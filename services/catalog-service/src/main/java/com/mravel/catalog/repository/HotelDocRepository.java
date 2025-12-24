@@ -15,8 +15,10 @@ public interface HotelDocRepository extends MongoRepository<HotelDoc, String>, H
     Optional<HotelDoc> findBySlugAndActiveTrue(String slug);
 
     boolean existsBySlug(String slug);
+    boolean existsBySlugAndIdNot(String slug, String id);
 
     Page<HotelDoc> findByPublisher_PartnerIdAndDeletedAtIsNull(String partnerId, Pageable pageable);
+    Optional<HotelDoc> findBySlugAndActiveTrueAndModeration_Status(String slug, HotelDoc.HotelStatus status);
 
     Optional<HotelDoc> findByIdAndDeletedAtIsNull(String id);
 

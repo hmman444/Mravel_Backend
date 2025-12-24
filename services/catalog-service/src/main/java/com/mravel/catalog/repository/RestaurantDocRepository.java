@@ -33,4 +33,5 @@ public interface RestaurantDocRepository extends MongoRepository<RestaurantDoc, 
         boolean active,
         Pageable pageable
     );
+    Optional<RestaurantDoc> findBySlugAndActiveTrueAndModeration_Status(String slug, RestaurantDoc.RestaurantStatus status);
 }

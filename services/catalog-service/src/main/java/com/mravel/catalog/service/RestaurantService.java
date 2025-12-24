@@ -101,8 +101,9 @@ public class RestaurantService {
     }
 
     public RestaurantDetailDTO getBySlug(String slug) {
-        RestaurantDoc r = restaurantRepo.findBySlugAndActiveTrue(slug)
-                .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
+        RestaurantDoc r = restaurantRepo
+            .findBySlugAndActiveTrueAndModeration_Status(slug, RestaurantDoc.RestaurantStatus.APPROVED)
+            .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
 
         Set<String> codes = new HashSet<>();
         if (r.getAmenityCodes() != null)

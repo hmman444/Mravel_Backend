@@ -28,20 +28,31 @@ public class PartnerHotelController {
         return ResponseEntity.ok(ApiResponse.success("OK", data));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<HotelDoc>> getByIdForPartner(
+            @PathVariable String id,
+            @RequestParam Long partnerId
+    ) {
+        var doc = service.getByIdForPartner(id, partnerId);
+        return ResponseEntity.ok(ApiResponse.success("OK", doc));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<HotelDoc>> create(
+            @RequestHeader(value="Authorization", required=false) String bearer,
             @RequestBody @Valid PartnerCatalogDtos.UpsertWrapper<PartnerCatalogDtos.UpsertHotelReq> body
     ) {
-        var data = service.create(body.partnerId(), body.pendingReason(), body.payload());
+        var data = service.create(body.partnerId(), body.pendingReason(), body.payload(), bearer);
         return ResponseEntity.ok(ApiResponse.success("OK", data));
     }
 
-    @PutMapping("/{id}")
+   @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<HotelDoc>> update(
+            @RequestHeader(value="Authorization", required=false) String bearer,
             @PathVariable String id,
             @RequestBody @Valid PartnerCatalogDtos.UpsertWrapper<PartnerCatalogDtos.UpsertHotelReq> body
     ) {
-        var data = service.update(id, body.partnerId(), body.pendingReason(), body.payload());
+        var data = service.update(id, body.partnerId(), body.pendingReason(), body.payload(), bearer);
         return ResponseEntity.ok(ApiResponse.success("OK", data));
     }
 

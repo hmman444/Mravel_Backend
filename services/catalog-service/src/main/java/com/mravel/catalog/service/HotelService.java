@@ -128,8 +128,9 @@ public class HotelService {
     }
 
     public HotelDetailDTO getBySlug(String slug) {
-        HotelDoc h = hotelRepo.findBySlugAndActiveTrue(slug)
-                .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+        HotelDoc h = hotelRepo
+            .findBySlugAndActiveTrueAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
+            .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
 
         Set<String> codes = new HashSet<>();
         if (h.getAmenityCodes() != null)
