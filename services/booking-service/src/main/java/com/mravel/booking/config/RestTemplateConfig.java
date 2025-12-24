@@ -1,6 +1,6 @@
 package com.mravel.booking.config;
 
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.ByteArrayInputStream;
@@ -24,7 +25,9 @@ public class RestTemplateConfig {
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
 
-        CloseableHttpClient httpClient = HttpClients.createDefault();
+        // giữ nguyên logic: Apache HC5 + Buffering để log request/response body
+        HttpClient httpClient = HttpClients.createDefault();
+
         HttpComponentsClientHttpRequestFactory baseFactory =
                 new HttpComponentsClientHttpRequestFactory(httpClient);
 
@@ -56,14 +59,41 @@ public class RestTemplateConfig {
 
         ClientHttpResponseWrapper(ClientHttpResponse delegate, byte[] body) {
             this.delegate = delegate;
-            this.body = body;
+            this.body = (body == null) ? new byte[0] : body;
         }
 
-        @Override public InputStream getBody() { return new ByteArrayInputStream(body); }
-        @Override public HttpStatusCode getStatusCode() throws IOException { return delegate.getStatusCode(); }
-        @Override public int getRawStatusCode() throws IOException { return delegate.getRawStatusCode(); }
-        @Override public String getStatusText() throws IOException { return delegate.getStatusText(); }
-        @Override public void close() { delegate.close(); }
-        @Override public HttpHeaders getHeaders() { return delegate.getHeaders(); }
+        @Override
+        public @NonNull InputStream getBody() {
+            return new ByteArrayInputStream(body);
+        }
+
+        @Override
+        public @NonNull HttpStatusCode getStatusCode() throws IOException {
+            return delegate.getStatusCode();
+        }
+
+        /**
+         * getRawStatusCode() bị deprecated từ Spring 6.
+         * Giữ behaviour tương đương: trả về mã số của status hiện tại.
+         */
+        @Override
+        public int getRawStatusCode() throws IOException {
+            return getStatusCode().value();
+        }
+
+        @Override
+        public @NonNull String getStatusText() throws IOException {
+            return delegate.getStatusText();
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+
+        @Override
+        public @NonNull HttpHeaders getHeaders() {
+            return delegate.getHeaders();
+        }
     }
 }

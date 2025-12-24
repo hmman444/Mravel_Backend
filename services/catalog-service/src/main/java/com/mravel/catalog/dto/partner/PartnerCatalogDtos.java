@@ -2,6 +2,7 @@ package com.mravel.catalog.dto.partner;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -205,35 +206,38 @@ public class PartnerCatalogDtos {
 
     // ========================= RESTAURANT =========================
     public record UpsertRestaurantReq(
-            @NotBlank String name,
-            String slug,
+        @NotBlank String name,
+        String slug,
 
-            // location/link
-            String destinationSlug,
-            String provinceName,
-            String districtName,
-            String wardName,
-            String addressLine,
-            Double latitude,
-            Double longitude,
+        // location/link
+        String destinationSlug,
 
-            // basic
-            String shortDescription,
-            String description,
-            String phone,
-            String email,
-            String website,
+        // ✅ thống nhất cityName, nhưng vẫn nhận provinceName nếu client cũ gửi lên
+        @JsonAlias({"provinceName"})
+        String cityName,
 
-            BigDecimal minPrice,
-            BigDecimal maxPrice,
+        String districtName,
+        String wardName,
+        String addressLine,
+        Double latitude,
+        Double longitude,
 
-            List<ImageReq> images,
+        // basic
+        String shortDescription,
+        String description,
+        String phone,
+        String email,
+        String website,
 
-            // NEW
-            List<String> amenityCodes,
-            List<UpsertTableTypeReq> tableTypes,
-            UpsertRestaurantBookingConfigReq bookingConfig
-    ) {}
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+
+        List<ImageReq> images,
+
+        List<String> amenityCodes,
+        List<UpsertTableTypeReq> tableTypes,
+        UpsertRestaurantBookingConfigReq bookingConfig
+) {}
 
     public record UpsertTableTypeReq(
             String id,

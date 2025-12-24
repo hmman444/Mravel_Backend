@@ -15,6 +15,8 @@ public interface RestaurantDocRepository extends MongoRepository<RestaurantDoc, 
 
     boolean existsBySlug(String slug);
 
+    boolean existsBySlugAndIdNot(String slug, String id);
+
     Optional<RestaurantDoc> findBySlug(String slug);
 
     Page<RestaurantDoc> findByPublisher_PartnerIdAndDeletedAtIsNull(String partnerId, Pageable pageable);

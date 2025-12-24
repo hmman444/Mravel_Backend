@@ -5,6 +5,7 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
@@ -42,8 +43,10 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
         cs.add(where("moderation.status").is(HotelStatus.APPROVED));
 
         // ----- location -----
-        if (has(location)) {
-            String loc = location.trim();
+        // inline check để JDT hiểu chắc chắn non-null (thay vì has())
+        if (location != null && !location.isBlank()) {
+            final String loc = location.trim();
+
             cs.add(new Criteria().orOperator(
                     where("destinationSlug").is(loc),
                     where("cityName").regex(loc, "i"),
@@ -55,9 +58,8 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
 
         // ----- capacity theo roomTypes -----
         if (minGuestsPerRoom != null || requiredRooms != null) {
-            Criteria roomCrit = new Criteria();
-
             List<Criteria> roomConditions = new ArrayList<>();
+
             if (minGuestsPerRoom != null) {
                 roomConditions.add(where("maxGuests").gte(minGuestsPerRoom));
             }
@@ -66,7 +68,12 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
             }
 
             if (!roomConditions.isEmpty()) {
-                roomCrit = new Criteria().andOperator(roomConditions.toArray(new Criteria[0]));
+                final Criteria[] rc = roomConditions.toArray(Criteria[]::new);
+                Objects.requireNonNull(rc, "criteria array must not be null");
+
+                final Criteria roomCrit = new Criteria().andOperator(rc);
+                Objects.requireNonNull(roomCrit, "roomCrit must not be null");
+
                 cs.add(where("roomTypes").elemMatch(roomCrit));
             }
         }
@@ -85,11 +92,9 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
 
     // ===== helpers =====
 
-    private static boolean has(String s) {
-        return s != null && !s.isBlank();
-    }
-
     private static Criteria and(List<Criteria> cs) {
-        return new Criteria().andOperator(cs.toArray(new Criteria[0]));
+        final Criteria[] arr = cs.toArray(Criteria[]::new);
+        Objects.requireNonNull(arr, "criteria array must not be null");
+        return new Criteria().andOperator(arr);
     }
 }

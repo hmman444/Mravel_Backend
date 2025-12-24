@@ -147,6 +147,14 @@ public class CatalogPartnerClient {
         return s;
     }
 
+    public ResponseEntity<ApiResponse<?>> getRestaurantByIdForPartner(String id, Long partnerId, String bearer) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(baseUrl + "/api/catalog/partners/restaurants/" + id)
+                .queryParam("partnerId", partnerId)
+                .toUriString();
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearer);
+    }
+
     // Wrapper giúp catalog-service phân biệt pending do tạo mới hay update
     public record CatalogUpsertWrapper<T>(Long partnerId, PartnerDtos.PendingReason pendingReason, T payload) {}
     public record UnlockWrapper(Long partnerId, String reason) {}
