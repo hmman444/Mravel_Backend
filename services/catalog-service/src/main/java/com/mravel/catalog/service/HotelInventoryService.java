@@ -26,87 +26,87 @@ public class HotelInventoryService {
      */
     public record RoomRequest(
             String roomTypeId,
-            int quantity
-    ) {}
-
-    // =====================================================================
-    //                      HELPER: LOAD TOTAL ROOMS CƠ BẢN
-    // =====================================================================
+            int quantity) {
+    }
 
     public AvailabilityResponse getAvailability(
-        String hotelId,
-        String hotelSlug,
-        String roomTypeId,
-        LocalDate checkInDate,
-        LocalDate checkOutDate,
-        int requestedRooms
-) {
-    if (requestedRooms <= 0) requestedRooms = 1;
-    if (checkInDate == null || checkOutDate == null) {
-        return new AvailabilityResponse(0, requestedRooms, false);
-    }
-
-    // chuẩn hoá nights: [checkIn, checkOut)
-    LocalDate start = checkInDate;
-    LocalDate end = checkOutDate.minusDays(1);
-    if (end.isBefore(start)) end = start;
-
-    // resolve hotelId nếu chỉ có slug
-    String resolvedHotelId = hotelId;
-    if ((resolvedHotelId == null || resolvedHotelId.isBlank())
-            && hotelSlug != null && !hotelSlug.isBlank()) {
-        resolvedHotelId = hotelRepo.findBySlugAndActiveTrue(hotelSlug)
-                .map(HotelDoc::getId)
-                .orElse(null);
-    }
-
-    if (resolvedHotelId == null || resolvedHotelId.isBlank()) {
-        // không biết hotelId thì không fallback totalRooms được
-        // (trừ khi bạn muốn query theo slug + tự set totalRooms)
-        List<RoomInventoryDoc> nights = inventoryRepo
-                .findByHotelSlugAndRoomTypeIdAndDateBetween(hotelSlug, roomTypeId, start, end);
-
-        if (nights == null || nights.isEmpty()) {
+            String hotelId,
+            String hotelSlug,
+            String roomTypeId,
+            LocalDate checkInDate,
+            LocalDate checkOutDate,
+            int requestedRooms) {
+        if (requestedRooms <= 0)
+            requestedRooms = 1;
+        if (checkInDate == null || checkOutDate == null) {
             return new AvailabilityResponse(0, requestedRooms, false);
         }
 
-        int minRemaining = nights.stream()
-                .mapToInt(RoomInventoryDoc::getRemainingRooms)
-                .min().orElse(0);
+        // chuẩn hoá nights: [checkIn, checkOut)
+        LocalDate start = checkInDate;
+        LocalDate end = checkOutDate.minusDays(1);
+        if (end.isBefore(start))
+            end = start;
+
+        // resolve hotelId nếu chỉ có slug
+        String resolvedHotelId = hotelId;
+        if ((resolvedHotelId == null || resolvedHotelId.isBlank())
+                && hotelSlug != null && !hotelSlug.isBlank()) {
+            resolvedHotelId = hotelRepo.findBySlugAndActiveTrue(hotelSlug)
+                    .map(HotelDoc::getId)
+                    .orElse(null);
+        }
+
+        if (resolvedHotelId == null || resolvedHotelId.isBlank()) {
+            // không biết hotelId thì không fallback totalRooms được
+            // (trừ khi bạn muốn query theo slug + tự set totalRooms)
+            List<RoomInventoryDoc> nights = inventoryRepo
+                    .findByHotelSlugAndRoomTypeIdAndDateBetween(hotelSlug, roomTypeId, start, end);
+
+            if (nights == null || nights.isEmpty()) {
+                return new AvailabilityResponse(0, requestedRooms, false);
+            }
+
+            int minRemaining = nights.stream()
+                    .mapToInt(RoomInventoryDoc::getRemainingRooms)
+                    .min().orElse(0);
+
+            return new AvailabilityResponse(minRemaining, requestedRooms, minRemaining >= requestedRooms);
+        }
+
+        // base totalRooms từ HotelDoc (fallback khi thiếu inventory doc)
+        int baseTotal = loadBaseTotalRooms(resolvedHotelId, List.of(roomTypeId))
+                .getOrDefault(roomTypeId, 0);
+
+        List<RoomInventoryDoc> nights = inventoryRepo
+                .findByHotelIdAndRoomTypeIdAndDateBetween(resolvedHotelId, roomTypeId, start, end);
+
+        Map<LocalDate, RoomInventoryDoc> byDate = (nights == null ? List.<RoomInventoryDoc>of() : nights)
+                .stream().collect(Collectors.toMap(RoomInventoryDoc::getDate, x -> x));
+
+        int minRemaining = Integer.MAX_VALUE;
+
+        LocalDate d = start;
+        while (!d.isAfter(end)) {
+            RoomInventoryDoc inv = byDate.get(d);
+
+            int total = (inv != null && inv.getTotalRooms() != null) ? inv.getTotalRooms() : baseTotal;
+            int booked = (inv != null && inv.getBookedRooms() != null) ? inv.getBookedRooms() : 0;
+            int held = (inv != null && inv.getHeldRooms() != null) ? inv.getHeldRooms() : 0;
+
+            int remaining = total - booked - held;
+            if (remaining < minRemaining)
+                minRemaining = remaining;
+
+            d = d.plusDays(1);
+        }
+
+        if (minRemaining == Integer.MAX_VALUE)
+            minRemaining = 0;
 
         return new AvailabilityResponse(minRemaining, requestedRooms, minRemaining >= requestedRooms);
     }
 
-    // base totalRooms từ HotelDoc (fallback khi thiếu inventory doc)
-    int baseTotal = loadBaseTotalRooms(resolvedHotelId, List.of(roomTypeId))
-            .getOrDefault(roomTypeId, 0);
-
-    List<RoomInventoryDoc> nights = inventoryRepo
-            .findByHotelIdAndRoomTypeIdAndDateBetween(resolvedHotelId, roomTypeId, start, end);
-
-    Map<LocalDate, RoomInventoryDoc> byDate = (nights == null ? List.<RoomInventoryDoc>of() : nights)
-            .stream().collect(Collectors.toMap(RoomInventoryDoc::getDate, x -> x));
-
-    int minRemaining = Integer.MAX_VALUE;
-
-    LocalDate d = start;
-    while (!d.isAfter(end)) {
-        RoomInventoryDoc inv = byDate.get(d);
-
-        int total = (inv != null && inv.getTotalRooms() != null) ? inv.getTotalRooms() : baseTotal;
-        int booked = (inv != null && inv.getBookedRooms() != null) ? inv.getBookedRooms() : 0;
-        int held = (inv != null && inv.getHeldRooms() != null) ? inv.getHeldRooms() : 0;
-
-        int remaining = total - booked - held;
-        if (remaining < minRemaining) minRemaining = remaining;
-
-        d = d.plusDays(1);
-    }
-
-    if (minRemaining == Integer.MAX_VALUE) minRemaining = 0;
-
-    return new AvailabilityResponse(minRemaining, requestedRooms, minRemaining >= requestedRooms);
-}
     /**
      * Load thông tin tổng số ph
      * òng của từng roomType từ HotelDoc.
@@ -114,15 +114,15 @@ public class HotelInventoryService {
      */
     private Map<String, Integer> loadBaseTotalRooms(
             String hotelId,
-            Collection<String> roomTypeIds
-    ) {
+            Collection<String> roomTypeIds) {
         HotelDoc hotel = hotelRepo.findById(hotelId)
                 .orElseThrow(() -> new IllegalArgumentException("Hotel không tồn tại: " + hotelId));
 
         Map<String, Integer> base = new HashMap<>();
         if (hotel.getRoomTypes() != null) {
             for (HotelDoc.RoomType rt : hotel.getRoomTypes()) {
-                if (rt == null || rt.getId() == null) continue;
+                if (rt == null || rt.getId() == null)
+                    continue;
                 if (roomTypeIds.contains(rt.getId())) {
                     int total = rt.getTotalRooms() != null ? rt.getTotalRooms() : 0;
                     base.put(rt.getId(), total);
@@ -139,7 +139,7 @@ public class HotelInventoryService {
     }
 
     // =====================================================================
-    //                      CHECK AVAILABILITY (KHÔNG TRỪ)
+    // CHECK AVAILABILITY (KHÔNG TRỪ)
     // =====================================================================
 
     /**
@@ -147,16 +147,15 @@ public class HotelInventoryService {
      * Nếu thiếu phòng => throw IllegalStateException.
      *
      * Logic:
-     *  - Nếu có RoomInventoryDoc.totalRooms != null -> dùng giá trị đó.
-     *  - Nếu KHÔNG có doc -> fallback sang RoomType.totalRooms từ HotelDoc.
+     * - Nếu có RoomInventoryDoc.totalRooms != null -> dùng giá trị đó.
+     * - Nếu KHÔNG có doc -> fallback sang RoomType.totalRooms từ HotelDoc.
      */
     @Transactional(readOnly = true)
     public void assertAvailability(
             String hotelId,
             LocalDate checkIn,
             LocalDate checkOut,
-            List<RoomRequest> requestedRooms
-    ) {
+            List<RoomRequest> requestedRooms) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Ngày check-in/check-out không hợp lệ");
         }
@@ -184,8 +183,7 @@ public class HotelInventoryService {
         Map<String, RoomInventoryDoc> invMap = inventories.stream()
                 .collect(Collectors.toMap(
                         inv -> inv.getRoomTypeId() + "|" + inv.getDate(),
-                        inv -> inv
-                ));
+                        inv -> inv));
 
         LocalDate d = checkIn;
         while (d.isBefore(checkOut)) {
@@ -207,8 +205,7 @@ public class HotelInventoryService {
                 if (remaining < req.quantity()) {
                     throw new IllegalStateException(
                             "Hết phòng cho loại phòng " + roomTypeId +
-                                    " vào đêm " + date + ". Còn tối đa: " + remaining
-                    );
+                                    " vào đêm " + date + ". Còn tối đa: " + remaining);
                 }
             }
 
@@ -217,7 +214,7 @@ public class HotelInventoryService {
     }
 
     // =====================================================================
-    //                    CHECK + TRỪ TỒN KHO (CONFIRM)
+    // CHECK + TRỪ TỒN KHO (CONFIRM)
     // =====================================================================
 
     /**
@@ -230,8 +227,7 @@ public class HotelInventoryService {
             String hotelSlug,
             LocalDate checkIn,
             LocalDate checkOut,
-            List<RoomRequest> requestedRooms
-    ) {
+            List<RoomRequest> requestedRooms) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Ngày check-in/check-out không hợp lệ");
         }
@@ -262,7 +258,8 @@ public class HotelInventoryService {
             for (RoomRequest req : requestedRooms) {
                 String roomTypeId = req.roomTypeId();
                 int quantity = req.quantity();
-                if (quantity <= 0) continue;
+                if (quantity <= 0)
+                    continue;
 
                 int baseTotal = baseTotals.getOrDefault(roomTypeId, 0);
 
@@ -276,8 +273,7 @@ public class HotelInventoryService {
                                 .date(date)
                                 .totalRooms(baseTotal)
                                 .bookedRooms(0)
-                                .build()
-                        );
+                                .build());
 
                 // Nếu totalRooms chưa set, gán = baseTotal
                 if (inv.getTotalRooms() == null) {
@@ -291,8 +287,7 @@ public class HotelInventoryService {
                 if (remaining < quantity) {
                     throw new IllegalStateException(
                             "Không thể trừ tồn kho. Hết phòng cho loại phòng "
-                                    + roomTypeId + " đêm " + date + ". Còn: " + remaining
-                    );
+                                    + roomTypeId + " đêm " + date + ". Còn: " + remaining);
                 }
 
                 inv.increaseBooked(quantity);
@@ -304,7 +299,7 @@ public class HotelInventoryService {
     }
 
     // =====================================================================
-    //                    ROLLBACK TỒN KHO KHI HỦY BOOKING
+    // ROLLBACK TỒN KHO KHI HỦY BOOKING
     // =====================================================================
 
     /**
@@ -316,8 +311,7 @@ public class HotelInventoryService {
             String hotelId,
             LocalDate checkIn,
             LocalDate checkOut,
-            List<RoomRequest> requestedRooms
-    ) {
+            List<RoomRequest> requestedRooms) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Ngày check-in/check-out không hợp lệ");
         }
@@ -340,14 +334,12 @@ public class HotelInventoryService {
         List<RoomInventoryDoc> exist = inventoryRepo
                 .findByHotelIdAndRoomTypeIdInAndDateBetween(
                         hotelId, roomTypeIds,
-                        checkIn, checkOut.minusDays(1)
-                );
+                        checkIn, checkOut.minusDays(1));
 
         Map<String, RoomInventoryDoc> invMap = exist.stream()
                 .collect(Collectors.toMap(
                         inv -> inv.getRoomTypeId() + "|" + inv.getDate(),
-                        inv -> inv
-                ));
+                        inv -> inv));
 
         List<RoomInventoryDoc> toSave = new ArrayList<>();
 
@@ -355,7 +347,8 @@ public class HotelInventoryService {
             for (RoomRequest req : requestedRooms) {
                 String key = req.roomTypeId() + "|" + date;
                 RoomInventoryDoc inv = invMap.get(key);
-                if (inv == null) continue; // chưa từng deduct => bỏ qua
+                if (inv == null)
+                    continue; // chưa từng deduct => bỏ qua
                 inv.decreaseBooked(req.quantity());
                 toSave.add(inv);
             }
@@ -367,7 +360,7 @@ public class HotelInventoryService {
     }
 
     // =====================================================================
-    //                    HOLD TỒN KHO (PENDING PAYMENT)
+    // HOLD TỒN KHO (PENDING PAYMENT)
     // =====================================================================
 
     @Transactional
@@ -376,8 +369,7 @@ public class HotelInventoryService {
             String hotelSlug,
             LocalDate checkIn,
             LocalDate checkOut,
-            List<RoomRequest> requestedRooms
-    ) {
+            List<RoomRequest> requestedRooms) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Ngày check-in/check-out không hợp lệ");
         }
@@ -406,7 +398,8 @@ public class HotelInventoryService {
             for (RoomRequest req : requestedRooms) {
                 String roomTypeId = req.roomTypeId();
                 int quantity = req.quantity();
-                if (quantity <= 0) continue;
+                if (quantity <= 0)
+                    continue;
 
                 int baseTotal = baseTotals.getOrDefault(roomTypeId, 0);
 
@@ -420,12 +413,14 @@ public class HotelInventoryService {
                                 .totalRooms(baseTotal)
                                 .bookedRooms(0)
                                 .heldRooms(0)
-                                .build()
-                        );
+                                .build());
 
-                if (inv.getTotalRooms() == null) inv.setTotalRooms(baseTotal);
-                if (inv.getBookedRooms() == null) inv.setBookedRooms(0);
-                if (inv.getHeldRooms() == null) inv.setHeldRooms(0);
+                if (inv.getTotalRooms() == null)
+                    inv.setTotalRooms(baseTotal);
+                if (inv.getBookedRooms() == null)
+                    inv.setBookedRooms(0);
+                if (inv.getHeldRooms() == null)
+                    inv.setHeldRooms(0);
 
                 int total = inv.getTotalRooms();
                 int booked = inv.getBookedRooms();
@@ -435,8 +430,7 @@ public class HotelInventoryService {
                 if (remaining < quantity) {
                     throw new IllegalStateException(
                             "Không thể HOLD. Hết phòng loại " + roomTypeId +
-                                    " đêm " + date + ". Còn: " + remaining
-                    );
+                                    " đêm " + date + ". Còn: " + remaining);
                 }
 
                 inv.increaseHeld(quantity);
@@ -448,7 +442,7 @@ public class HotelInventoryService {
     }
 
     // =====================================================================
-    //                 COMMIT SAU KHI THANH TOÁN (HELD -> BOOKED)
+    // COMMIT SAU KHI THANH TOÁN (HELD -> BOOKED)
     // =====================================================================
 
     @Transactional
@@ -457,8 +451,7 @@ public class HotelInventoryService {
             String hotelSlug,
             LocalDate checkIn,
             LocalDate checkOut,
-            List<RoomRequest> requestedRooms
-    ) {
+            List<RoomRequest> requestedRooms) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Ngày check-in/check-out không hợp lệ");
         }
@@ -479,18 +472,20 @@ public class HotelInventoryService {
         for (LocalDate date : dates) {
             for (RoomRequest req : requestedRooms) {
                 int qty = req.quantity();
-                if (qty <= 0) continue;
+                if (qty <= 0)
+                    continue;
 
                 RoomInventoryDoc inv = inventoryRepo
                         .findByHotelIdAndRoomTypeIdAndDate(hotelId, req.roomTypeId(), date)
                         .orElseThrow(() -> new IllegalStateException(
                                 "Không tìm thấy inventory để COMMIT: "
                                         + req.roomTypeId() + "|" + date
-                                        + " (hotelId=" + hotelId + ")"
-                        ));
+                                        + " (hotelId=" + hotelId + ")"));
 
-                if (inv.getHeldRooms() == null) inv.setHeldRooms(0);
-                if (inv.getBookedRooms() == null) inv.setBookedRooms(0);
+                if (inv.getHeldRooms() == null)
+                    inv.setHeldRooms(0);
+                if (inv.getBookedRooms() == null)
+                    inv.setBookedRooms(0);
 
                 inv.commitHeldToBooked(qty);
                 toSave.add(inv);
@@ -501,7 +496,7 @@ public class HotelInventoryService {
     }
 
     // =====================================================================
-    //                RELEASE HOLD KHI CANCEL PENDING / AUTO CANCEL
+    // RELEASE HOLD KHI CANCEL PENDING / AUTO CANCEL
     // =====================================================================
 
     @Transactional
@@ -509,8 +504,7 @@ public class HotelInventoryService {
             String hotelId,
             LocalDate checkIn,
             LocalDate checkOut,
-            List<RoomRequest> requestedRooms
-    ) {
+            List<RoomRequest> requestedRooms) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Ngày check-in/check-out không hợp lệ");
         }
@@ -530,13 +524,15 @@ public class HotelInventoryService {
         for (LocalDate date : dates) {
             for (RoomRequest req : requestedRooms) {
                 int qty = req.quantity();
-                if (qty <= 0) continue;
+                if (qty <= 0)
+                    continue;
 
                 RoomInventoryDoc inv = inventoryRepo
                         .findByHotelIdAndRoomTypeIdAndDate(hotelId, req.roomTypeId(), date)
                         .orElse(null);
 
-                if (inv == null) continue;
+                if (inv == null)
+                    continue;
 
                 inv.decreaseHeld(qty);
                 toSave.add(inv);

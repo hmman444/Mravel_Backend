@@ -23,16 +23,10 @@ import lombok.Setter;
 
 @Document(collection = "restaurants")
 @CompoundIndexes({
-    // Tìm theo destination + active
-    @CompoundIndex(
-        name = "restaurant_active_destination_idx",
-        def = "{'active':1,'destinationSlug':1}"
-    ),
-    // Search theo price bucket & rating
-    @CompoundIndex(
-        name = "restaurant_price_rating_idx",
-        def = "{'active':1,'priceBucket':1,'avgRating':-1}"
-    )
+        // Tìm theo destination + active
+        @CompoundIndex(name = "restaurant_active_destination_idx", def = "{'active':1,'destinationSlug':1}"),
+        // Search theo price bucket & rating
+        @CompoundIndex(name = "restaurant_price_rating_idx", def = "{'active':1,'priceBucket':1,'avgRating':-1}")
 })
 @Getter
 @Setter
@@ -58,7 +52,8 @@ public class RestaurantDoc {
     private String destinationSlug;
 
     /**
-     * Optional: tham chiếu tới 1 PlaceDoc khác (ví dụ: nhà hàng nằm trong hotel / POI cụ thể).
+     * Optional: tham chiếu tới 1 PlaceDoc khác (ví dụ: nhà hàng nằm trong hotel /
+     * POI cụ thể).
      * Có thể để null nếu chỉ gắn với destination.
      */
     @Indexed
@@ -91,7 +86,7 @@ public class RestaurantDoc {
     private List<CuisineTag> cuisines;
 
     private String shortDescription; // đoạn ngắn trên list
-    private String description;      // mô tả dài
+    private String description; // mô tả dài
 
     // Liên hệ
     private String phone;
@@ -120,8 +115,8 @@ public class RestaurantDoc {
     /**
      * Giờ mở cửa theo từng ngày trong tuần.
      * Ví dụ:
-     *  - Thứ hai: 11:00 - 22:00
-     *  - ...
+     * - Thứ hai: 11:00 - 22:00
+     * - ...
      */
     private List<OpeningHour> openingHours;
 
@@ -156,8 +151,8 @@ public class RestaurantDoc {
     /**
      * Danh sách code tiện ích mà nhà hàng CÓ.
      * FE/BE có master list tất cả tiện ích, khi render sẽ:
-     *  - code có trong list -> tick xanh
-     *  - code không có      -> X đỏ
+     * - code có trong list -> tick xanh
+     * - code không có -> X đỏ
      */
     private List<String> amenityCodes;
 
@@ -195,40 +190,53 @@ public class RestaurantDoc {
 
     private List<TableType> tableTypes;
 
-    /** Cấu hình booking riêng cho nhà hàng (slot, duration, hủy/hoàn, pending expire...) */
+    /**
+     * Cấu hình booking riêng cho nhà hàng (slot, duration, hủy/hoàn, pending
+     * expire...)
+     */
     private BookingConfig bookingConfig;
 
     // =====================================================================
-    //                              SUBDOCUMENTS
+    // SUBDOCUMENTS
     // =====================================================================
 
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
     public static class TableType {
-        private String id;                 // "tb-2", "tb-4-vip" ...
-        private String name;               // "Bàn 2", "Bàn 4 VIP"
-        private Integer seats;             // 2/4/6...
-        private Integer minPeople;         // optional
-        private Integer maxPeople;         // optional
+        private String id; // "tb-2", "tb-4-vip" ...
+        private String name; // "Bàn 2", "Bàn 4 VIP"
+        private Integer seats; // 2/4/6...
+        private Integer minPeople; // optional
+        private Integer maxPeople; // optional
 
         /** Tổng số bàn của loại này (tồn kho tĩnh) */
         private Integer totalTables;
 
         /** Tiền cọc cho 1 bàn loại này */
         private BigDecimal depositPrice;
-        private String currencyCode;       // "VND"
+        private String currencyCode; // "VND"
 
         /** Loại bàn đặc biệt (để UI show badge) */
-        @Builder.Default private Boolean vip = false;
-        @Builder.Default private Boolean privateRoom = false;
+        @Builder.Default
+        private Boolean vip = false;
+        @Builder.Default
+        private Boolean privateRoom = false;
 
         /** Nếu tableType này có duration riêng thì override */
         private List<Integer> allowedDurationsMinutes; // vd: [60, 90, 120]
-        private Integer defaultDurationMinutes;        // vd: 90
+        private Integer defaultDurationMinutes; // vd: 90
 
-        private String note;               // mô tả ngắn cho UI
+        private String note; // mô tả ngắn cho UI
     }
 
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
     public static class BookingConfig {
 
         /** Booking slot size (phút). Ví dụ 15/30. Khuyến nghị 30 cho tiểu luận */
@@ -296,9 +304,9 @@ public class RestaurantDoc {
     @AllArgsConstructor
     @Builder
     public static class CuisineTag {
-        private String code;     // "VIETNAMESE", "ASIAN", "KOREAN", "NORTH",...
-        private String name;     // "Việt", "Hàn Quốc", "Món Bắc",...
-        private String region;   // "NORTH", "CENTRAL", "SOUTH", "ASIA", "WESTERN"... (optional)
+        private String code; // "VIETNAMESE", "ASIAN", "KOREAN", "NORTH",...
+        private String name; // "Việt", "Hàn Quốc", "Món Bắc",...
+        private String region; // "NORTH", "CENTRAL", "SOUTH", "ASIA", "WESTERN"... (optional)
     }
 
     /** Giờ mở cửa cho một ngày trong tuần */
@@ -326,8 +334,8 @@ public class RestaurantDoc {
     @AllArgsConstructor
     @Builder
     public static class SuitableFor {
-        private String code;    // "FAMILY", "FRIENDS", "COMPANY_PARTY",...
-        private String label;   // "Ăn gia đình", "Tụ tập bạn bè",...
+        private String code; // "FAMILY", "FRIENDS", "COMPANY_PARTY",...
+        private String label; // "Ăn gia đình", "Tụ tập bạn bè",...
     }
 
     /** Không gian / ambience (ấm cúng, sang trọng, ngoài trời,...) */
@@ -337,8 +345,8 @@ public class RestaurantDoc {
     @AllArgsConstructor
     @Builder
     public static class AmbienceTag {
-        private String code;    // "COZY", "ELEGANT", "OUTDOOR",...
-        private String label;   // "Ấm cúng", "Sang trọng",...
+        private String code; // "COZY", "ELEGANT", "OUTDOOR",...
+        private String label; // "Ấm cúng", "Sang trọng",...
     }
 
     /** Thông tin sức chứa & phòng riêng */
@@ -375,7 +383,7 @@ public class RestaurantDoc {
     public static class SignatureDish {
         private String name;
         private String description;
-        private BigDecimal estimatedPrice;  // optional
+        private BigDecimal estimatedPrice; // optional
         @Builder.Default
         private Boolean highlight = true;
     }
@@ -387,8 +395,8 @@ public class RestaurantDoc {
     @AllArgsConstructor
     @Builder
     public static class MenuSection {
-        private String code;       // "STARTER", "MAIN_COURSE", "DESSERT", "DRINK", "BUFFET",...
-        private String name;       // "Khai vị", "Món chính",...
+        private String code; // "STARTER", "MAIN_COURSE", "DESSERT", "DRINK", "BUFFET",...
+        private String name; // "Khai vị", "Món chính",...
 
         private List<MenuItem> items;
     }
@@ -406,7 +414,7 @@ public class RestaurantDoc {
         private BigDecimal priceFrom;
         private BigDecimal priceTo;
 
-        private String unit;       // "phần", "combo 2 người",...
+        private String unit; // "phần", "combo 2 người",...
 
         @Builder.Default
         private Boolean combo = false;
@@ -454,16 +462,16 @@ public class RestaurantDoc {
         }
 
         public enum ContentSection {
-            OVERVIEW,   // Giới thiệu chung
-            STORY,      // Bài viết dài / PR
+            OVERVIEW, // Giới thiệu chung
+            STORY, // Bài viết dài / PR
             OTHER
         }
 
         private BlockType type;
         private ContentSection section;
-        private String text;          // HEADING / PARAGRAPH / QUOTE / INFOBOX
-        private Image image;          // cho IMAGE
-        private List<Image> gallery;  // cho GALLERY
+        private String text; // HEADING / PARAGRAPH / QUOTE / INFOBOX
+        private Image image; // cho IMAGE
+        private List<Image> gallery; // cho GALLERY
         private double[] mapLocation; // cho MAP (lon, lat) nếu khác location chính
     }
 
@@ -495,8 +503,8 @@ public class RestaurantDoc {
 
         // --- Thời gian đặt / giữ chỗ ---
         private Integer minBookingLeadTimeMinutes; // đặt trước tối thiểu, vd: 60'
-        private Integer maxHoldTimeMinutes;        // giữ chỗ tối đa, vd: 20'
-        private Integer minGuestsPerBooking;       // "Không quy định" -> null
+        private Integer maxHoldTimeMinutes; // giữ chỗ tối đa, vd: 20'
+        private Integer minGuestsPerBooking; // "Không quy định" -> null
 
         // --- Hóa đơn ---
         @Builder.Default
@@ -532,7 +540,7 @@ public class RestaurantDoc {
     public static class BlackoutDateRule {
         private BlackoutDateType dateType; // GREGORIAN_DATE / DATE_RANGE / LUNAR_DATE
 
-        private Integer month;   // nếu là ngày cố định dương lịch
+        private Integer month; // nếu là ngày cố định dương lịch
         private Integer day;
 
         private String fromDate; // ISO 8601: "2025-01-01"
@@ -551,9 +559,9 @@ public class RestaurantDoc {
     @AllArgsConstructor
     @Builder
     public static class OutsideDrinkFee {
-        private String drinkType;      // "WINE", "SPIRITS", "BEER", "OTHER"
-        private BigDecimal feeAmount;  // 400000, 200000,...
-        private String currencyCode;   // "VND"
+        private String drinkType; // "WINE", "SPIRITS", "BEER", "OTHER"
+        private BigDecimal feeAmount; // 400000, 200000,...
+        private String currencyCode; // "VND"
         private String note;
     }
 
@@ -582,8 +590,8 @@ public class RestaurantDoc {
     @AllArgsConstructor
     @Builder
     public static class ReviewKeywordStat {
-        private String code;   // "good_food", "friendly_staff", "family_friendly",...
-        private String label;  // "Món ăn ngon", "Nhân viên thân thiện",...
+        private String code; // "good_food", "friendly_staff", "family_friendly",...
+        private String label; // "Món ăn ngon", "Nhân viên thân thiện",...
         private Integer count; // số lần được nhắc
     }
 
@@ -642,10 +650,26 @@ public class RestaurantDoc {
         private String unlockRequestReason;
 
         private String pendingReason;
+
+        public String getLastActionByAdminId() {
+            return lastActionByAdminId;
+        }
+
+        public void setLastActionByAdminId(String lastActionByAdminId) {
+            this.lastActionByAdminId = lastActionByAdminId;
+        }
+
+        public Instant getLastActionAt() {
+            return lastActionAt;
+        }
+
+        public void setLastActionAt(Instant lastActionAt) {
+            this.lastActionAt = lastActionAt;
+        }
     }
 
     // =====================================================================
-    //                                 ENUMS
+    // ENUMS
     // =====================================================================
 
     /** Loại hình nhà hàng chính */
@@ -662,10 +686,10 @@ public class RestaurantDoc {
 
     /** Mức giá tổng quan */
     public enum PriceLevel {
-        CHEAP,          // rẻ
-        MODERATE,       // trung bình
-        EXPENSIVE,      // cao
-        LUXURY          // rất cao
+        CHEAP, // rẻ
+        MODERATE, // trung bình
+        EXPENSIVE, // cao
+        LUXURY // rất cao
     }
 
     /** Bucket giá theo khoảng để filter ("<150k", "150-250k"...) */
@@ -688,8 +712,8 @@ public class RestaurantDoc {
     /** Loại quy tắc ngày ngoại lệ */
     public enum BlackoutDateType {
         GREGORIAN_DATE, // ngày dương lịch cố định
-        DATE_RANGE,     // khoảng từ ngày - đến ngày
-        LUNAR_DATE      // ngày âm lịch
+        DATE_RANGE, // khoảng từ ngày - đến ngày
+        LUNAR_DATE // ngày âm lịch
     }
 
     /** Loại đối tác đăng tải */

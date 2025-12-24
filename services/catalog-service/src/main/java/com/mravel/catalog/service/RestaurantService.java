@@ -46,11 +46,13 @@ public class RestaurantService {
         String location = request.location();
         if (location != null) {
             location = location.trim();
-            if (location.isBlank()) location = null;
+            if (location.isBlank())
+                location = null;
         }
 
         Integer people = request.people();
-        if (people != null && people <= 0) people = null;
+        if (people != null && people <= 0)
+            people = null;
 
         Set<String> cuisineSlugs = request.cuisineSlugs();
         if (cuisineSlugs != null) {
@@ -59,12 +61,13 @@ public class RestaurantService {
                     .map(s -> s.trim().toUpperCase())
                     .filter(s -> !s.isBlank())
                     .collect(java.util.stream.Collectors.toSet());
-            if (cuisineSlugs.isEmpty()) cuisineSlugs = null;
+            if (cuisineSlugs.isEmpty())
+                cuisineSlugs = null;
         }
 
         // ===== NEW: parse visitDate + visitTime =====
-        LocalDate visitDate = parseDate(request.visitDate());   // "YYYY-MM-DD"
-        LocalTime visitTime = parseTime(request.visitTime());   // "HH:mm"
+        LocalDate visitDate = parseDate(request.visitDate()); // "YYYY-MM-DD"
+        LocalTime visitTime = parseTime(request.visitTime()); // "HH:mm"
 
         // Nếu user không nhập date/time -> giữ nguyên logic cũ
         if (visitDate == null || visitTime == null) {
@@ -85,8 +88,7 @@ public class RestaurantService {
         // paginate thủ công
         if (pageable == null || pageable.isUnpaged()) {
             return new org.springframework.data.domain.PageImpl<>(
-                    opened.stream().map(RestaurantMapper::toSummary).toList()
-            );
+                    opened.stream().map(RestaurantMapper::toSummary).toList());
         }
 
         int start = (int) pageable.getOffset();
@@ -102,8 +104,8 @@ public class RestaurantService {
 
     public RestaurantDetailDTO getBySlug(String slug) {
         RestaurantDoc r = restaurantRepo
-            .findBySlugAndActiveTrueAndModeration_Status(slug, RestaurantDoc.RestaurantStatus.APPROVED)
-            .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
+                .findBySlugAndActiveTrueAndModeration_Status(slug, RestaurantDoc.RestaurantStatus.APPROVED)
+                .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
 
         Set<String> codes = new HashSet<>();
         if (r.getAmenityCodes() != null)
@@ -143,7 +145,8 @@ public class RestaurantService {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private static LocalDate parseDate(String s) {
-        if (s == null || s.isBlank()) return null;
+        if (s == null || s.isBlank())
+            return null;
         try {
             return LocalDate.parse(s.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
         } catch (DateTimeParseException e) {
@@ -152,7 +155,8 @@ public class RestaurantService {
     }
 
     private static LocalTime parseTime(String s) {
-        if (s == null || s.isBlank()) return null;
+        if (s == null || s.isBlank())
+            return null;
         try {
             return LocalTime.parse(s.trim(), TIME_FMT); // "19:00"
         } catch (DateTimeParseException e) {
@@ -161,29 +165,38 @@ public class RestaurantService {
     }
 
     private static boolean isOpenAt(RestaurantDoc r, LocalDate date, LocalTime time) {
-        if (r == null || date == null || time == null) return true;
+        if (r == null || date == null || time == null)
+            return true;
 
         List<RestaurantDoc.OpeningHour> hours = r.getOpeningHours();
-        if (hours == null || hours.isEmpty()) return false;
+        if (hours == null || hours.isEmpty())
+            return false;
 
         DayOfWeek dow = date.getDayOfWeek();
 
         for (RestaurantDoc.OpeningHour h : hours) {
-            if (h == null) continue;
-            if (h.getDayOfWeek() != dow) continue;
-            if (Boolean.TRUE.equals(h.getClosed())) continue;
-            if (Boolean.TRUE.equals(h.getOpen24h())) return true;
+            if (h == null)
+                continue;
+            if (h.getDayOfWeek() != dow)
+                continue;
+            if (Boolean.TRUE.equals(h.getClosed()))
+                continue;
+            if (Boolean.TRUE.equals(h.getOpen24h()))
+                return true;
 
             LocalTime open = h.getOpenTime();
             LocalTime close = h.getCloseTime();
-            if (open == null || close == null) continue;
+            if (open == null || close == null)
+                continue;
 
             // Case bình thường: open <= time < close
             if (!close.isBefore(open)) {
-                if (!time.isBefore(open) && time.isBefore(close)) return true;
+                if (!time.isBefore(open) && time.isBefore(close))
+                    return true;
             } else {
                 // Case qua nửa đêm: 18:00 - 02:00
-                if (!time.isBefore(open) || time.isBefore(close)) return true;
+                if (!time.isBefore(open) || time.isBefore(close))
+                    return true;
             }
         }
         return false;

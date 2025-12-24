@@ -192,9 +192,10 @@ public class PlanController {
         }
 
         @GetMapping("/recent")
-        public ResponseEntity<ApiResponse<List<PlanFeedItem>>> getRecentPlans() {
+        public ResponseEntity<ApiResponse<List<PlanFeedItem>>> getRecentPlans(
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
                 Long userId = currentUser.getId();
-                List<PlanFeedItem> items = planService.getRecentPlans(userId);
+                List<PlanFeedItem> items = planService.getRecentPlans(userId, authorizationHeader);
 
                 return ResponseEntity.ok(
                                 ApiResponse.success("Lấy danh sách lịch trình xem gần đây thành công", items));

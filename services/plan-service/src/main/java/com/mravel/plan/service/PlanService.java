@@ -489,40 +489,47 @@ public class PlanService {
         }
 
         @Transactional
-        public List<PlanFeedItem> getRecentPlans(Long viewerId) {
-                if (viewerId == null) {
+        public List<PlanFeedItem> getRecentPlans(Long viewerId, String authorizationHeader) {
+                if (viewerId == null)
                         return List.of();
-                }
 
-                // Lấy top 20 lịch trình vừa xem gần đây nhất
-                List<PlanRecentView> views = recentViewRepository
-                                .findTop20ByUserIdOrderByViewedAtDesc(viewerId);
+                List<PlanRecentView> views = recentViewRepository.findTop20ByUserIdOrderByViewedAtDesc(viewerId);
 
                 if (views.isEmpty())
                         return List.of();
 
-                List<Long> planIds = views.stream()
-                                .map(PlanRecentView::getPlanId)
-                                .toList();
+                // DEDUPE theo planId, giữ cái viewedAt mới nhất
+                LinkedHashMap<Long, PlanRecentView> uniq = new LinkedHashMap<>();
+                for (PlanRecentView v : views) {
+                        uniq.putIfAbsent(v.getPlanId(), v);
+                }
+                List<Long> planIds = new ArrayList<>(uniq.keySet());
 
-                // Load plan
                 List<Plan> plans = planRepository.findAllById(planIds);
-
-                // Map id -> Plan để giữ đúng thứ tự theo viewedAt
                 Map<Long, Plan> planMap = plans.stream()
                                 .collect(Collectors.toMap(Plan::getId, p -> p));
 
                 List<PlanFeedItem> result = new ArrayList<>();
 
-                for (PlanRecentView v : views) {
-                        Plan p = planMap.get(v.getPlanId());
+                for (Long planId : planIds) {
+                        Plan p = planMap.get(planId);
                         if (p == null)
                                 continue;
 
-                        // Chỉ thêm nếu user hiện tại vẫn xem được (tránh case visibility đổi)
-                        if (!permissionService.canView(p.getId(), viewerId, false)) {
-                                continue;
+                        boolean isFriend = false;
+
+                        // chỉ cần check friend nếu plan FRIENDS
+                        if (p.getVisibility() == Visibility.FRIENDS && authorizationHeader != null) {
+                                try {
+                                        RelationshipType relationship = friendClient
+                                                        .getRelationship(authorizationHeader, p.getAuthorId());
+                                        isFriend = (relationship == RelationshipType.FRIEND);
+                                } catch (Exception ignored) {
+                                }
                         }
+
+                        if (!permissionService.canView(p.getId(), viewerId, isFriend))
+                                continue;
 
                         result.add(planMapper.toFeedItem(p));
                 }

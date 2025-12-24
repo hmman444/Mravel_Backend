@@ -590,6 +590,22 @@ public class HotelDoc {
 
         private String pendingReason;
 
+
+        public String getLastActionByAdminId() {
+            return lastActionByAdminId;
+        }
+
+        public void setLastActionByAdminId(String lastActionByAdminId) {
+            this.lastActionByAdminId = lastActionByAdminId;
+        }
+
+        public Instant getLastActionAt() {
+            return lastActionAt;
+        }
+
+        public void setLastActionAt(Instant lastActionAt) {
+            this.lastActionAt = lastActionAt;
+        }
     }
 
     // =====================================================================

@@ -53,12 +53,11 @@ public class HotelService {
 
         Integer requiredRooms = (rooms != null && rooms > 0) ? rooms : null;
 
-        Integer minGuestsPerRoom =
-                (guestsNormalized > 0)
-                        ? ((requiredRooms != null)
-                                ? (int) Math.ceil(guestsNormalized * 1.0 / requiredRooms)
-                                : guestsNormalized)
-                        : null;
+        Integer minGuestsPerRoom = (guestsNormalized > 0)
+                ? ((requiredRooms != null)
+                        ? (int) Math.ceil(guestsNormalized * 1.0 / requiredRooms)
+                        : guestsNormalized)
+                : null;
 
         // ==== NEW: availability filter nếu có ngày ====
         var checkIn = request.checkIn();
@@ -83,8 +82,7 @@ public class HotelService {
             List<HotelSummaryDTO> slice = new ArrayList<>(
                     available.subList(from, to).stream()
                             .map(HotelMapper::toSummary)
-                            .toList()
-            );
+                            .toList());
             return new PageImpl<>(slice, pageable, available.size());
         }
 
@@ -98,19 +96,22 @@ public class HotelService {
             LocalDate checkIn,
             LocalDate checkOut,
             int roomsNeeded,
-            Integer minGuestsPerRoom
-    ) {
-        if (hotel.getRoomTypes() == null || hotel.getRoomTypes().isEmpty()) return false;
+            Integer minGuestsPerRoom) {
+        if (hotel.getRoomTypes() == null || hotel.getRoomTypes().isEmpty())
+            return false;
 
         for (HotelDoc.RoomType rt : hotel.getRoomTypes()) {
-            if (rt == null || rt.getId() == null) continue;
+            if (rt == null || rt.getId() == null)
+                continue;
 
             Integer maxGuests = rt.getMaxGuests();
             Integer totalRooms = rt.getTotalRooms();
 
             // giữ logic khớp với search (đừng check lung tung)
-            if (minGuestsPerRoom != null && (maxGuests == null || maxGuests < minGuestsPerRoom)) continue;
-            if (totalRooms != null && totalRooms < roomsNeeded) continue;
+            if (minGuestsPerRoom != null && (maxGuests == null || maxGuests < minGuestsPerRoom))
+                continue;
+            if (totalRooms != null && totalRooms < roomsNeeded)
+                continue;
 
             var av = inventoryService.getAvailability(
                     hotel.getId(),
@@ -118,19 +119,18 @@ public class HotelService {
                     rt.getId(),
                     checkIn,
                     checkOut,
-                    roomsNeeded
-            );
+                    roomsNeeded);
 
-            if (Boolean.TRUE.equals(av.isEnough())) return true;
+            if (Boolean.TRUE.equals(av.isEnough()))
+                return true;
         }
 
         return false;
     }
 
     public HotelDetailDTO getBySlug(String slug) {
-        HotelDoc h = hotelRepo
-            .findBySlugAndActiveTrueAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
-            .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
+        HotelDoc h = hotelRepo.findBySlugAndActiveTrueAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
+                .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
 
         Set<String> codes = new HashSet<>();
         if (h.getAmenityCodes() != null)
