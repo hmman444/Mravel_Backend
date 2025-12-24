@@ -1,5 +1,6 @@
 package com.mravel.catalog.service.admin;
 
+import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.repository.RestaurantDocRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,11 @@ public class AdminRestaurantModerationService {
 
         touchAdmin(doc, adminId);
         return repo.save(doc);
+    }
+
+    public RestaurantDoc getByIdForAdmin(String id) {
+        return repo.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
     }
 
     public RestaurantDoc reject(String id, Long adminId, String reason) {

@@ -56,6 +56,13 @@ public class AdminCatalogModerationController {
                 size, extractToken(request));
     }
 
+    @GetMapping("/restaurants/{id}")
+    public ResponseEntity<ApiResponse<?>> getRestaurantDetail(
+            @PathVariable String id,
+            HttpServletRequest request) {
+        return catalogClient.adminGetRestaurantDetail(id, extractToken(request));
+    }
+
     // =============== HOTEL ACTIONS ===============
     @PostMapping("/hotels/{id}:approve")
     public ResponseEntity<ApiResponse<?>> approveHotel(@PathVariable String id, HttpServletRequest request) {
