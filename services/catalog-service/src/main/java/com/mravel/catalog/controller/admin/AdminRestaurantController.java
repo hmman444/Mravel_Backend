@@ -37,6 +37,12 @@ public class AdminRestaurantController {
         return ResponseEntity.ok(ApiResponse.success("OK", data));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<RestaurantDoc>> detail(@PathVariable String id) {
+        var doc = moderationService.getByIdForAdmin(id);
+        return ResponseEntity.ok(ApiResponse.success("OK", doc));
+    }
+
     // adminId = query param
     @PostMapping("/{id}:approve")
     public ResponseEntity<ApiResponse<RestaurantDoc>> approve(
