@@ -223,6 +223,14 @@ public class CatalogClient {
         return exchangeAbsolute(b.toUriString(), HttpMethod.GET, null, bearerToken);
     }
 
+    public ResponseEntity<ApiResponse<?>> adminGetRestaurantDetail(String id, String bearerToken) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + "/api/catalog/admin/restaurants/" + id)
+                .toUriString();
+
+        return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+    }
+
     public ResponseEntity<ApiResponse<?>> adminApproveRestaurant(String id, Long adminId, String bearerToken) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(requireBaseUrl() + "/api/catalog/admin/restaurants/" + id + ":approve")
