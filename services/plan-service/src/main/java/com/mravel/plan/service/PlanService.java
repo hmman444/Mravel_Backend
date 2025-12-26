@@ -231,40 +231,63 @@ public class PlanService {
         }
 
         @Transactional
-        public PlanFeedItem copyPlan(Long planId, Long userId) {
+        public PlanFeedItem copyPlan(Long planId, Long userId, String authorizationHeader) {
 
                 Plan source = planRepository.findById(planId)
                                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
                 boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
 
-                if (source.getVisibility() != Visibility.PUBLIC && !isMember) {
+                boolean isFriend = false;
+                if (authorizationHeader != null) {
+                        try {
+                                RelationshipType relationship = friendClient.getRelationship(
+                                                authorizationHeader,
+                                                source.getAuthorId());
+                                isFriend = (relationship == RelationshipType.FRIEND);
+                        } catch (Exception ignored) {
+                        }
+                }
+
+                // CÁCH B: Ai xem được thì copy được
+                // - PUBLIC: ai cũng xem/copy
+                // - FRIENDS: bạn bè xem/copy
+                // - PRIVATE: chỉ member/owner xem/copy
+                if (!permissionService.canView(planId, userId, isFriend) && !isMember) {
                         throw new RuntimeException("You don't have permission to copy this plan.");
                 }
-                // Tạo plan mới
+
+                // ========= TẠO PLAN MỚI =========
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
-                                .visibility(Visibility.PRIVATE)
+                                .visibility(Visibility.PRIVATE) // copy về PRIVATE
                                 .authorId(userId)
                                 .startDate(source.getStartDate())
                                 .endDate(source.getEndDate())
                                 .days(source.getDays())
+
                                 .budgetCurrency(source.getBudgetCurrency())
                                 .budgetTotal(source.getBudgetTotal())
                                 .budgetPerPerson(source.getBudgetPerPerson())
+
                                 .createdAt(Instant.now())
                                 .views(0L)
-                                // Tổng chi phí sẽ tính lại sau hoặc để 0
+
                                 .totalEstimatedCost(0L)
                                 .totalActualCost(0L)
-                                .images(new ArrayList<>(source.getImages()))
-                                .destinations(new ArrayList<>(source.getDestinations()))
+
+                                .images(source.getImages() != null ? new ArrayList<>(source.getImages())
+                                                : new ArrayList<>())
+                                .destinations(source.getDestinations() != null
+                                                ? new ArrayList<>(source.getDestinations())
+                                                : new ArrayList<>())
                                 .build();
 
                 planRepository.save(copy);
                 permissionService.ensureOwner(copy.getId(), userId);
 
+                // ========= COPY LISTS (DAY) + CARDS =========
                 List<PlanList> sourceLists = listRepository.findByPlanIdOrderByPositionAsc(source.getId());
 
                 List<PlanList> sourceDays = sourceLists.stream()
@@ -272,30 +295,27 @@ public class PlanService {
                                 .sorted(Comparator.comparingInt(PlanList::getPosition))
                                 .toList();
 
-                Map<Long, PlanList> oldToNewList = new HashMap<>();
-
                 for (int i = 0; i < sourceDays.size(); i++) {
-                        PlanList src = sourceDays.get(i);
+                        PlanList srcList = sourceDays.get(i);
 
-                        PlanList dst = PlanList.builder()
+                        PlanList dstList = PlanList.builder()
                                         .plan(copy)
                                         .type(PlanListType.DAY)
                                         .position(i)
-                                        .title(src.getTitle())
+                                        .title(srcList.getTitle())
                                         .dayDate(copy.getStartDate().plusDays(i))
                                         .build();
 
-                        listRepository.save(dst);
-                        oldToNewList.put(src.getId(), dst);
+                        listRepository.save(dstList);
 
                         // copy cards
-                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(src.getId());
+                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(srcList.getId());
                         for (int c = 0; c < srcCards.size(); c++) {
 
                                 PlanCard oc = srcCards.get(c);
 
                                 PlanCard nc = PlanCard.builder()
-                                                .list(dst)
+                                                .list(dstList)
                                                 .text(oc.getText())
                                                 .description(oc.getDescription())
                                                 .startTime(oc.getStartTime())
@@ -309,9 +329,11 @@ public class PlanService {
 
                                                 .currencyCode(oc.getCurrencyCode())
                                                 .estimatedCost(oc.getEstimatedCost())
-                                                // Reset actual về null, để tính lại sau
+
+                                                // reset actual để người copy tự nhập lại
                                                 .actualCost(null)
                                                 .actualManual(false)
+
                                                 .budgetAmount(oc.getBudgetAmount())
                                                 .participantCount(null)
 
@@ -321,25 +343,29 @@ public class PlanService {
                                                 .payerId(null)
                                                 .build();
 
-                                oc.getExtraCosts().forEach(e -> nc.getExtraCosts().add(
-                                                ExtraCost.builder()
-                                                                .reason(e.getReason())
-                                                                .type(e.getType())
-                                                                .estimatedAmount(e.getEstimatedAmount())
-                                                                .actualAmount(e.getActualAmount())
-                                                                .build()));
+                                // copy extraCosts (giữ nguyên như bạn đang làm)
+                                if (oc.getExtraCosts() != null) {
+                                        oc.getExtraCosts().forEach(e -> nc.getExtraCosts().add(
+                                                        ExtraCost.builder()
+                                                                        .reason(e.getReason())
+                                                                        .type(e.getType())
+                                                                        .estimatedAmount(e.getEstimatedAmount())
+                                                                        .actualAmount(e.getActualAmount())
+                                                                        .build()));
+                                }
 
                                 cardRepository.save(nc);
                         }
                 }
 
-                // trash mới
+                // ========= TRASH LIST =========
                 listRepository.save(
                                 PlanList.builder()
                                                 .plan(copy)
                                                 .type(PlanListType.TRASH)
                                                 .position(sourceDays.size())
                                                 .title("Trash")
+                                                .dayDate(null)
                                                 .build());
 
                 return planMapper.toFeedItem(copy);

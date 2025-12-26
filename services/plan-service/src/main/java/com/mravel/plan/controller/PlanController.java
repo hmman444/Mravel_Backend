@@ -113,11 +113,11 @@ public class PlanController {
 
         @PostMapping("/{id}/copy")
         public ResponseEntity<ApiResponse<PlanFeedItem>> copyPlan(
-                        @PathVariable Long id) {
+                        @PathVariable Long id,
+                        @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
                 Long userId = currentUser.getId();
-                PlanFeedItem copied = planService.copyPlan(id, userId);
-                return ResponseEntity.ok(
-                                ApiResponse.success("Sao chép plan công khai thành công", copied));
+                PlanFeedItem copied = planService.copyPlan(id, userId, authorizationHeader);
+                return ResponseEntity.ok(ApiResponse.success("Sao chép plan thành công", copied));
         }
 
         @PostMapping("/{id}/comments")
