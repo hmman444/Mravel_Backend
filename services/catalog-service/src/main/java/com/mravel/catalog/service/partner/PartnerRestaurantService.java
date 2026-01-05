@@ -33,8 +33,7 @@ public class PartnerRestaurantService {
         Pageable pageable = PageRequest.of(
                 page == null ? 0 : page,
                 size == null ? 20 : size,
-                Sort.by(Sort.Direction.DESC, "publisher.lastUpdatedAt")
-        );
+                Sort.by(Sort.Direction.DESC, "publisher.lastUpdatedAt"));
 
         if (status == null || status.isBlank()) {
             return repo.findByPublisher_PartnerIdAndDeletedAtIsNull(pid, pageable);
@@ -44,43 +43,44 @@ public class PartnerRestaurantService {
 
         return switch (st) {
             case "PENDING" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-                            pid, RestaurantDoc.RestaurantStatus.PENDING_REVIEW, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
+                        pid, RestaurantDoc.RestaurantStatus.PENDING_REVIEW, pageable);
 
             case "REJECTED" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-                            pid, RestaurantDoc.RestaurantStatus.REJECTED, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
+                        pid, RestaurantDoc.RestaurantStatus.REJECTED, pageable);
 
             case "ADMIN_BLOCKED" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-                            pid, RestaurantDoc.RestaurantStatus.BLOCKED, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
+                        pid, RestaurantDoc.RestaurantStatus.BLOCKED, pageable);
 
             case "ACTIVE" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
-                            pid, RestaurantDoc.RestaurantStatus.APPROVED, true, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
+                        pid, RestaurantDoc.RestaurantStatus.APPROVED, true, pageable);
 
             case "PARTNER_PAUSED" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
-                            pid, RestaurantDoc.RestaurantStatus.APPROVED, false, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
+                        pid, RestaurantDoc.RestaurantStatus.APPROVED, false, pageable);
 
             default -> throw new IllegalArgumentException("Invalid status: " + status);
         };
     }
 
-    // =========================================================
+    // ===
     // CREATE (default list rỗng + default bookingConfig)
-    // =========================================================
+    // ===
     public RestaurantDoc create(Long partnerId,
-                                PartnerCatalogDtos.PendingReason pendingReason,
-                                PartnerCatalogDtos.UpsertRestaurantReq req,
-                                String bearer) {
+            PartnerCatalogDtos.PendingReason pendingReason,
+            PartnerCatalogDtos.UpsertRestaurantReq req,
+            String bearer) {
         pendingReason = PartnerCatalogDtos.PendingReason.CREATE;
 
         RestaurantDoc doc = new RestaurantDoc();
         doc.setActive(true);
         doc.setDeletedAt(null);
 
-        if (req.name() != null) doc.setName(req.name());
+        if (req.name() != null)
+            doc.setName(req.name());
         rejectBlankIfPresent(req.name(), "name");
         String slugBase = (req.slug() != null && !req.slug().isBlank()) ? req.slug() : req.name();
         doc.setSlug(genUniqueSlugForCreate(slugBase));
@@ -92,7 +92,7 @@ public class PartnerRestaurantService {
         doc.setAddressLine(req.addressLine());
 
         if (req.latitude() != null && req.longitude() != null) {
-            doc.setLocation(new double[]{ req.longitude(), req.latitude() });
+            doc.setLocation(new double[] { req.longitude(), req.latitude() });
         } else {
             doc.setLocation(null);
         }
@@ -124,11 +124,11 @@ public class PartnerRestaurantService {
         // ✅ bookingConfig luôn có default (kể cả req.bookingConfig null)
         doc.setBookingConfig(buildBookingConfigOrDefault(req.bookingConfig()));
 
-         RestaurantDoc.PublisherInfo pub = RestaurantDoc.PublisherInfo.builder()
-            .partnerId(String.valueOf(partnerId))
-            .createdAt(Instant.now())
-            .lastUpdatedAt(Instant.now())
-            .build();
+        RestaurantDoc.PublisherInfo pub = RestaurantDoc.PublisherInfo.builder()
+                .partnerId(String.valueOf(partnerId))
+                .createdAt(Instant.now())
+                .lastUpdatedAt(Instant.now())
+                .build();
 
         enrichPublisherFromBearerIfPossible(pub, bearer);
         doc.setPublisher(pub);
@@ -142,14 +142,14 @@ public class PartnerRestaurantService {
         return repo.save(doc);
     }
 
-    // =========================================================
+    // ===
     // UPDATE (bookingConfig merge, không set null đè config cũ)
-    // =========================================================
+    // ===
     public RestaurantDoc update(String id,
-                                Long partnerId,
-                                PartnerCatalogDtos.PendingReason pendingReason,
-                                PartnerCatalogDtos.UpsertRestaurantReq req,
-                                String bearer) {
+            Long partnerId,
+            PartnerCatalogDtos.PendingReason pendingReason,
+            PartnerCatalogDtos.UpsertRestaurantReq req,
+            String bearer) {
         pendingReason = PartnerCatalogDtos.PendingReason.UPDATE;
 
         RestaurantDoc doc = repo.findByIdAndDeletedAtIsNull(id)
@@ -157,7 +157,8 @@ public class PartnerRestaurantService {
         assertOwner(doc, partnerId);
 
         // name là @NotBlank => luôn có
-        if (req.name() != null) doc.setName(req.name());
+        if (req.name() != null)
+            doc.setName(req.name());
         rejectBlankIfPresent(req.name(), "name");
 
         if (req.slug() != null && !req.slug().isBlank()) {
@@ -167,25 +168,37 @@ public class PartnerRestaurantService {
             }
         }
 
-        if (req.destinationSlug() != null) doc.setDestinationSlug(req.destinationSlug());
-        if (req.cityName() != null) doc.setCityName(req.cityName());
-        if (req.districtName() != null) doc.setDistrictName(req.districtName());
-        if (req.wardName() != null) doc.setWardName(req.wardName());
-        if (req.addressLine() != null) doc.setAddressLine(req.addressLine());
+        if (req.destinationSlug() != null)
+            doc.setDestinationSlug(req.destinationSlug());
+        if (req.cityName() != null)
+            doc.setCityName(req.cityName());
+        if (req.districtName() != null)
+            doc.setDistrictName(req.districtName());
+        if (req.wardName() != null)
+            doc.setWardName(req.wardName());
+        if (req.addressLine() != null)
+            doc.setAddressLine(req.addressLine());
 
         if (req.latitude() != null && req.longitude() != null) {
-            doc.setLocation(new double[]{ req.longitude(), req.latitude() });
+            doc.setLocation(new double[] { req.longitude(), req.latitude() });
         }
 
-        if (req.shortDescription() != null) doc.setShortDescription(req.shortDescription());
-        if (req.description() != null) doc.setDescription(req.description());
-        if (req.website() != null) doc.setWebsite(req.website());
+        if (req.shortDescription() != null)
+            doc.setShortDescription(req.shortDescription());
+        if (req.description() != null)
+            doc.setDescription(req.description());
+        if (req.website() != null)
+            doc.setWebsite(req.website());
 
-        if (req.phone() != null) doc.setPhone(req.phone());
-        if (req.email() != null) doc.setEmail(req.email());
+        if (req.phone() != null)
+            doc.setPhone(req.phone());
+        if (req.email() != null)
+            doc.setEmail(req.email());
 
-        if (req.minPrice() != null) doc.setMinPricePerPerson(req.minPrice());
-        if (req.maxPrice() != null) doc.setMaxPricePerPerson(req.maxPrice());
+        if (req.minPrice() != null)
+            doc.setMinPricePerPerson(req.minPrice());
+        if (req.maxPrice() != null)
+            doc.setMaxPricePerPerson(req.maxPrice());
 
         if (req.images() != null) {
             doc.setImages(mapResImages(req.images()));
@@ -209,18 +222,28 @@ public class PartnerRestaurantService {
                 doc.setBookingConfig(buildBookingConfigOrDefault(null));
             }
 
-            if (c.slotMinutes() != null) doc.getBookingConfig().setSlotMinutes(c.slotMinutes());
-            if (c.allowedDurationsMinutes() != null) doc.getBookingConfig().setAllowedDurationsMinutes(c.allowedDurationsMinutes());
-            if (c.defaultDurationMinutes() != null) doc.getBookingConfig().setDefaultDurationMinutes(c.defaultDurationMinutes());
-            if (c.minBookingLeadTimeMinutes() != null) doc.getBookingConfig().setMinBookingLeadTimeMinutes(c.minBookingLeadTimeMinutes());
-            if (c.graceArrivalMinutes() != null) doc.getBookingConfig().setGraceArrivalMinutes(c.graceArrivalMinutes());
-            if (c.freeCancelMinutes() != null) doc.getBookingConfig().setFreeCancelMinutes(c.freeCancelMinutes());
-            if (c.pendingPaymentExpireMinutes() != null) doc.getBookingConfig().setPendingPaymentExpireMinutes(c.pendingPaymentExpireMinutes());
-            if (c.depositOnly() != null) doc.getBookingConfig().setDepositOnly(c.depositOnly());
-            if (c.maxTablesPerBooking() != null) doc.getBookingConfig().setMaxTablesPerBooking(c.maxTablesPerBooking());
+            if (c.slotMinutes() != null)
+                doc.getBookingConfig().setSlotMinutes(c.slotMinutes());
+            if (c.allowedDurationsMinutes() != null)
+                doc.getBookingConfig().setAllowedDurationsMinutes(c.allowedDurationsMinutes());
+            if (c.defaultDurationMinutes() != null)
+                doc.getBookingConfig().setDefaultDurationMinutes(c.defaultDurationMinutes());
+            if (c.minBookingLeadTimeMinutes() != null)
+                doc.getBookingConfig().setMinBookingLeadTimeMinutes(c.minBookingLeadTimeMinutes());
+            if (c.graceArrivalMinutes() != null)
+                doc.getBookingConfig().setGraceArrivalMinutes(c.graceArrivalMinutes());
+            if (c.freeCancelMinutes() != null)
+                doc.getBookingConfig().setFreeCancelMinutes(c.freeCancelMinutes());
+            if (c.pendingPaymentExpireMinutes() != null)
+                doc.getBookingConfig().setPendingPaymentExpireMinutes(c.pendingPaymentExpireMinutes());
+            if (c.depositOnly() != null)
+                doc.getBookingConfig().setDepositOnly(c.depositOnly());
+            if (c.maxTablesPerBooking() != null)
+                doc.getBookingConfig().setMaxTablesPerBooking(c.maxTablesPerBooking());
         }
 
-        if (doc.getModeration() == null) doc.setModeration(new RestaurantDoc.ModerationInfo());
+        if (doc.getModeration() == null)
+            doc.setModeration(new RestaurantDoc.ModerationInfo());
         doc.getModeration().setStatus(RestaurantDoc.RestaurantStatus.PENDING_REVIEW);
         doc.getModeration().setRejectionReason(null);
         doc.getModeration().setPendingReason(pendingReason.name());
@@ -297,26 +320,32 @@ public class PartnerRestaurantService {
         return doc;
     }
 
-    // =========================================================
+    // ===
     // HELPERS
-    // =========================================================
+    // ===
 
-    private RestaurantDoc.BookingConfig buildBookingConfigOrDefault(PartnerCatalogDtos.UpsertRestaurantBookingConfigReq c) {
+    private RestaurantDoc.BookingConfig buildBookingConfigOrDefault(
+            PartnerCatalogDtos.UpsertRestaurantBookingConfigReq c) {
         return RestaurantDoc.BookingConfig.builder()
                 .slotMinutes(c != null && c.slotMinutes() != null ? c.slotMinutes() : 30)
-                .allowedDurationsMinutes(c != null && c.allowedDurationsMinutes() != null ? c.allowedDurationsMinutes() : List.of(60, 90, 120))
-                .defaultDurationMinutes(c != null && c.defaultDurationMinutes() != null ? c.defaultDurationMinutes() : 90)
-                .minBookingLeadTimeMinutes(c != null && c.minBookingLeadTimeMinutes() != null ? c.minBookingLeadTimeMinutes() : 60)
+                .allowedDurationsMinutes(c != null && c.allowedDurationsMinutes() != null ? c.allowedDurationsMinutes()
+                        : List.of(60, 90, 120))
+                .defaultDurationMinutes(
+                        c != null && c.defaultDurationMinutes() != null ? c.defaultDurationMinutes() : 90)
+                .minBookingLeadTimeMinutes(
+                        c != null && c.minBookingLeadTimeMinutes() != null ? c.minBookingLeadTimeMinutes() : 60)
                 .graceArrivalMinutes(c != null && c.graceArrivalMinutes() != null ? c.graceArrivalMinutes() : 15)
                 .freeCancelMinutes(c != null && c.freeCancelMinutes() != null ? c.freeCancelMinutes() : 30)
-                .pendingPaymentExpireMinutes(c != null && c.pendingPaymentExpireMinutes() != null ? c.pendingPaymentExpireMinutes() : 30)
+                .pendingPaymentExpireMinutes(
+                        c != null && c.pendingPaymentExpireMinutes() != null ? c.pendingPaymentExpireMinutes() : 30)
                 .depositOnly(c == null || c.depositOnly() == null ? true : c.depositOnly())
                 .maxTablesPerBooking(c != null && c.maxTablesPerBooking() != null ? c.maxTablesPerBooking() : 5)
                 .build();
     }
 
     private List<RestaurantDoc.Image> mapResImages(List<PartnerCatalogDtos.ImageReq> images) {
-        if (images == null) return null;
+        if (images == null)
+            return null;
 
         List<RestaurantDoc.Image> list = images.stream()
                 .filter(Objects::nonNull)
@@ -362,7 +391,8 @@ public class PartnerRestaurantService {
     }
 
     private static List<String> normalizeCodes(List<String> codes) {
-        if (codes == null) return null;
+        if (codes == null)
+            return null;
         return codes.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
@@ -407,11 +437,14 @@ public class PartnerRestaurantService {
 
     private void enrichPublisherFromBearerIfPossible(RestaurantDoc.PublisherInfo pub, String bearer) {
         try {
-            if (pub == null) return;
-            if (bearer == null || bearer.isBlank()) return;
+            if (pub == null)
+                return;
+            if (bearer == null || bearer.isBlank())
+                return;
 
             String pidStr = pub.getPartnerId();
-            if (pidStr == null || pidStr.isBlank()) return;
+            if (pidStr == null || pidStr.isBlank())
+                return;
 
             Long pid;
             try {
@@ -421,7 +454,8 @@ public class PartnerRestaurantService {
             }
 
             var user = userServiceClient.getUserById(pid, bearer);
-            if (user == null) return;
+            if (user == null)
+                return;
 
             pub.setPartnerName(user.fullname());
             pub.setPartnerEmail(user.email());

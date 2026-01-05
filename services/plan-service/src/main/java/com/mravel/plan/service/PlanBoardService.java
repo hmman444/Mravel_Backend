@@ -1159,10 +1159,15 @@ public class PlanBoardService {
 
             inviteTokenRepo.save(tokenEntity);
 
+            // mailService.sendInviteEmail(
+            // email,
+            // plan.getTitle(),
+            // "http://localhost:5173/plans/join?token=" + token);
+
             mailService.sendInviteEmail(
                     email,
                     plan.getTitle(),
-                    "http://localhost:5173/plans/join?token=" + token);
+                    "http://localhost:3000/plans/join?token=" + token);
 
             result.add(InviteDto.builder()
                     .id(tokenEntity.getId())

@@ -22,8 +22,7 @@ public class CatalogInventoryClient {
     public CatalogInventoryClient(
             RestTemplate restTemplate,
             ObjectMapper objectMapper,
-            @Value("${mravel.services.catalog.base-url}") String catalogBaseUrl
-    ) {
+            @Value("${mravel.services.catalog.base-url}") String catalogBaseUrl) {
         this.restTemplate = Objects.requireNonNull(restTemplate, "restTemplate must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.catalogBaseUrl = Objects.requireNonNull(catalogBaseUrl, "catalogBaseUrl must not be null");
@@ -53,7 +52,7 @@ public class CatalogInventoryClient {
         post("/api/catalog/hotels/inventory/rollback", req);
     }
 
-    // ======================= helpers =======================
+    // ===== helpers =====
 
     private <T> void post(String path, T req) {
         Objects.requireNonNull(path, "path must not be null");
@@ -76,7 +75,8 @@ public class CatalogInventoryClient {
             String body = ex.getResponseBodyAsString();
             ApiResponse<?> api = objectMapper.readValue(body, ApiResponse.class);
             String msg = api.getMessage();
-            if (msg != null && !msg.isBlank()) return msg;
+            if (msg != null && !msg.isBlank())
+                return msg;
         } catch (Exception ignore) {
         }
         return "Lỗi inventory từ catalog-service: " + ex.getStatusCode();

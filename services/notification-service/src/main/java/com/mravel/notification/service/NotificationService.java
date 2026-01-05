@@ -10,6 +10,7 @@ import com.mravel.notification.model.Notification;
 import com.mravel.notification.repository.NotificationRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -48,9 +50,14 @@ public class NotificationService {
 
             Map<Long, UserMiniResponse> actorMap = Map.of();
             if (noti.getActorId() != null) {
-                List<UserMiniResponse> minis = userClient.batchMini(List.of(noti.getActorId()));
-                actorMap = minis.stream()
-                        .collect(java.util.stream.Collectors.toMap(UserMiniResponse::getId, x -> x));
+                try {
+                    List<UserMiniResponse> minis = userClient.batchMini(List.of(noti.getActorId()));
+                    actorMap = minis.stream()
+                            .collect(java.util.stream.Collectors.toMap(UserMiniResponse::getId, x -> x));
+                } catch (Exception ex) {
+                    log.warn("User service batchMini failed: {}", ex.getMessage());
+                    // Continue without actor info so notification still gets created
+                }
             }
 
             NotificationResponse resp = toResponse(noti, unread, actorMap);

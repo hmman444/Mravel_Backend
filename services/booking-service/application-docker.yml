@@ -1,0 +1,32 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: booking-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+mravel:
+  services:
+    auth:
+      base-url: http://gateway:8080
+      validate-path: /api/auth/validate
+    catalog:
+      base-url: http://gateway:8080
+
+  payment:
+    vnpay:
+      base-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+      tmn-code: ${VNPAY_TMN_CODE:YM8LV0DC}
+      hash-secret: ${VNPAY_HASH_SECRET:}
+
+      return-url: "http://gateway:8080/api/booking/payment/vnpay/return"
+      ipn-url: "http://gateway:8080/api/booking/payment/vnpay/ipn"

@@ -67,8 +67,7 @@ public class HotelBookingService {
                 req.hotelSlug(),
                 req.checkInDate(),
                 req.checkOutDate(),
-                roomRequests
-        ));
+                roomRequests));
 
         // Build rooms + tính tiền
         List<BookingRoom> roomEntities = new ArrayList<>();
@@ -77,7 +76,8 @@ public class HotelBookingService {
 
         for (SelectedRoom sr : req.rooms()) {
             Integer qty = sr.quantity();
-            if (qty == null || qty <= 0) continue;
+            if (qty == null || qty <= 0)
+                continue;
 
             if (sr.pricePerNight() == null) {
                 throw new IllegalArgumentException("Thiếu giá/đêm cho phòng " + sr.roomTypeId());
@@ -158,9 +158,10 @@ public class HotelBookingService {
     }
 
     @Transactional
-    public ResumePaymentDTO resumeHotelPaymentForOwner(String code, Long userId, String guestSid, Payment.PaymentMethod method){
+    public ResumePaymentDTO resumeHotelPaymentForOwner(String code, Long userId, String guestSid,
+            Payment.PaymentMethod method) {
         HotelBooking b = hotelBookingRepository.findByCode(code.trim())
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
         // ✅ chỉ cho resume khi còn pending
         if (b.getStatus() != BookingStatus.PENDING_PAYMENT || b.getPaymentStatus() != PaymentStatus.PENDING) {
@@ -174,7 +175,8 @@ public class HotelBookingService {
             }
         } else {
             // booking guest => cần guestSid đúng
-            if (guestSid == null || guestSid.isBlank() || b.getGuestSessionId() == null || !guestSid.equals(b.getGuestSessionId())) {
+            if (guestSid == null || guestSid.isBlank() || b.getGuestSessionId() == null
+                    || !guestSid.equals(b.getGuestSessionId())) {
                 throw new IllegalStateException("Không có quyền tiếp tục thanh toán booking này");
             }
         }
@@ -182,13 +184,15 @@ public class HotelBookingService {
         // ✅ trong 30 phút
         Instant deadline = b.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
         Instant now = Instant.now();
-        if (now.isAfter(deadline)) throw new IllegalStateException("Đơn đã quá hạn thanh toán");
+        if (now.isAfter(deadline))
+            throw new IllegalStateException("Đơn đã quá hạn thanh toán");
         long expiresIn = Duration.between(now, deadline).getSeconds();
 
         // default method: nếu FE không gửi thì dùng method gần nhất, không có thì MOMO
         Payment.PaymentMethod finalMethod = method;
         if (finalMethod == null) {
-        finalMethod = (b.getActivePaymentMethod() != null) ? b.getActivePaymentMethod() : Payment.PaymentMethod.MOMO_WALLET;
+            finalMethod = (b.getActivePaymentMethod() != null) ? b.getActivePaymentMethod()
+                    : Payment.PaymentMethod.MOMO_WALLET;
         }
 
         Payment attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
@@ -221,8 +225,7 @@ public class HotelBookingService {
                     booking.getHotelSlug(),
                     booking.getCheckInDate(),
                     booking.getCheckOutDate(),
-                    roomRequests
-            ));
+                    roomRequests));
         }
 
         BigDecimal finalPaid = (paidAmount != null && paidAmount.compareTo(BigDecimal.ZERO) > 0)
@@ -241,95 +244,94 @@ public class HotelBookingService {
 
     @Transactional
     public HotelBooking cancelHotelBooking(String bookingCode, Long userId, String guestSid, String reason) {
-    HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
-        .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
+        HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
 
-    // ✅ quyền: user booking
-    if (booking.getUserId() != null) {
-        if (userId == null || !userId.equals(booking.getUserId()))
-        throw new IllegalStateException("Bạn không có quyền hủy booking này");
-    } else {
-        // ✅ quyền: guest booking
-        if (guestSid == null || guestSid.isBlank()
-            || booking.getGuestSessionId() == null
-            || !guestSid.equals(booking.getGuestSessionId()))
-        throw new IllegalStateException("Không có quyền hủy booking này");
-    }
+        // ✅ quyền: user booking
+        if (booking.getUserId() != null) {
+            if (userId == null || !userId.equals(booking.getUserId()))
+                throw new IllegalStateException("Bạn không có quyền hủy booking này");
+        } else {
+            // ✅ quyền: guest booking
+            if (guestSid == null || guestSid.isBlank()
+                    || booking.getGuestSessionId() == null
+                    || !guestSid.equals(booking.getGuestSessionId()))
+                throw new IllegalStateException("Không có quyền hủy booking này");
+        }
 
-    return cancelHotelBookingInternal(booking, reason);
+        return cancelHotelBookingInternal(booking, reason);
     }
 
     @Transactional
     public HotelBooking cancelHotelBookingByLookup(String bookingCode, String reason) {
-    HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
-        .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
+        HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
 
-    // lookup chỉ cho guest
-    if (booking.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
+        // lookup chỉ cho guest
+        if (booking.getUserId() != null)
+            throw new IllegalStateException("Booking này thuộc tài khoản");
 
-    return cancelHotelBookingInternal(booking, reason);
+        return cancelHotelBookingInternal(booking, reason);
     }
 
     private HotelBooking cancelHotelBookingInternal(HotelBooking booking, String reason) {
         if (booking.getStatus() == BookingStatus.CANCELLED
-            || booking.getStatus() == BookingStatus.CANCELLED_BY_GUEST
-            || booking.getStatus() == BookingStatus.CANCELLED_BY_PARTNER
-            || booking.getStatus() == BookingStatus.REFUNDED
-            || booking.getStatus() == BookingStatus.COMPLETED) {
-        return booking;
-    }
-
-    BookingStatus oldStatus = booking.getStatus();
-    long minutesFromCreate = Duration.between(booking.getCreatedAt(), Instant.now()).toMinutes();
-
-    booking.setCancelReason(reason);
-    booking.setCancelledAt(Instant.now());
-
-    // ✅ status nói “ai huỷ”
-    booking.setStatus(BookingStatus.CANCELLED_BY_GUEST);
-
-    // ✅ paymentStatus nói “hoàn tiền hay không”
-    boolean shouldRefund;
-    if (minutesFromCreate <= FREE_CANCEL_MINUTES) {
-        shouldRefund = true;
-    } else {
-        // sau 30p: DEPOSIT không hoàn, FULL hoàn (đúng rule bạn đang dùng)
-        shouldRefund = booking.getPayOption() == PayOption.FULL;
-    }
-
-    if (shouldRefund) {
-        booking.setPaymentStatus(PaymentStatus.REFUNDED);
-    } else {
-        booking.setPaymentStatus(PaymentStatus.FAILED);
-    }
-
-    // inventory rollback/release giữ nguyên như bạn viết
-    if (Boolean.TRUE.equals(booking.getInventoryDeducted())) {
-        List<RoomRequestDTO> roomRequests = buildRoomRequestsFromBooking(booking);
-
-        if (oldStatus == BookingStatus.PENDING_PAYMENT) {
-        catalogInventoryClient.releaseHold(new RollbackInventoryRequest(
-            booking.getHotelId(),
-            booking.getCheckInDate(),
-            booking.getCheckOutDate(),
-            roomRequests
-        ));
-        booking.setInventoryDeducted(false);
-        } else if (oldStatus == BookingStatus.CONFIRMED || oldStatus == BookingStatus.PAID) {
-        catalogInventoryClient.rollbackInventory(new RollbackInventoryRequest(
-            booking.getHotelId(),
-            booking.getCheckInDate(),
-            booking.getCheckOutDate(),
-            roomRequests
-        ));
-        booking.setInventoryDeducted(false);
+                || booking.getStatus() == BookingStatus.CANCELLED_BY_GUEST
+                || booking.getStatus() == BookingStatus.CANCELLED_BY_PARTNER
+                || booking.getStatus() == BookingStatus.REFUNDED
+                || booking.getStatus() == BookingStatus.COMPLETED) {
+            return booking;
         }
-    }
 
-    booking.setPendingPaymentUrl(null);
-    booking.setPendingPaymentOrderId(null);
+        BookingStatus oldStatus = booking.getStatus();
+        long minutesFromCreate = Duration.between(booking.getCreatedAt(), Instant.now()).toMinutes();
 
-    return hotelBookingRepository.save(booking);
+        booking.setCancelReason(reason);
+        booking.setCancelledAt(Instant.now());
+
+        // ✅ status nói “ai huỷ”
+        booking.setStatus(BookingStatus.CANCELLED_BY_GUEST);
+
+        // ✅ paymentStatus nói “hoàn tiền hay không”
+        boolean shouldRefund;
+        if (minutesFromCreate <= FREE_CANCEL_MINUTES) {
+            shouldRefund = true;
+        } else {
+            // sau 30p: DEPOSIT không hoàn, FULL hoàn (đúng rule bạn đang dùng)
+            shouldRefund = booking.getPayOption() == PayOption.FULL;
+        }
+
+        if (shouldRefund) {
+            booking.setPaymentStatus(PaymentStatus.REFUNDED);
+        } else {
+            booking.setPaymentStatus(PaymentStatus.FAILED);
+        }
+
+        // inventory rollback/release giữ nguyên như bạn viết
+        if (Boolean.TRUE.equals(booking.getInventoryDeducted())) {
+            List<RoomRequestDTO> roomRequests = buildRoomRequestsFromBooking(booking);
+
+            if (oldStatus == BookingStatus.PENDING_PAYMENT) {
+                catalogInventoryClient.releaseHold(new RollbackInventoryRequest(
+                        booking.getHotelId(),
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate(),
+                        roomRequests));
+                booking.setInventoryDeducted(false);
+            } else if (oldStatus == BookingStatus.CONFIRMED || oldStatus == BookingStatus.PAID) {
+                catalogInventoryClient.rollbackInventory(new RollbackInventoryRequest(
+                        booking.getHotelId(),
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate(),
+                        roomRequests));
+                booking.setInventoryDeducted(false);
+            }
+        }
+
+        booking.setPendingPaymentUrl(null);
+        booking.setPendingPaymentOrderId(null);
+
+        return hotelBookingRepository.save(booking);
     }
 
     @Scheduled(fixedDelayString = "${mravel.booking.pending-expire-check-ms:60000}")
@@ -337,15 +339,17 @@ public class HotelBookingService {
     public void autoCancelPendingHotelBookings() {
         Instant cutoff = Instant.now().minus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
 
-        List<HotelBooking> pendings =
-                hotelBookingRepository.findByStatusAndCreatedAtBefore(BookingStatus.PENDING_PAYMENT, cutoff);
+        List<HotelBooking> pendings = hotelBookingRepository
+                .findByStatusAndCreatedAtBefore(BookingStatus.PENDING_PAYMENT, cutoff);
 
-        if (pendings.isEmpty()) return;
+        if (pendings.isEmpty())
+            return;
 
         Instant now = Instant.now();
 
         for (HotelBooking b : pendings) {
-            if (b.getStatus() != BookingStatus.PENDING_PAYMENT) continue;
+            if (b.getStatus() != BookingStatus.PENDING_PAYMENT)
+                continue;
 
             b.setStatus(BookingStatus.CANCELLED);
             b.setPaymentStatus(PaymentStatus.FAILED);
@@ -360,8 +364,7 @@ public class HotelBookingService {
                         b.getHotelId(),
                         b.getCheckInDate(),
                         b.getCheckOutDate(),
-                        roomRequests
-                ));
+                        roomRequests));
                 b.setInventoryDeducted(false);
             }
         }
@@ -369,14 +372,15 @@ public class HotelBookingService {
         hotelBookingRepository.saveAll(pendings);
     }
 
-    // ========================= Helpers =========================
+    // ======= Helpers =======
 
     private Payment.PaymentMethod parsePaymentMethod(String raw) {
         return PaymentMethodUtils.parseOrDefault(raw, Payment.PaymentMethod.MOMO_WALLET);
     }
 
     private void validateRequest(CreateHotelBookingRequest req) {
-        if (req == null) throw new IllegalArgumentException("Request không được null");
+        if (req == null)
+            throw new IllegalArgumentException("Request không được null");
 
         if (req.contactName() == null || req.contactName().isBlank()) {
             throw new IllegalArgumentException("contactName không được trống");
@@ -419,7 +423,8 @@ public class HotelBookingService {
     }
 
     private BigDecimal calculateDeposit(BigDecimal totalAmount, PayOption payOption) {
-        if (payOption == PayOption.FULL) return totalAmount;
+        if (payOption == PayOption.FULL)
+            return totalAmount;
         return totalAmount.multiply(DEPOSIT_PERCENT);
     }
 
@@ -431,16 +436,19 @@ public class HotelBookingService {
     }
 
     private List<RoomRequestDTO> buildRoomRequestsFromSelectedRooms(List<SelectedRoom> rooms) {
-        if (rooms == null || rooms.isEmpty()) return List.of();
+        if (rooms == null || rooms.isEmpty())
+            return List.of();
 
         Map<String, Integer> map = new HashMap<>();
 
         for (SelectedRoom sr : rooms) {
             int qty = (sr.quantity() == null) ? 0 : sr.quantity();
-            if (qty <= 0) continue;
+            if (qty <= 0)
+                continue;
 
             String roomTypeId = sr.roomTypeId();
-            if (roomTypeId == null || roomTypeId.isBlank()) continue;
+            if (roomTypeId == null || roomTypeId.isBlank())
+                continue;
 
             map.put(roomTypeId, map.getOrDefault(roomTypeId, 0) + qty);
         }
@@ -451,16 +459,19 @@ public class HotelBookingService {
     }
 
     private List<RoomRequestDTO> buildRoomRequestsFromBooking(HotelBooking booking) {
-        if (booking.getRooms() == null || booking.getRooms().isEmpty()) return List.of();
+        if (booking.getRooms() == null || booking.getRooms().isEmpty())
+            return List.of();
 
         Map<String, Integer> map = new HashMap<>();
 
         for (BookingRoom br : booking.getRooms()) {
             int qty = (br.getQuantity() == null) ? 0 : br.getQuantity();
-            if (qty <= 0) continue;
+            if (qty <= 0)
+                continue;
 
             String roomTypeId = br.getRoomTypeId();
-            if (roomTypeId == null || roomTypeId.isBlank()) continue;
+            if (roomTypeId == null || roomTypeId.isBlank())
+                continue;
 
             map.put(roomTypeId, map.getOrDefault(roomTypeId, 0) + qty);
         }
@@ -472,13 +483,16 @@ public class HotelBookingService {
 
     @Transactional
     public int claimGuestBookingsToUser(String sid, Long userId) {
-        if (userId == null) throw new IllegalArgumentException("Thiếu userId");
-        if (sid == null || sid.isBlank()) return 0;
+        if (userId == null)
+            throw new IllegalArgumentException("Thiếu userId");
+        if (sid == null || sid.isBlank())
+            return 0;
 
         var list = hotelBookingRepository
-            .findByGuestSessionIdAndUserIdIsNullOrderByCreatedAtDesc(sid);
+                .findByGuestSessionIdAndUserIdIsNullOrderByCreatedAtDesc(sid);
 
-        if (list.isEmpty()) return 0;
+        if (list.isEmpty())
+            return 0;
 
         for (var b : list) {
             b.setUserId(userId);

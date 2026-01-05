@@ -9,7 +9,7 @@ import com.mravel.catalog.model.enums.AmenitySection;
 
 public class HotelDtos {
 
-        // ================== SUMMARY (LIST / SEARCH RESULT) ==================
+        // SUMMARY (LIST / SEARCH RESULT)
 
         /**
          * Dùng cho trang list / search khách sạn.
@@ -54,7 +54,7 @@ public class HotelDtos {
         ) {
         }
 
-        // ================== DETAIL (TRANG CHI TIẾT) ==================
+        // DETAIL (TRANG CHI TIẾT)
 
         /**
          * Dùng cho trang chi tiết khách sạn.
@@ -134,7 +134,7 @@ public class HotelDtos {
                         Integer freeCancelMinutes) {
         }
 
-        // ================== SUB-DTO CHO CÁC PHẦN CON ==================
+        // SUB-DTO CHO CÁC PHẦN CON
 
         // Ảnh dùng chung
         public record ImageDTO(
@@ -220,7 +220,7 @@ public class HotelDtos {
                         Integer count) {
         }
 
-        // ================== ROOM & RATE PLAN ==================
+        // ROOM & RATE PLAN
 
         public record RoomTypeDTO(
                         String id,
@@ -268,7 +268,7 @@ public class HotelDtos {
                         Boolean showLowAvailability) {
         }
 
-        // ================== PUBLISHER & MODERATION ==================
+        // PUBLISHER & MODERATION
 
         public record PublisherDTO(
                         String partnerId,

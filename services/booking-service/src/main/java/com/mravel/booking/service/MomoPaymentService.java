@@ -29,11 +29,13 @@ public class MomoPaymentService {
     /**
      * 1) IPN từ MoMo
      * - MoMo gửi orderId (bây giờ có thể là attemptId)
-     * - Ta resolve orderId -> booking thật bằng pendingPaymentOrderId (fallback code)
+     * - Ta resolve orderId -> booking thật bằng pendingPaymentOrderId (fallback
+     * code)
      * - rồi gọi mark...PaidAndConfirm(booking.getCode(), amount)
      */
     public void handleIpn(MomoIpnRequest body) {
-        if (body == null) return;
+        if (body == null)
+            return;
 
         Integer resultCode = body.getResultCode();
         if (resultCode == null || resultCode != 0) {
@@ -56,7 +58,8 @@ public class MomoPaymentService {
      * - logic giống IPN
      */
     public void handleClientConfirm(MomoConfirmRequest body) {
-        if (body == null) return;
+        if (body == null)
+            return;
 
         Integer resultCode = body.getResultCode();
         if (resultCode != null && resultCode != 0) {
@@ -74,46 +77,47 @@ public class MomoPaymentService {
         resolveAndMarkPaid(orderId, paidAmount, amountLong);
     }
 
-    // ========================= core logic =========================
+    // ======= core logic =======
     private void resolveAndMarkPaid(String orderId, BigDecimal paidAmountHotel, Long amountLongForRestaurant) {
-    // 0) ưu tiên PaymentAttempt (Payment) trước
-    var p = paymentRepository.findByProviderRequestId(orderId).orElse(null);
-    if (p != null && p.getBooking() != null) {
-        BookingBase booking = p.getBooking();
+        // 0) ưu tiên PaymentAttempt (Payment) trước
+        var p = paymentRepository.findByProviderRequestId(orderId).orElse(null);
+        if (p != null && p.getBooking() != null) {
+            BookingBase booking = p.getBooking();
 
-        // mark payment record SUCCESS (optional nhưng nên làm)
-        p.setStatus(Payment.PaymentStatus.SUCCESS);
-        p.setPaidAt(Instant.now());
-        paymentRepository.save(p);
+            // mark payment record SUCCESS (optional nhưng nên làm)
+            p.setStatus(Payment.PaymentStatus.SUCCESS);
+            p.setPaidAt(Instant.now());
+            paymentRepository.save(p);
 
-        if (booking instanceof com.mravel.booking.model.HotelBooking hb) {
-        hotelBookingService.markHotelBookingPaidAndConfirm(hb.getCode(), paidAmountHotel);
-        return;
+            if (booking instanceof com.mravel.booking.model.HotelBooking hb) {
+                hotelBookingService.markHotelBookingPaidAndConfirm(hb.getCode(), paidAmountHotel);
+                return;
+            }
+            if (booking instanceof com.mravel.booking.model.RestaurantBooking rb) {
+                restaurantBookingService.markRestaurantBookingPaidAndConfirm(rb.getCode(), amountLongForRestaurant);
+                return;
+            }
         }
-        if (booking instanceof com.mravel.booking.model.RestaurantBooking rb) {
-        restaurantBookingService.markRestaurantBookingPaidAndConfirm(rb.getCode(), amountLongForRestaurant);
-        return;
+
+        // 1) fallback tương thích cũ (orderId == BK-/RB-)
+        var hb = hotelBookingRepository.findByCode(orderId).orElse(null);
+        if (hb != null) {
+            hotelBookingService.markHotelBookingPaidAndConfirm(hb.getCode(), paidAmountHotel);
+            return;
         }
-    }
 
-    // 1) fallback tương thích cũ (orderId == BK-/RB-)
-    var hb = hotelBookingRepository.findByCode(orderId).orElse(null);
-    if (hb != null) {
-        hotelBookingService.markHotelBookingPaidAndConfirm(hb.getCode(), paidAmountHotel);
-        return;
-    }
+        var rb = restaurantBookingRepository.findByCode(orderId).orElse(null);
+        if (rb != null) {
+            restaurantBookingService.markRestaurantBookingPaidAndConfirm(rb.getCode(), amountLongForRestaurant);
+            return;
+        }
 
-    var rb = restaurantBookingRepository.findByCode(orderId).orElse(null);
-    if (rb != null) {
-        restaurantBookingService.markRestaurantBookingPaidAndConfirm(rb.getCode(), amountLongForRestaurant);
-        return;
-    }
-
-    throw new IllegalArgumentException("Không tìm thấy booking theo orderId=" + orderId);
+        throw new IllegalArgumentException("Không tìm thấy booking theo orderId=" + orderId);
     }
 
     private static String trim(String s) {
-        if (s == null) return null;
+        if (s == null)
+            return null;
         String t = s.trim();
         return t.isBlank() ? null : t;
     }

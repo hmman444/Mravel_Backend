@@ -1,6 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -11,17 +13,18 @@
   </parent>
 
   <artifactId>catalog-service</artifactId>
+  <name>mravel-catalog-service</name>
   <packaging>jar</packaging>
-  <name>catalog-service</name>
 
   <dependencies>
-    <!-- Web -->
+
+    <!-- Web (REST APIs) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
-    <!-- MongoDB (thay cho JPA) -->
+    <!-- MongoDB -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-mongodb</artifactId>
@@ -39,49 +42,49 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- OpenAPI/Swagger UI -->
+    <!-- OpenAPI / Swagger UI -->
+    <!-- NOTE: nên đưa version lên root sau, hiện giữ để build ổn -->
     <dependency>
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>2.5.0</version>
     </dependency>
 
-    <!-- Cache (nếu bạn đang dùng) -->
+    <!-- Cache -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-cache</artifactId>
     </dependency>
+
     <dependency>
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
     </dependency>
 
-    <!-- Utils nội bộ (tùy chọn) -->
+    <!-- Shared utils -->
     <dependency>
       <groupId>com.mravel</groupId>
       <artifactId>common-utils</artifactId>
       <version>1.0-SNAPSHOT</version>
-      <optional>true</optional>
+    </dependency>
+
+    <!-- Security (permitAll nhưng giữ config thống nhất) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- WebFlux (geo / reactive helpers, không thay MVC) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
     </dependency>
 
     <!-- Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
-      <version>1.18.32</version>
       <scope>provided</scope>
-    </dependency>
-
-    <!-- Security (đang permitAll, vẫn giữ để đồng bộ cấu hình) -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-
-    <!-- geo utils -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-webflux</artifactId>
     </dependency>
 
     <!-- Test -->
@@ -90,23 +93,30 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
   </dependencies>
 
   <build>
+
+    <!-- đảm bảo Docker copy đúng: target/app.jar -->
+    <finalName>app</finalName>
+
     <plugins>
+
+      <!-- BẮT BUỘC: tạo Spring Boot executable jar -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <release>21</release>
-          <parameters>true</parameters>
-        </configuration>
-      </plugin>
+
     </plugins>
   </build>
+
 </project>

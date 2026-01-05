@@ -1,37 +1,24 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>com.mravel</groupId>
-        <artifactId>Mravel_Backend</artifactId>
-        <version>1.0-SNAPSHOT</version>
-        <relativePath>../../pom.xml</relativePath>
-    </parent>
+  <parent>
+    <groupId>com.mravel</groupId>
+    <artifactId>Mravel_Backend</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
 
   <artifactId>realtime-service</artifactId>
-  <name>realtime-service</name>
+  <name>mravel-realtime-service</name>
   <description>Mravel Realtime Service</description>
-
-  <properties>
-    <java.version>17</java.version>
-    <spring.boot.version>3.3.0</spring.boot.version>
-  </properties>
-
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-dependencies</artifactId>
-        <version>${spring.boot.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  <packaging>jar</packaging>
 
   <dependencies>
+
     <!-- Web basic -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -50,22 +37,18 @@
       <artifactId>spring-kafka</artifactId>
     </dependency>
 
-    <!-- JSON (Jackson) -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-    </dependency>
-
+    <!-- Shared utils -->
     <dependency>
       <groupId>com.mravel</groupId>
       <artifactId>common-utils</artifactId>
       <version>1.0-SNAPSHOT</version>
     </dependency>
 
+    <!-- Lombok -->
     <dependency>
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-        <optional>true</optional>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <!-- Test -->
@@ -74,14 +57,27 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
   </dependencies>
 
   <build>
+    <!-- Docker copy chắc chắn: target/app.jar -->
+    <finalName>app</finalName>
+
     <plugins>
+      <!-- BẮT BUỘC: tạo executable boot jar -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
+
 </project>

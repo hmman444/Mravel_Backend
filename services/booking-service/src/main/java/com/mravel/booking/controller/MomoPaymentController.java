@@ -48,8 +48,7 @@ public class MomoPaymentController {
             @RequestParam(required = false, name = "orderId") String orderId,
             @RequestParam(required = false, name = "bookingCode") String bookingCode,
             @RequestParam(required = false) Long amount,
-            @RequestParam(required = false) Integer resultCode
-    ) {
+            @RequestParam(required = false) Integer resultCode) {
         System.out.println(">>> [MoMo REDIRECT] orderId=" + orderId
                 + ", bookingCode=" + bookingCode
                 + ", amount=" + amount
@@ -69,8 +68,7 @@ public class MomoPaymentController {
                 if (rb != null) {
                     restaurantBookingService.markRestaurantBookingPaidAndConfirm(
                             rb.getCode(), // ✅ bookingCode thật
-                            amount
-                    );
+                            amount);
                 } else {
                     // fallback: lỡ oid không phải RB nhưng bị nhầm
                     var hb = hotelBookingRepository.findByCode(oid)
@@ -80,8 +78,7 @@ public class MomoPaymentController {
                     if (hb != null) {
                         hotelBookingService.markHotelBookingPaidAndConfirm(
                                 hb.getCode(),
-                                amount == null ? null : BigDecimal.valueOf(amount)
-                        );
+                                amount == null ? null : BigDecimal.valueOf(amount));
                     }
                 }
             } else {
@@ -93,8 +90,7 @@ public class MomoPaymentController {
                 if (hb != null) {
                     hotelBookingService.markHotelBookingPaidAndConfirm(
                             hb.getCode(), // ✅ bookingCode thật
-                            amount == null ? null : BigDecimal.valueOf(amount)
-                    );
+                            amount == null ? null : BigDecimal.valueOf(amount));
                 } else {
                     // fallback: lỡ oid là restaurant attemptId
                     var rb = restaurantBookingRepository.findByCode(oid)
@@ -104,14 +100,14 @@ public class MomoPaymentController {
                     if (rb != null) {
                         restaurantBookingService.markRestaurantBookingPaidAndConfirm(
                                 rb.getCode(),
-                                amount
-                        );
+                                amount);
                     }
                 }
             }
         }
 
-        String feUrl = "http://localhost:5173/my-bookings";
+        // String feUrl = "http://localhost:5173/my-bookings";
+        String feUrl = "http://localhost:3000/my-bookings";
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(Objects.requireNonNull(URI.create(feUrl)))
                 .build();
