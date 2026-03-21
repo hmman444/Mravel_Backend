@@ -49,7 +49,7 @@ public class PlanGeneralService {
     public void updateTitle(Long planId, Long userId, String title) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setTitle(title);
-
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_TITLE_UPDATED");
     }
 
@@ -59,6 +59,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setDescription(desc);
 
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_DESCRIPTION_UPDATED");
 
     }
@@ -69,6 +70,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setStatus(status);
 
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_STATUS_UPDATED");
 
     }
@@ -79,6 +81,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setThumbnail(url);
 
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_THUMBNAIL_UPDATED");
     }
 
@@ -88,6 +91,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).getImages().add(url);
 
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_ADDED");
     }
 
@@ -96,6 +100,7 @@ public class PlanGeneralService {
     public void removeImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).getImages().remove(url);
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_REMOVED");
     }
 
@@ -138,6 +143,7 @@ public class PlanGeneralService {
 
             trash.setPosition(oldCount);
 
+            planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
@@ -165,6 +171,7 @@ public class PlanGeneralService {
             plan.setEndDate(startNew);
             trash.setPosition(1);
 
+            planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
@@ -182,6 +189,7 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
+            planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
@@ -212,6 +220,7 @@ public class PlanGeneralService {
             if (startChanged)
                 planBoardService.syncDayLists(plan);
 
+            planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             return;
         }
@@ -235,6 +244,7 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
+            planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
         }
     }
@@ -265,6 +275,7 @@ public class PlanGeneralService {
         if (perPerson != null) {
             plan.setBudgetPerPerson(perPerson);
         }
+        planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_BUDGET_UPDATED");
 
     }

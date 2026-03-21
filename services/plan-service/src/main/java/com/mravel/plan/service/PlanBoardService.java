@@ -6,6 +6,7 @@ import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.board.*;
 import com.mravel.plan.kafka.KafkaProducer;
 import com.mravel.plan.kafka.PlanBoardEvent;
+import com.mravel.plan.kafka.PlanBoardEventV2;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
@@ -119,13 +120,37 @@ public class PlanBoardService {
         trash.setPosition(dayLists.size());
     }
 
+    /**
+     * Phase 1d — increments boardRevision inside the caller's transaction.
+     * No @CacheEvict here: the parent @Transactional mutation methods already carry
+     * 
+     * @CacheEvict(beforeInvocation = true), so the cache is evicted before this
+     *                              runs.
+     *                              The next call to getBoardSnapshot() (inside
+     *                              publishBoard) re-populates it with
+     *                              the new revision value.
+     *                              Must only be called from within an
+     *                              active @Transactional context.
+     */
+    public long incrementBoardRevision(Long planId) {
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found: " + planId));
+        long newRevision = (plan.getBoardRevision() == null ? 0L : plan.getBoardRevision()) + 1;
+        plan.setBoardRevision(newRevision);
+        planRepository.save(plan);
+        return newRevision;
+    }
+
+    /**
+     * Phase 5 — publishes ONLY a v1 full-snapshot event for legacy consumers.
+     * v2 patch-only events are produced exclusively by PlanBoardCommandService.
+     * Legacy board endpoints (PlanBoardController) still call this method so that
+     * any remaining v1 WebSocket subscribers receive updates during the transition.
+     */
     public void publishBoard(Long planId, Long actorId, String eventType) {
         try {
             BoardResponse board = getBoard(planId, actorId, false);
-            // log.info("[PlanService] publishBoard eventType={}, planId={}, actorId={},
-            // lists={}",
-            // eventType, planId, actorId,
-            // board.getLists() != null ? board.getLists().size() : null);
+
             PlanBoardEvent evt = PlanBoardEvent.builder()
                     .eventType(eventType)
                     .planId(planId)
@@ -133,8 +158,24 @@ public class PlanBoardService {
                     .timestamp(System.currentTimeMillis())
                     .board(board)
                     .build();
-
             kafkaProducer.publishBoardEvent(evt);
+
+            // Emit a lightweight v2 sync event so v2 clients can refresh state
+            // without consuming v1 full-snapshot payloads over WebSocket.
+            PlanBoardEventV2 syncEvt = PlanBoardEventV2.builder()
+                    .envelopeVersion("2")
+                    .planId(planId)
+                    .entityType("BOARD")
+                    .entityId(planId)
+                    .operationType("SYNC")
+                    .patch(Map.of("eventType", eventType))
+                    .actorId(actorId)
+                    .operationId(UUID.randomUUID().toString())
+                    .revision(board.getBoardRevision() != null ? board.getBoardRevision() : 0L)
+                    .occurredAt(Instant.now().toString())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            kafkaProducer.publishBoardEventV2(syncEvt);
 
         } catch (Exception ex) {
             log.error("Failed to publish board event for planId={}", planId, ex);
@@ -226,8 +267,8 @@ public class PlanBoardService {
                 .status(plan.getStatus().name())
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
-                // myRole = null
                 .myRole(null)
+                .boardRevision(plan.getBoardRevision())
                 .costSummary(costSummary)
                 .memberCostSummary(memberCostSummary)
                 .lists(
@@ -635,6 +676,7 @@ public class PlanBoardService {
         // cập nhật endDate của Plan
         plan.setEndDate(newDate);
         planRepository.save(plan);
+        incrementBoardRevision(planId); // Phase 1d
         log.info("[PlanService] createList -> before publishBoard, planId={}, userId={}", planId, userId);
         publishBoard(planId, userId, "CREATE_LIST");
 
@@ -660,6 +702,7 @@ public class PlanBoardService {
         }
 
         list.setTitle(req.getTitle());
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "RENAME_LIST");
     }
 
@@ -682,6 +725,7 @@ public class PlanBoardService {
         listRepository.delete(target);
 
         syncDayLists(target.getPlan());
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "DELETE_LIST");
     }
 
@@ -746,6 +790,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "CREATE_CARD");
 
         return toCardDto(card);
@@ -790,6 +835,7 @@ public class PlanBoardService {
         recalculateSplitDetails(card);
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "UPDATE_CARD");
         return toCardDto(card);
     }
@@ -813,6 +859,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "DELETE_CARD");
     }
 
@@ -836,7 +883,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "CLEAR_TRASH");
     }
 
@@ -920,6 +967,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "DUPLICATE_CARD");
 
         return toCardDto(copy);
@@ -1030,16 +1078,17 @@ public class PlanBoardService {
                             .note(p.getNote())
                             .build()));
 
-            cloneList.getCards().add(copy);
-
             recalculateCardCosts(copy);
             recalculateSplitDetails(copy);
 
             cardRepository.save(copy);
         }
 
+        List<PlanCard> duplicatedCards = cardRepository.findByListIdOrderByPositionAsc(cloneList.getId());
+
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "DUPLICATE_LIST");
 
         return ListDto.builder()
@@ -1049,7 +1098,7 @@ public class PlanBoardService {
                 .type("DAY")
                 .dayDate(cloneList.getDayDate())
                 .cards(
-                        cloneList.getCards().stream()
+                        duplicatedCards.stream()
                                 .sorted(Comparator.comparingInt(PlanCard::getPosition))
                                 .map(this::toCardDto)
                                 .toList())
@@ -1081,6 +1130,7 @@ public class PlanBoardService {
 
         Plan plan = planRepository.findById(planId).orElseThrow();
         syncDayLists(plan);
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "REORDER_LIST");
 
         // getBoard sẽ dùng snapshot mới (đã bị evict ở @CacheEvict trên reorder)
@@ -1122,7 +1172,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-
+        incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "REORDER_CARD");
 
         return getBoard(planId, userId, isFriend);

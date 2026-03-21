@@ -43,4 +43,14 @@ public class PlanList {
     @Column(nullable = false)
     @Builder.Default
     private PlanListType type = PlanListType.DAY;
+
+    /**
+     * Phase 3a — optimistic locking version.
+     * Clients send If-Match: "{version}" header; service throws ConflictException on mismatch.
+     * Hibernate increments this automatically on every UPDATE.
+     */
+    @Version
+    @Column(nullable = false)
+    @Builder.Default
+    private Long version = 0L;
 }
