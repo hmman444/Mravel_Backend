@@ -15,7 +15,7 @@ public final class RestaurantBookingMapper {
     }
 
     /*
-     * ✅ DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho
+     * DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho
      * RestaurantBookingSummaryDTO:
      * RestaurantBookingSummaryDTO(
      * String code,
@@ -95,11 +95,6 @@ public final class RestaurantBookingMapper {
 
         List<BookingTableLine> lines = mapLines(b.getTables());
 
-        // Nếu DTO detail của bạn hiện CHƯA có
-        // updatedAt/totalAmount/currencyCode/payOption...
-        // thì bạn có 2 lựa chọn:
-        // 1) Update DTO cho "đầy đủ" như Hotel (khuyến nghị)
-        // 2) Giữ signature cũ và bỏ bớt field tương ứng
         return new RestaurantBookingDetailDTO(
                 b.getId(),
                 b.getCreatedAt(),

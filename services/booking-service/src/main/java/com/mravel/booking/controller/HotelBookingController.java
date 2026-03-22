@@ -23,11 +23,10 @@ public class HotelBookingController {
     public ResponseEntity<ApiResponse<HotelBookingCreatedDTO>> createBooking(
             @RequestBody CreateHotelBookingRequest request,
             HttpServletRequest httpReq,
-            HttpServletResponse httpResp
-    ) {
+            HttpServletResponse httpResp) {
         String guestSid = null;
 
-        // ✅ only guest (userId null) mới dùng cookie
+        // only guest (userId null) mới dùng cookie
         if (request.userId() == null) {
             guestSid = GuestSessionCookie.ensure(httpReq, httpResp);
         }
@@ -35,7 +34,6 @@ public class HotelBookingController {
         HotelBookingCreatedDTO dto = hotelBookingService.createHotelBooking(request, guestSid);
 
         return ResponseEntity.ok(
-                ApiResponse.success("Tạo booking khách sạn thành công", dto)
-        );
+                ApiResponse.success("Tạo booking khách sạn thành công", dto));
     }
 }

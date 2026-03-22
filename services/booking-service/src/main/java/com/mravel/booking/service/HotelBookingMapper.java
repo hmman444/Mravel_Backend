@@ -16,7 +16,7 @@ public final class HotelBookingMapper {
     }
 
     /*
-     * ✅ DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho
+     * DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho
      * HotelBookingSummaryDTO:
      * HotelBookingSummaryDTO(
      * String code,

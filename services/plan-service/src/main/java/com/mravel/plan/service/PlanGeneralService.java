@@ -1,6 +1,8 @@
 package com.mravel.plan.service;
 
 import com.mravel.plan.dto.board.UpdateBudgetRequest;
+import com.mravel.plan.exception.BadRequestException;
+import com.mravel.plan.exception.NotFoundException;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -28,14 +30,14 @@ public class PlanGeneralService {
     // helper
     private Plan loadPlan(Long planId) {
         return planRepo.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
     }
 
     private PlanList loadTrash(Long planId) {
         return listRepo.findByPlanIdOrderByPositionAsc(planId)
                 .stream().filter(l -> l.getType() == PlanListType.TRASH)
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Trash list missing"));
+                .orElseThrow(() -> new NotFoundException("Trash list missing"));
     }
 
     private List<PlanList> loadDayLists(Long planId) {
@@ -76,7 +78,8 @@ public class PlanGeneralService {
 
         long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_STATUS_UPDATED");
-        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("status", status.name()), revision);
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("status", status.name()),
+                revision);
 
     }
 
@@ -100,7 +103,8 @@ public class PlanGeneralService {
 
         long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_ADDED");
-        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()), revision);
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()),
+                revision);
     }
 
     @Transactional
@@ -111,7 +115,8 @@ public class PlanGeneralService {
         plan.getImages().remove(url);
         long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_REMOVED");
-        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()), revision);
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()),
+                revision);
     }
 
     // logic update date
@@ -121,7 +126,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
 
         if (endNew.isBefore(startNew)) {
-            throw new RuntimeException("endDate must be >= startDate");
+            throw new BadRequestException("endDate must be >= startDate");
         }
 
         Plan plan = loadPlan(planId);
@@ -275,10 +280,10 @@ public class PlanGeneralService {
         Long perPerson = req.getBudgetPerPerson();
 
         if (total != null && total < 0) {
-            throw new RuntimeException("budgetTotal must be >= 0");
+            throw new BadRequestException("budgetTotal must be >= 0");
         }
         if (perPerson != null && perPerson < 0) {
-            throw new RuntimeException("budgetPerPerson must be >= 0");
+            throw new BadRequestException("budgetPerPerson must be >= 0");
         }
 
         if (req.getBudgetCurrency() != null && !req.getBudgetCurrency().isBlank()) {

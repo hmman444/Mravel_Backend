@@ -20,12 +20,10 @@ public class PaymentMethodsController {
 
   @GetMapping("/methods")
   public ApiResponse<List<PaymentMethodDTO>> methods() {
-    // Bạn muốn show nhiều icon nhưng chỉ enable cái nào BE support thật
     var desired = List.of(
         Payment.PaymentMethod.MOMO_WALLET,
         Payment.PaymentMethod.VNPAY,
-        Payment.PaymentMethod.ZALOPAY
-    );
+        Payment.PaymentMethod.ZALOPAY);
 
     Set<Payment.PaymentMethod> supported = registry.availableMethods();
 
@@ -34,8 +32,7 @@ public class PaymentMethodsController {
             m.name(),
             labelOf(m),
             iconKeyOf(m),
-            supported.contains(m)
-        ))
+            supported.contains(m)))
         .toList();
 
     return ApiResponse.success("OK", items);
@@ -65,6 +62,6 @@ public class PaymentMethodsController {
       String method,
       String label,
       String iconKey,
-      boolean enabled
-  ) {}
+      boolean enabled) {
+  }
 }

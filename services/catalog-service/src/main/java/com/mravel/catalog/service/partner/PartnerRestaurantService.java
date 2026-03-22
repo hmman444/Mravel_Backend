@@ -107,10 +107,10 @@ public class PartnerRestaurantService {
         doc.setPhone(req.phone());
         doc.setEmail(req.email());
 
-        // ✅ default list rỗng
+        // default list rỗng
         doc.setImages(req.images() == null ? List.of() : mapResImages(req.images()));
 
-        // ✅ amenityCodes: validate + default list rỗng
+        // amenityCodes: validate + default list rỗng
         if (req.amenityCodes() != null) {
             amenityCatalogService.validateCodes(AmenityScope.RESTAURANT, req.amenityCodes());
             doc.setAmenityCodes(normalizeCodes(req.amenityCodes()));
@@ -118,10 +118,10 @@ public class PartnerRestaurantService {
             doc.setAmenityCodes(List.of());
         }
 
-        // ✅ tableTypes default list rỗng
+        // tableTypes default list rỗng
         doc.setTableTypes(req.tableTypes() == null ? List.of() : mapTableTypes(req.tableTypes()));
 
-        // ✅ bookingConfig luôn có default (kể cả req.bookingConfig null)
+        // bookingConfig luôn có default (kể cả req.bookingConfig null)
         doc.setBookingConfig(buildBookingConfigOrDefault(req.bookingConfig()));
 
         RestaurantDoc.PublisherInfo pub = RestaurantDoc.PublisherInfo.builder()
@@ -213,7 +213,7 @@ public class PartnerRestaurantService {
             doc.setTableTypes(mapTableTypes(req.tableTypes()));
         }
 
-        // ✅ MERGE bookingConfig: chỉ set field nào != null
+        // MERGE bookingConfig: chỉ set field nào != null
         if (req.bookingConfig() != null) {
             var c = req.bookingConfig();
 

@@ -67,7 +67,7 @@ public class MomoPaymentController {
 
                 if (rb != null) {
                     restaurantBookingService.markRestaurantBookingPaidAndConfirm(
-                            rb.getCode(), // ✅ bookingCode thật
+                            rb.getCode(), // bookingCode thật
                             amount);
                 } else {
                     // fallback: lỡ oid không phải RB nhưng bị nhầm
@@ -89,7 +89,7 @@ public class MomoPaymentController {
 
                 if (hb != null) {
                     hotelBookingService.markHotelBookingPaidAndConfirm(
-                            hb.getCode(), // ✅ bookingCode thật
+                            hb.getCode(), // bookingCode thật
                             amount == null ? null : BigDecimal.valueOf(amount));
                 } else {
                     // fallback: lỡ oid là restaurant attemptId
