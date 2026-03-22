@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -49,8 +51,9 @@ public class PlanGeneralService {
     public void updateTitle(Long planId, Long userId, String title) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setTitle(title);
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_TITLE_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("planTitle", title), revision);
     }
 
     @Transactional
@@ -59,8 +62,9 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setDescription(desc);
 
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_DESCRIPTION_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("description", desc), revision);
 
     }
 
@@ -70,8 +74,9 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setStatus(status);
 
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_STATUS_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("status", status.name()), revision);
 
     }
 
@@ -81,27 +86,32 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setThumbnail(url);
 
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_THUMBNAIL_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("thumbnail", url), revision);
     }
 
     @Transactional
     @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void addImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
-        loadPlan(planId).getImages().add(url);
+        Plan plan = loadPlan(planId);
+        plan.getImages().add(url);
 
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_ADDED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()), revision);
     }
 
     @Transactional
     @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void removeImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
-        loadPlan(planId).getImages().remove(url);
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        Plan plan = loadPlan(planId);
+        plan.getImages().remove(url);
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_REMOVED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()), revision);
     }
 
     // logic update date
@@ -143,8 +153,9 @@ public class PlanGeneralService {
 
             trash.setPosition(oldCount);
 
-            planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
             return;
         }
 
@@ -171,8 +182,9 @@ public class PlanGeneralService {
             plan.setEndDate(startNew);
             trash.setPosition(1);
 
-            planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
             return;
         }
 
@@ -189,8 +201,9 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
-            planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
             return;
         }
 
@@ -220,8 +233,9 @@ public class PlanGeneralService {
             if (startChanged)
                 planBoardService.syncDayLists(plan);
 
-            planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
             return;
         }
 
@@ -244,8 +258,9 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
-            planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
         }
     }
 
@@ -275,9 +290,14 @@ public class PlanGeneralService {
         if (perPerson != null) {
             plan.setBudgetPerPerson(perPerson);
         }
-        planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_BUDGET_UPDATED");
 
+        Map<String, Object> budgetPatch = new HashMap<>();
+        budgetPatch.put("budgetCurrency", plan.getBudgetCurrency());
+        budgetPatch.put("budgetTotal", plan.getBudgetTotal());
+        budgetPatch.put("budgetPerPerson", plan.getBudgetPerPerson());
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", budgetPatch, revision);
     }
 
 }

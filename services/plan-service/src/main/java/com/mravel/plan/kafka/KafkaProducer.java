@@ -66,6 +66,11 @@ public class KafkaProducer {
 
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize PlanBoardEventV2 for planId={}", event.getPlanId(), e);
+        } catch (Exception e) {
+            // Catches DataIntegrityViolationException from duplicate (planId, revision) in revision log,
+            // or Kafka send failures. Logged and swallowed to avoid contaminating the caller's JPA tx.
+            log.warn("Failed to publish PlanBoardEventV2 planId={} revision={}: {}",
+                    event.getPlanId(), event.getRevision(), e.getMessage());
         } finally {
             sample.stop(Timer.builder("plan.board_event.publish_latency_ms")
                     .tag("operation_type", event.getOperationType() != null ? event.getOperationType() : "UNKNOWN")

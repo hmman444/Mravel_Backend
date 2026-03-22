@@ -57,9 +57,8 @@ public class PlanBoardCommandService {
                 permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
                 ListDto created = boardService.createList(planId, userId, req);
-                // boardRevision already incremented inside createList; but createList also
-                // calls
-                // publishBoard (v1). For v2 we publish the patch-only event below.
+                // boardRevision and event publishing are already handled inside
+                // boardService.createList.
                 long revision = getRevision(planId);
 
                 Map<String, Object> patch = Map.of(
@@ -79,7 +78,9 @@ public class PlanBoardCommandService {
                                 .occurredAt(Instant.now().toString())
                                 .build();
 
-                publishPatchEvent(planId, userId, "LIST", created.getId(), "CREATE", patch, revision, operationId);
+                // boardService.createList already emits v2 patch + persists revision log.
+                // Publishing again here would duplicate (planId, revision) in plan_revision_log
+                // and can cause transaction rollback (HTTP 500).
                 return response;
         }
 
@@ -104,7 +105,6 @@ public class PlanBoardCommandService {
                                 .occurredAt(Instant.now().toString())
                                 .build();
 
-                publishPatchEvent(planId, userId, "LIST", listId, "UPDATE", patch, revision, operationId);
                 return response;
         }
 
@@ -128,7 +128,6 @@ public class PlanBoardCommandService {
                                 .occurredAt(Instant.now().toString())
                                 .build();
 
-                publishPatchEvent(planId, userId, "LIST", listId, "DELETE", patch, revision, operationId);
                 return response;
         }
 
@@ -201,7 +200,6 @@ public class PlanBoardCommandService {
                                 .occurredAt(Instant.now().toString())
                                 .build();
 
-                publishPatchEvent(planId, userId, "CARD", created.getId(), "CREATE", patch, revision, operationId);
                 return response;
         }
 
@@ -235,7 +233,6 @@ public class PlanBoardCommandService {
                                 .occurredAt(Instant.now().toString())
                                 .build();
 
-                publishPatchEvent(planId, userId, "CARD", cardId, "UPDATE", patch, revision, operationId);
                 return response;
         }
 
@@ -260,7 +257,6 @@ public class PlanBoardCommandService {
                                 .occurredAt(Instant.now().toString())
                                 .build();
 
-                publishPatchEvent(planId, userId, "CARD", cardId, "DELETE", patch, revision, operationId);
                 return response;
         }
 

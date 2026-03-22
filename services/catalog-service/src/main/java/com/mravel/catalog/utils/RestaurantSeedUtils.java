@@ -25,9 +25,9 @@ public final class RestaurantSeedUtils {
     private RestaurantSeedUtils() {
     }
 
-    // ===============
+    //
     // CONTENT BLOCK HELPERS
-    // ===============
+    //
 
     // ---- Không có section (dùng cho seed đơn giản) ----
     public static ContentBlock heading(String text) {
@@ -97,9 +97,9 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ===============
+    //
     // IMAGE HELPERS
-    // ===============
+    //
 
     public static Image img(String url, String caption, boolean cover, Integer sortOrder) {
         return Image.builder()
@@ -117,9 +117,9 @@ public final class RestaurantSeedUtils {
         return list;
     }
 
-    // ===============
+    //
     // SEED HELPERS
-    // ===============
+    //
 
     // ---- Opening hours ----
     public static OpeningHour openingHour(
