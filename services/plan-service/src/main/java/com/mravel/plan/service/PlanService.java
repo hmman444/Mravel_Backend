@@ -306,7 +306,9 @@ public class PlanService {
                                         .dayDate(copy.getStartDate().plusDays(i))
                                         .build();
 
-                        listRepository.save(dstList);
+                        // save(...) can return a managed instance different from the transient input
+                        // (especially when Spring Data routes to merge). Always use returned entity.
+                        PlanList savedDstList = listRepository.save(dstList);
 
                         // copy cards
                         List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(srcList.getId());
@@ -315,7 +317,7 @@ public class PlanService {
                                 PlanCard oc = srcCards.get(c);
 
                                 PlanCard nc = PlanCard.builder()
-                                                .list(dstList)
+                                                .list(savedDstList)
                                                 .text(oc.getText())
                                                 .description(oc.getDescription())
                                                 .startTime(oc.getStartTime())
