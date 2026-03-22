@@ -193,9 +193,9 @@ public class HotelDoc {
     /** Trạng thái kiểm duyệt, khóa, báo cáo… */
     private ModerationInfo moderation;
 
-    // =====================================================================
+    //
     // SUBDOCUMENTS
-    // =====================================================================
+    //
 
     @Getter
     @Setter
@@ -590,7 +590,6 @@ public class HotelDoc {
 
         private String pendingReason;
 
-
         public String getLastActionByAdminId() {
             return lastActionByAdminId;
         }
@@ -608,9 +607,9 @@ public class HotelDoc {
         }
     }
 
-    // =====================================================================
+    //
     // ENUMS
-    // =====================================================================
+    //
 
     public enum HotelType {
         HOTEL,

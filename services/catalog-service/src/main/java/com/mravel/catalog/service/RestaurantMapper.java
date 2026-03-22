@@ -14,7 +14,7 @@ import com.mravel.catalog.model.doc.RestaurantDoc;
 
 public class RestaurantMapper {
 
-        // ================== SUMMARY ==================
+        // SUMMARY
 
         public static RestaurantSummaryDTO toSummary(RestaurantDoc r) {
                 // Cover image
@@ -98,7 +98,7 @@ public class RestaurantMapper {
                                 highlightTags);
         }
 
-        // ================== DETAIL ==================
+        // DETAIL
 
         public static RestaurantDetailDTO toDetail(RestaurantDoc r, Map<String, AmenityCatalogDoc> catalogMap) {
                 // Location
@@ -276,7 +276,7 @@ public class RestaurantMapper {
                                 bookingConfig);
         }
 
-        // ================== SUB MAPPERS ==================
+        // SUB MAPPERS
 
         // Image
         public static ImageDTO toImage(RestaurantDoc.Image img) {

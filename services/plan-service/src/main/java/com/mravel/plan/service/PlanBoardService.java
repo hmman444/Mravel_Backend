@@ -6,6 +6,7 @@ import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.board.*;
 import com.mravel.plan.kafka.KafkaProducer;
 import com.mravel.plan.kafka.PlanBoardEvent;
+import com.mravel.plan.kafka.PlanBoardEventV2;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
@@ -23,6 +24,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -119,13 +121,36 @@ public class PlanBoardService {
         trash.setPosition(dayLists.size());
     }
 
+    /**
+     * Phase 1d — increments boardRevision inside the caller's transaction.
+     * No @CacheEvict here: the parent @Transactional mutation methods already carry
+     * 
+     * @CacheEvict(beforeInvocation = true), so the cache is evicted before this
+     *                              runs.
+     *                              The next call to getBoardSnapshot() (inside
+     *                              publishBoard) re-populates it with
+     *                              the new revision value.
+     *                              Must only be called from within an
+     *                              active @Transactional context.
+     */
+    public long incrementBoardRevision(Long planId) {
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found: " + planId));
+        long newRevision = (plan.getBoardRevision() == null ? 0L : plan.getBoardRevision()) + 1;
+        plan.setBoardRevision(newRevision);
+        planRepository.save(plan);
+        return newRevision;
+    }
+
+    /**
+     * Publishes a v1 full-snapshot event for legacy consumers.
+     * v2 patch-only events are now emitted directly by each mutation method via
+     * emitV2Patch() / emitV2Sync().
+     */
     public void publishBoard(Long planId, Long actorId, String eventType) {
         try {
             BoardResponse board = getBoard(planId, actorId, false);
-            // log.info("[PlanService] publishBoard eventType={}, planId={}, actorId={},
-            // lists={}",
-            // eventType, planId, actorId,
-            // board.getLists() != null ? board.getLists().size() : null);
+
             PlanBoardEvent evt = PlanBoardEvent.builder()
                     .eventType(eventType)
                     .planId(planId)
@@ -133,11 +158,56 @@ public class PlanBoardService {
                     .timestamp(System.currentTimeMillis())
                     .board(board)
                     .build();
-
             kafkaProducer.publishBoardEvent(evt);
 
         } catch (Exception ex) {
             log.error("Failed to publish board event for planId={}", planId, ex);
+        }
+    }
+
+    /**
+     * Emits a targeted v2 patch-only event. Called by each mutation method so
+     * realtime consumers can apply incremental updates without a full reload.
+     */
+    public void emitV2Patch(Long planId, Long actorId, String entityType,
+            Long entityId, String operationType, Map<String, Object> patch, long revision) {
+        try {
+            PlanBoardEventV2 evt = PlanBoardEventV2.builder()
+                    .envelopeVersion("2")
+                    .planId(planId)
+                    .entityType(entityType)
+                    .entityId(entityId)
+                    .operationType(operationType)
+                    .patch(patch)
+                    .actorId(actorId)
+                    .operationId(UUID.randomUUID().toString())
+                    .revision(revision)
+                    .occurredAt(Instant.now().toString())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            kafkaProducer.publishBoardEventV2(evt);
+        } catch (Exception ex) {
+            log.error("Failed to emit v2 patch planId={} entity={} op={}", planId, entityType, operationType, ex);
+        }
+    }
+
+    /**
+     * Emits a v2 BOARD/SYNC event for complex operations (duplicateList, updateDates)
+     * that cannot be expressed as a simple patch.
+     */
+    public void emitV2Sync(Long planId, Long actorId, long revision) {
+        emitV2Patch(planId, actorId, "BOARD", planId, "SYNC", Collections.emptyMap(), revision);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> cardDtoToMap(CardDto dto) {
+        try {
+            return objectMapper.convertValue(dto, Map.class);
+        } catch (Exception e) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", dto.getId());
+            m.put("text", dto.getText());
+            return m;
         }
     }
 
@@ -226,8 +296,8 @@ public class PlanBoardService {
                 .status(plan.getStatus().name())
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
-                // myRole = null
                 .myRole(null)
+                .boardRevision(plan.getBoardRevision())
                 .costSummary(costSummary)
                 .memberCostSummary(memberCostSummary)
                 .lists(
@@ -635,8 +705,17 @@ public class PlanBoardService {
         // cập nhật endDate của Plan
         plan.setEndDate(newDate);
         planRepository.save(plan);
+        long revision = incrementBoardRevision(planId);
         log.info("[PlanService] createList -> before publishBoard, planId={}, userId={}", planId, userId);
         publishBoard(planId, userId, "CREATE_LIST");
+
+        Map<String, Object> listPatch = new HashMap<>();
+        listPatch.put("listId", list.getId());
+        listPatch.put("title", list.getTitle());
+        listPatch.put("position", list.getPosition());
+        listPatch.put("type", "DAY");
+        listPatch.put("dayDate", list.getDayDate() != null ? list.getDayDate().toString() : null);
+        emitV2Patch(planId, userId, "LIST", list.getId(), "CREATE", listPatch, revision);
 
         return ListDto.builder()
                 .id(list.getId())
@@ -660,7 +739,9 @@ public class PlanBoardService {
         }
 
         list.setTitle(req.getTitle());
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "RENAME_LIST");
+        emitV2Patch(planId, userId, "LIST", listId, "UPDATE", Map.of("title", req.getTitle()), revision);
     }
 
     @Transactional
@@ -682,7 +763,9 @@ public class PlanBoardService {
         listRepository.delete(target);
 
         syncDayLists(target.getPlan());
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "DELETE_LIST");
+        emitV2Patch(planId, userId, "LIST", listId, "DELETE", Map.of("listId", listId), revision);
     }
 
     public void moveCardsToTrash(PlanList from, PlanList trash) {
@@ -746,9 +829,15 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
+        CardDto cardDto = toCardDto(card);
         publishBoard(planId, userId, "CREATE_CARD");
 
-        return toCardDto(card);
+        Map<String, Object> cardPatch = cardDtoToMap(cardDto);
+        cardPatch.put("listId", listId);
+        emitV2Patch(planId, userId, "CARD", card.getId(), "CREATE", cardPatch, revision);
+
+        return cardDto;
     }
 
     @Transactional
@@ -790,8 +879,11 @@ public class PlanBoardService {
         recalculateSplitDetails(card);
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
+        CardDto cardDto = toCardDto(card);
         publishBoard(planId, userId, "UPDATE_CARD");
-        return toCardDto(card);
+        emitV2Patch(planId, userId, "CARD", card.getId(), "UPDATE", cardDtoToMap(cardDto), revision);
+        return cardDto;
     }
 
     @Transactional
@@ -813,7 +905,9 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "DELETE_CARD");
+        emitV2Patch(planId, userId, "CARD", cardId, "DELETE", Map.of("cardId", cardId, "listId", listId), revision);
     }
 
     @Transactional
@@ -836,8 +930,9 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "CLEAR_TRASH");
+        emitV2Patch(planId, userId, "BOARD", planId, "CLEAR_TRASH", Collections.emptyMap(), revision);
     }
 
     @Transactional
@@ -920,9 +1015,15 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
+        CardDto copyDto = toCardDto(copy);
         publishBoard(planId, userId, "DUPLICATE_CARD");
 
-        return toCardDto(copy);
+        Map<String, Object> copyPatch = cardDtoToMap(copyDto);
+        copyPatch.put("listId", listId);
+        emitV2Patch(planId, userId, "CARD", copy.getId(), "CREATE", copyPatch, revision);
+
+        return copyDto;
     }
 
     // drag drop
@@ -1030,17 +1131,19 @@ public class PlanBoardService {
                             .note(p.getNote())
                             .build()));
 
-            cloneList.getCards().add(copy);
-
             recalculateCardCosts(copy);
             recalculateSplitDetails(copy);
 
             cardRepository.save(copy);
         }
 
+        List<PlanCard> duplicatedCards = cardRepository.findByListIdOrderByPositionAsc(cloneList.getId());
+
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "DUPLICATE_LIST");
+        emitV2Sync(planId, userId, revision);
 
         return ListDto.builder()
                 .id(cloneList.getId())
@@ -1049,7 +1152,7 @@ public class PlanBoardService {
                 .type("DAY")
                 .dayDate(cloneList.getDayDate())
                 .cards(
-                        cloneList.getCards().stream()
+                        duplicatedCards.stream()
                                 .sorted(Comparator.comparingInt(PlanCard::getPosition))
                                 .map(this::toCardDto)
                                 .toList())
@@ -1081,7 +1184,13 @@ public class PlanBoardService {
 
         Plan plan = planRepository.findById(planId).orElseThrow();
         syncDayLists(plan);
+        long revision = incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "REORDER_LIST");
+
+        List<Map<String, Object>> positions = lists.stream()
+                .map(l -> { Map<String, Object> m = new HashMap<>(); m.put("listId", l.getId()); m.put("position", l.getPosition()); return m; })
+                .toList();
+        emitV2Patch(planId, userId, "LIST", null, "REORDER", Map.of("positions", positions), revision);
 
         // getBoard sẽ dùng snapshot mới (đã bị evict ở @CacheEvict trên reorder)
         return getBoard(planId, userId, isFriend);
@@ -1122,8 +1231,23 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-
+        long revision = incrementBoardRevision(planId); // Phase 1d
         publishBoard(planId, userId, "REORDER_CARD");
+
+        if (source.getId().equals(dest.getId())) {
+            List<Map<String, Object>> positions = destCards.stream()
+                    .map(c -> { Map<String, Object> m = new HashMap<>(); m.put("cardId", c.getId()); m.put("position", c.getPosition()); return m; })
+                    .toList();
+            emitV2Patch(planId, userId, "CARD", source.getId(), "REORDER",
+                    Map.of("listId", source.getId(), "positions", positions), revision);
+        } else {
+            Map<String, Object> movePatch = new HashMap<>();
+            movePatch.put("cardId", moved.getId());
+            movePatch.put("sourceListId", source.getId());
+            movePatch.put("targetListId", dest.getId());
+            movePatch.put("targetPosition", req.getDestIndex());
+            emitV2Patch(planId, userId, "CARD", moved.getId(), "MOVE", movePatch, revision);
+        }
 
         return getBoard(planId, userId, isFriend);
     }
@@ -1159,10 +1283,15 @@ public class PlanBoardService {
 
             inviteTokenRepo.save(tokenEntity);
 
+            // mailService.sendInviteEmail(
+            // email,
+            // plan.getTitle(),
+            // "http://localhost:5173/plans/join?token=" + token);
+
             mailService.sendInviteEmail(
                     email,
                     plan.getTitle(),
-                    "http://localhost:5173/plans/join?token=" + token);
+                    "http://localhost:3000/plans/join?token=" + token);
 
             result.add(InviteDto.builder()
                     .id(tokenEntity.getId())

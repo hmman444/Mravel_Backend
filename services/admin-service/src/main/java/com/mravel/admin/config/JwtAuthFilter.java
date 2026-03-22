@@ -35,6 +35,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Value("${mravel.services.auth.validate-path}")
     private String validatePath;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -52,10 +55,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String base = Objects.requireNonNull(authBaseUrl, "mravel.services.auth.base-url must not be null");
             String path = Objects.requireNonNull(validatePath, "mravel.services.auth.validate-path must not be null");
 
+            // When running with the 'docker' profile, prefer calling through the gateway
+            // instead of localhost (which is not reachable from inside containers).
+            if (activeProfile != null && activeProfile.contains("docker") && base.contains("localhost")) {
+                base = base.replaceAll("localhost(:\\d+)?", "gateway:8080");
+            }
+
             URI uri = UriComponentsBuilder.fromHttpUrl(Objects.requireNonNull(base))
                     .path(path)
                     .build(true)
                     .toUri();
+
+            // Helpful debug log
+            // (use debug level in production to avoid leaking tokens)
+            System.out.println("[JwtAuthFilter] calling auth validate at: " + uri.toString());
 
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(Objects.requireNonNull(header.substring(7), "token must not be null"));

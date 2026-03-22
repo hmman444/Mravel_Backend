@@ -12,42 +12,45 @@ import java.util.List;
 
 public final class HotelBookingMapper {
 
-    private HotelBookingMapper() {}
+    private HotelBookingMapper() {
+    }
 
     /*
-     * ✅ DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho HotelBookingSummaryDTO:
+     * ✅ DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho
+     * HotelBookingSummaryDTO:
      * HotelBookingSummaryDTO(
-     *   String code,
-     *   String hotelId,
-     *   String hotelName,
-     *   String hotelSlug,
-     *   java.time.LocalDate checkInDate,
-     *   java.time.LocalDate checkOutDate,
-     *   Integer nights,
-     *   Integer roomsCount,
+     * String code,
+     * String hotelId,
+     * String hotelName,
+     * String hotelSlug,
+     * java.time.LocalDate checkInDate,
+     * java.time.LocalDate checkOutDate,
+     * Integer nights,
+     * Integer roomsCount,
      *
-     *   String contactName,
-     *   String contactPhone,
-     *   String contactEmail,
+     * String contactName,
+     * String contactPhone,
+     * String contactEmail,
      *
-     *   java.math.BigDecimal totalAmount,
-     *   java.math.BigDecimal depositAmount,
-     *   java.math.BigDecimal amountPayable,
-     *   java.math.BigDecimal amountPaid,
-     *   String currencyCode,
+     * java.math.BigDecimal totalAmount,
+     * java.math.BigDecimal depositAmount,
+     * java.math.BigDecimal amountPayable,
+     * java.math.BigDecimal amountPaid,
+     * String currencyCode,
      *
-     *   String bookingStatus,
-     *   String paymentStatus,
-     *   java.time.Instant createdAt,
-     *   java.time.Instant paidAt,
-     *   java.time.Instant cancelledAt,
-     *   String cancelReason
+     * String bookingStatus,
+     * String paymentStatus,
+     * java.time.Instant createdAt,
+     * java.time.Instant paidAt,
+     * java.time.Instant cancelledAt,
+     * String cancelReason
      * )
      */
 
-    // ===================== SUMMARY (CHO LIST) =====================
+    // === SUMMARY (CHO LIST) ===
     public static HotelBookingSummaryDTO toSummary(HotelBooking b) {
-        if (b == null) return null;
+        if (b == null)
+            return null;
 
         return new HotelBookingSummaryDTO(
                 b.getCode(),
@@ -76,17 +79,16 @@ public final class HotelBookingMapper {
                 b.getCreatedAt(),
                 b.getPaidAt(),
                 b.getCancelledAt(),
-                b.getCancelReason()
-        );
+                b.getCancelReason());
     }
 
-    // ===================== CREATED (SAU KHI TẠO) =====================
+    // === CREATED (SAU KHI TẠO) ===
     public static HotelBookingCreatedDTO toCreatedDTO(
             HotelBooking b,
             String paymentMethod,
-            String paymentUrl
-    ) {
-        if (b == null) return null;
+            String paymentUrl) {
+        if (b == null)
+            return null;
 
         return new HotelBookingCreatedDTO(
                 b.getCode(),
@@ -102,21 +104,20 @@ public final class HotelBookingMapper {
                 b.getAmountPayable(),
                 b.getCurrencyCode(),
                 paymentMethod,
-                paymentUrl
-        );
+                paymentUrl);
     }
 
-    // ===================== DETAIL (CHO DETAIL) =====================
+    // === DETAIL (CHO DETAIL) ===
     public static HotelBookingDetailDTO toDetail(HotelBooking b) {
         return toDetailDTO(b);
     }
 
     public static HotelBookingDetailDTO toDetailDTO(HotelBooking b) {
-        if (b == null) return null;
+        if (b == null)
+            return null;
 
-        List<BookingRoomLine> roomLines =
-                (b.getRooms() == null) ? Collections.emptyList()
-                        : b.getRooms().stream().map(HotelBookingMapper::toRoomLine).toList();
+        List<BookingRoomLine> roomLines = (b.getRooms() == null) ? Collections.emptyList()
+                : b.getRooms().stream().map(HotelBookingMapper::toRoomLine).toList();
 
         return new HotelBookingDetailDTO(
                 b.getId(),
@@ -155,12 +156,12 @@ public final class HotelBookingMapper {
                 b.getCancelReason(),
 
                 b.getInventoryDeducted(),
-                roomLines
-        );
+                roomLines);
     }
 
     private static BookingRoomLine toRoomLine(BookingRoom r) {
-        if (r == null) return null;
+        if (r == null)
+            return null;
 
         return new BookingRoomLine(
                 r.getId(),
@@ -171,7 +172,6 @@ public final class HotelBookingMapper {
                 r.getQuantity(),
                 r.getNights(),
                 r.getPricePerNight(),
-                r.getTotalAmount()
-        );
+                r.getTotalAmount());
     }
 }

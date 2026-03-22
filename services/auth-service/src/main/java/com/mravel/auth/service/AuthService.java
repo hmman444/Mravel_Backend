@@ -38,42 +38,69 @@ public class AuthService {
 
     @Transactional
     public void register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail()))
-            throw new RuntimeException("Email đã tồn tại");
+        // If an account with the email already exists, allow re-register when not
+        // enabled
+        userRepository.findByEmail(request.getEmail()).ifPresentOrElse(existing -> {
+            if (existing.isEnabled()) {
+                throw new RuntimeException("Email đã tồn tại");
+            }
 
-        User user = userRepository.save(
-                User.builder()
-                        .email(request.getEmail())
+            // Existing but not enabled -> update and resend OTP
+            existing.setFullname(request.getFullname());
+            existing.setPassword(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(existing);
+
+            log.info("Re-register for disabled user {} - resending OTP", existing.getEmail());
+            String otp = otpService.generateOtp(existing.getEmail());
+            try {
+                notificationService.sendOtpEmail(existing.getEmail(), otp);
+            } catch (Exception ex) {
+                log.error("SMTP send OTP failed during re-register: {}", ex.getMessage(), ex);
+                log.warn("DEV OTP for {} = {}", existing.getEmail(), otp);
+            }
+        }, () -> {
+            // New user flow
+            User user = userRepository.save(
+                    User.builder()
+                            .email(request.getEmail())
+                            .fullname(request.getFullname())
+                            .password(passwordEncoder.encode(request.getPassword()))
+                            .provider("local")
+                            .role(Role.USER)
+                            .enabled(false)
+                            .build());
+
+            try {
+                UserRegisteredEvent event = UserRegisteredEvent.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
                         .fullname(request.getFullname())
-                        .password(passwordEncoder.encode(request.getPassword()))
+                        .avatar(defaultAvatar)
                         .provider("local")
-                        .role(Role.USER)
-                        .enabled(false)
+                        .role(user.getRole().name())
+                        .build();
+
+                String payload = new ObjectMapper().writeValueAsString(event);
+                outboxRepository.save(OutboxEvent.builder()
+                        .eventType("USER_REGISTERED")
+                        .payload(payload)
+                        .status("PENDING")
                         .build());
 
-        try {
-            UserRegisteredEvent event = UserRegisteredEvent.builder()
-                    .id(user.getId())
-                    .email(user.getEmail())
-                    .fullname(request.getFullname())
-                    .avatar(defaultAvatar)
-                    .provider("local")
-                    .role(user.getRole().name())
-                    .build();
+            } catch (Exception e) {
+                throw new RuntimeException("Lỗi khi serialize UserRegisteredEvent: " + e.getMessage());
+            }
 
-            String payload = new ObjectMapper().writeValueAsString(event);
-            outboxRepository.save(OutboxEvent.builder()
-                    .eventType("USER_REGISTERED")
-                    .payload(payload)
-                    .status("PENDING")
-                    .build());
-
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi serialize UserRegisteredEvent: " + e.getMessage());
-        }
-
-        String otp = otpService.generateOtp(user.getEmail());
-        notificationService.sendOtpEmail(user.getEmail(), otp);
+            String otp = otpService.generateOtp(user.getEmail());
+            try {
+                notificationService.sendOtpEmail(user.getEmail(), otp);
+            } catch (Exception ex) {
+                log.error("SMTP send OTP failed: {}", ex.getMessage(), ex);
+                // In dev environment we still want registration to succeed even if email can't
+                // be sent
+                log.warn("DEV OTP for {} = {}", user.getEmail(), otp);
+            }
+        });
     }
 
     public JwtResponse socialLogin(SocialLoginRequest request) {
@@ -208,6 +235,21 @@ public class AuthService {
         notificationService.sendOtpEmail(email, otp);
     }
 
+    /**
+     * Test SMTP connection via NotificationService (returns true if connection OK)
+     */
+    public boolean testSmtpConnection() {
+        return notificationService.testSmtpConnection();
+    }
+
+    /**
+     * Send a test OTP email (used by debug/test endpoint)
+     */
+    public void sendTestOtp(String email) {
+        String otp = "000000";
+        notificationService.sendOtpEmail(email, otp);
+    }
+
     public void resetPassword(ResetPasswordRequest request) {
         if (!otpService.validateOtp(request.getEmail(), request.getOtpCode())) {
             throw new RuntimeException("OTP không hợp lệ hoặc đã hết hạn");
@@ -221,48 +263,72 @@ public class AuthService {
 
     @Transactional
     public void registerPartner(PartnerRegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail()))
-            throw new RuntimeException("Email đã tồn tại");
+        // If an account with the email already exists, allow re-register when not
+        // enabled
+        userRepository.findByEmail(request.getEmail()).ifPresentOrElse(existing -> {
+            if (existing.isEnabled()) {
+                throw new RuntimeException("Email đã tồn tại");
+            }
 
-        User user = userRepository.save(
-                User.builder()
-                        .email(request.getEmail())
-                        .fullname(request.getFullname())
-                        .password(passwordEncoder.encode(request.getPassword()))
+            // If admin locked the account, do not allow re-register
+            if (existing.getStatus() == AccountStatus.LOCKED) {
+                throw new RuntimeException("Tài khoản này đã bị khóa bởi quản trị viên");
+            }
+
+            // Existing but not enabled -> update and resend OTP (promote to PARTNER role)
+            existing.setFullname(request.getFullname());
+            existing.setPassword(passwordEncoder.encode(request.getPassword()));
+            existing.setRole(Role.PARTNER);
+            userRepository.save(existing);
+
+            log.info("Re-register partner for disabled user {} - resending OTP", existing.getEmail());
+            String otp = otpService.generateOtp(existing.getEmail());
+            try {
+                notificationService.sendOtpEmail(existing.getEmail(), otp);
+            } catch (Exception ex) {
+                log.error("SMTP send OTP failed during re-register partner: {}", ex.getMessage(), ex);
+                log.warn("DEV OTP for {} = {}", existing.getEmail(), otp);
+            }
+        }, () -> {
+            User user = userRepository.save(
+                    User.builder()
+                            .email(request.getEmail())
+                            .fullname(request.getFullname())
+                            .password(passwordEncoder.encode(request.getPassword()))
+                            .provider("local")
+                            .role(Role.PARTNER)
+                            .enabled(false)
+                            .build());
+
+            try {
+                UserRegisteredEvent event = UserRegisteredEvent.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .fullname(user.getFullname())
+                        .avatar(defaultAvatar)
                         .provider("local")
-                        .role(Role.PARTNER) // ✅ IMPORTANT
-                        .enabled(false)
+                        .role(user.getRole().name())
+                        .build();
+
+                String payload = new ObjectMapper().writeValueAsString(event);
+                outboxRepository.save(OutboxEvent.builder()
+                        .eventType("USER_REGISTERED")
+                        .payload(payload)
+                        .status("PENDING")
                         .build());
+            } catch (Exception e) {
+                throw new RuntimeException("Lỗi khi serialize UserRegisteredEvent: " + e.getMessage());
+            }
 
-        // ✅ Outbox event tạo profile ở user-service
-        try {
-            UserRegisteredEvent event = UserRegisteredEvent.builder()
-                    .id(user.getId())
-                    .email(user.getEmail())
-                    .fullname(user.getFullname())
-                    .avatar(defaultAvatar)
-                    .provider("local")
-                    .role(user.getRole().name()) // ✅ NEW
-                    .build();
-
-            String payload = new ObjectMapper().writeValueAsString(event);
-            outboxRepository.save(OutboxEvent.builder()
-                    .eventType("USER_REGISTERED")
-                    .payload(payload)
-                    .status("PENDING")
-                    .build());
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi serialize UserRegisteredEvent: " + e.getMessage());
-        }
-
-        String otp = otpService.generateOtp(user.getEmail());
-        try {
-            notificationService.sendOtpEmail(user.getEmail(), otp);
-        } catch (Exception ex) {
-            log.error("SMTP send OTP failed: {}", ex.getMessage(), ex);
-            log.warn("DEV OTP for {} = {}", user.getEmail(), otp); // chỉ dùng local dev
-            throw new RuntimeException("Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
-        }
+            String otp = otpService.generateOtp(user.getEmail());
+            try {
+                notificationService.sendOtpEmail(user.getEmail(), otp);
+            } catch (Exception ex) {
+                log.error("SMTP send OTP failed: {}", ex.getMessage(), ex);
+                log.warn("DEV OTP for {} = {}", user.getEmail(), otp); // chỉ dùng local dev
+                throw new RuntimeException("Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
+            }
+        });
     }
 
     public void verifyOtpPartner(VerifyOtpRequest request) {

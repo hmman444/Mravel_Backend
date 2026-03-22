@@ -1,0 +1,29 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: plan-service
+
+  datasource:
+    url: jdbc:mysql://mysql:3306/mravel_plan?useSSL=false&serverTimezone=UTC
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_ROOT_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+mravel:
+  services:
+    auth:
+      base-url: http://gateway:8080
+      validate-path: /api/auth/validate
+
+    user:
+      base-url: http://gateway:8080
+      userProfiles-path: /api/users
+
+    notification:
+      base-url: http://gateway:8080
+      create-path: /api/notifications

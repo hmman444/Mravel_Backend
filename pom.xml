@@ -92,27 +92,7 @@
     <module>libs/security-jwt</module>
     <module>libs/notification-core</module>
 
-    <!-- Services -->
-    <module>services/auth-service</module>
-    <module>services/catalog-service</module>
-    <module>services/user-service</module>
-    <module>services/plan-service</module>
-    <module>services/realtime-service</module>
-    <module>services/booking-service</module>
-    <module>services/admin-service</module>
-    <module>services/notification-service</module>
-    <module>services/partner-service</module>
-    <!--<module>services/review-service</module>
-    <module>services/location-service</module>
-    <module>services/report-service</module> -->
-
-    <!-- Admin & Partner -->
-    <!-- <module>admin/admin-service</module>
-    <module>partner/partner-service</module> -->
-
-    <!-- Infrastructure -->
-    <!-- <module>gateway/api-gateway</module>
-    <module>config/config-service</module> -->
+    <module>services</module>
   </modules>
 
 </project>

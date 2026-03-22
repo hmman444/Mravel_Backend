@@ -138,9 +138,9 @@ public class HotelInventoryService {
         return base;
     }
 
-    // =====================================================================
+    //
     // CHECK AVAILABILITY (KHÔNG TRỪ)
-    // =====================================================================
+    //
 
     /**
      * Check inventory cho 1 booking (KHÔNG trừ tồn kho).
@@ -213,9 +213,9 @@ public class HotelInventoryService {
         }
     }
 
-    // =====================================================================
+    //
     // CHECK + TRỪ TỒN KHO (CONFIRM)
-    // =====================================================================
+    //
 
     /**
      * Check + trừ tồn kho (dùng khi muốn hold/confirm).
@@ -298,9 +298,9 @@ public class HotelInventoryService {
         inventoryRepo.saveAll(toSave);
     }
 
-    // =====================================================================
+    //
     // ROLLBACK TỒN KHO KHI HỦY BOOKING
-    // =====================================================================
+    //
 
     /**
      * Trả lại tồn kho khi hủy booking (chỉ gọi nếu bạn đã từng deduct).
@@ -359,9 +359,9 @@ public class HotelInventoryService {
         }
     }
 
-    // =====================================================================
+    //
     // HOLD TỒN KHO (PENDING PAYMENT)
-    // =====================================================================
+    //
 
     @Transactional
     public void holdInventoryForPendingBooking(
@@ -441,9 +441,9 @@ public class HotelInventoryService {
         inventoryRepo.saveAll(toSave);
     }
 
-    // =====================================================================
+    //
     // COMMIT SAU KHI THANH TOÁN (HELD -> BOOKED)
-    // =====================================================================
+    //
 
     @Transactional
     public void commitInventoryAfterPaid(
@@ -495,9 +495,9 @@ public class HotelInventoryService {
         inventoryRepo.saveAll(toSave);
     }
 
-    // =====================================================================
+    //
     // RELEASE HOLD KHI CANCEL PENDING / AUTO CANCEL
-    // =====================================================================
+    //
 
     @Transactional
     public void releaseHoldForCancelledBooking(

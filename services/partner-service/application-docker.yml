@@ -1,0 +1,19 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: partner-service
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+mravel:
+  services:
+    auth:
+      base-url: http://gateway:8080
+      validate-path: /api/auth/validate
+    catalog:
+      base-url: http://gateway:8080
+    booking:
+      base-url: http://gateway:8080

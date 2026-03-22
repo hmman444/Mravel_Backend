@@ -1,52 +1,57 @@
 package com.mravel.notification;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationService {
 
     private final JavaMailSender mailSender;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username:}")
+    private String mailFrom;
+
     public void sendOtpEmail(String toEmail, String otpCode) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            String from = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "no-reply@mravel.local";
 
-            helper.setTo(toEmail);
-            helper.setSubject("🔐 Mã xác thực OTP của bạn - Mravel");
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(from);
+            msg.setTo(toEmail);
+            msg.setSubject("🔐 Mã xác thực OTP của bạn - Mravel");
+            msg.setText("Xin chao,\n\nMa OTP cua ban la: " + otpCode + "\nMa co hieu luc trong 5 phut.\n\nMravel Team");
 
-            String htmlContent = """
-                        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7fb; padding: 20px;">
-                            <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
-                                <div style="background: linear-gradient(to right, #2563eb, #3b82f6); color: white; text-align: center; padding: 20px 10px;">
-                                    <h1 style="margin: 0; font-size: 22px;">Mravel - Xác Thực Tài Khoản</h1>
-                                </div>
-                                <div style="padding: 30px; text-align: center;">
-                                    <p style="font-size: 16px; color: #333;">Xin chào,</p>
-                                    <p style="font-size: 16px; color: #333;">Mã OTP của bạn để đặt lại mật khẩu là:</p>
-                                    <h2 style="font-size: 36px; color: #2563eb; letter-spacing: 4px; margin: 20px 0;">%s</h2>
-                                    <p style="font-size: 15px; color: #666;">Mã OTP có hiệu lực trong <b>5 phút</b>. Vui lòng không chia sẻ mã này với bất kỳ ai.</p>
-                                    <p style="font-size: 14px; color: #999; margin-top: 30px;">Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
-                                </div>
-                                <div style="background: #f4f7fb; text-align: center; padding: 15px; font-size: 13px; color: #999;">
-                                    © 2025 Mravel Team. All rights reserved.
-                                </div>
-                            </div>
-                        </div>
-                    """
-                    .formatted(otpCode);
+            mailSender.send(msg);
+            log.info("OTP email sent to {}", toEmail);
+        } catch (Exception ex) {
+            // Don't throw — fail softly and log (consistent with plan-service)
+            log.error("Cannot send OTP email to {}: {}", toEmail, ex.getMessage(), ex);
+        }
+    }
 
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
+    /**
+     * Test SMTP connection using the configured JavaMailSenderImpl (returns true if connection successful)
+     */
+    public boolean testSmtpConnection() {
+        if (!(mailSender instanceof JavaMailSenderImpl)) {
+            log.warn("mailSender is not a JavaMailSenderImpl, cannot test connection");
+            return false;
+        }
 
-        } catch (MessagingException e) {
-            throw new RuntimeException("Không thể gửi email OTP: " + e.getMessage());
+        JavaMailSenderImpl impl = (JavaMailSenderImpl) mailSender;
+        try {
+            impl.testConnection();
+            log.info("SMTP test connection OK (host={})", impl.getHost());
+            return true;
+        } catch (Exception ex) {
+            log.error("SMTP test connection failed: {}", ex.getMessage(), ex);
+            return false;
         }
     }
 }

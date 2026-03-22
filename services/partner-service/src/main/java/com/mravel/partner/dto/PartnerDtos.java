@@ -10,341 +10,352 @@ import java.util.List;
 
 public class PartnerDtos {
 
-    // =========================================================
-    //                         ENUMS
-    // =========================================================
+        // ===
+        // ENUMS
+        // ===
 
-    public enum ServiceStatus {
-        PENDING,
-        ACTIVE,
-        REJECTED,
-        PARTNER_PAUSED,
-        ADMIN_BLOCKED
-    }
+        public enum ServiceStatus {
+                PENDING,
+                ACTIVE,
+                REJECTED,
+                PARTNER_PAUSED,
+                ADMIN_BLOCKED
+        }
 
-    public enum PendingReason { CREATE, UPDATE }
+        public enum PendingReason {
+                CREATE, UPDATE
+        }
 
-    // =========================================================
-    //                     COMMON REQUESTS
-    // =========================================================
+        // ===
+        // COMMON REQUESTS
+        // ===
 
-    public record RejectReasonReq(@NotBlank String reason) {}
-    public record BlockReasonReq(@NotBlank String reason) {}
-    public record UnlockRequestReq(@NotBlank String reason) {}
+        public record RejectReasonReq(@NotBlank String reason) {
+        }
 
-    // =========================================================
-    //                 WRAPPERS (OPTIONAL)
-    // =========================================================
+        public record BlockReasonReq(@NotBlank String reason) {
+        }
 
-    public record UpsertWrapper<T>(
-            @NotNull Long partnerId,
-            @NotNull PendingReason pendingReason,
-            @NotNull T payload
-    ) {}
+        public record UnlockRequestReq(@NotBlank String reason) {
+        }
 
-    public record UnlockRequestWrapper(
-            @NotNull Long partnerId,
-            @NotBlank String reason
-    ) {}
+        // ===
+        // WRAPPERS (OPTIONAL)
+        // ===
 
-    // =========================================================
-    //                      HOTEL – REQUESTS (FULL)
-    // =========================================================
+        public record UpsertWrapper<T>(
+                        @NotNull Long partnerId,
+                        @NotNull PendingReason pendingReason,
+                        @NotNull T payload) {
+        }
 
-    public record ImageReq(
-            @NotBlank String url,
-            String caption,
-            Boolean cover,
-            Integer sortOrder
-    ) {}
+        public record UnlockRequestWrapper(
+                        @NotNull Long partnerId,
+                        @NotBlank String reason) {
+        }
 
-    public record UpsertHotelReq(
-            // --- link & location ---
-            @NotBlank String destinationSlug,
-            String cityName,
-            String districtName,
-            String wardName,
-            String addressLine,
-            Double latitude,
-            Double longitude,
+        // ===
+        // HOTEL – REQUESTS (FULL)
+        // ===
 
-            // --- basic ---
-            @NotBlank String name,
-            String slug,                 // optional: nếu null -> backend gen
-            String hotelType,            // HOTEL/HOMESTAY/...
-            Integer starRating,
-            String shortDescription,
-            String description,
-            String phone,
-            String email,
-            String website,
+        public record ImageReq(
+                        @NotBlank String url,
+                        String caption,
+                        Boolean cover,
+                        Integer sortOrder) {
+        }
 
-            // --- checkin/out flags ---
-            String defaultCheckInTime,   // "14:00"
-            String defaultCheckOutTime,  // "12:00"
-            Boolean hasOnlineCheckin,
+        public record UpsertHotelReq(
+                        // --- link & location ---
+                        @NotBlank String destinationSlug,
+                        String cityName,
+                        String districtName,
+                        String wardName,
+                        String addressLine,
+                        Double latitude,
+                        Double longitude,
 
-            // --- media/content ---
-            List<ImageReq> images,
-            List<UpsertContentBlockReq> content,
+                        // --- basic ---
+                        @NotBlank String name,
+                        String slug, // optional: nếu null -> backend gen
+                        String hotelType, // HOTEL/HOMESTAY/...
+                        Integer starRating,
+                        String shortDescription,
+                        String description,
+                        String phone,
+                        String email,
+                        String website,
 
-            // --- amenities ---
-            List<String> amenityCodes,   // scope HOTEL
+                        // --- checkin/out flags ---
+                        String defaultCheckInTime, // "14:00"
+                        String defaultCheckOutTime, // "12:00"
+                        Boolean hasOnlineCheckin,
 
-            // --- rooms ---
-            List<UpsertRoomTypeReq> roomTypes,
+                        // --- media/content ---
+                        List<ImageReq> images,
+                        List<UpsertContentBlockReq> content,
 
-            // --- nearby/policy/info/faq ---
-            List<UpsertNearbyPlaceReq> nearbyPlaces,
-            UpsertHotelPolicyReq policy,
-            UpsertGeneralInfoReq generalInfo,
-            List<UpsertFaqReq> faqs,
+                        // --- amenities ---
+                        List<String> amenityCodes, // scope HOTEL
 
-            // --- configs ---
-            UpsertTaxConfigReq taxConfig,
-            UpsertBookingConfigReq bookingConfig
-    ) {}
+                        // --- rooms ---
+                        List<UpsertRoomTypeReq> roomTypes,
 
-    // ===== Content blocks =====
-    public record UpsertContentBlockReq(
-            String type,        // HEADING/PARAGRAPH/IMAGE/GALLERY/QUOTE/DIVIDER/INFOBOX/MAP
-            String section,     // OVERVIEW/STORY/OTHER
-            String text,
-            ImageReq image,         // for IMAGE
-            List<ImageReq> gallery, // for GALLERY
-            Double mapLat,          // for MAP
-            Double mapLon,          // for MAP
-            Integer sortOrder
-    ) {}
+                        // --- nearby/policy/info/faq ---
+                        List<UpsertNearbyPlaceReq> nearbyPlaces,
+                        UpsertHotelPolicyReq policy,
+                        UpsertGeneralInfoReq generalInfo,
+                        List<UpsertFaqReq> faqs,
 
-    // ===== Nearby =====
-    public record UpsertNearbyPlaceReq(
-            String placeSlug,
-            @NotBlank String name,
-            String category,
-            Double distanceMeters
-    ) {}
+                        // --- configs ---
+                        UpsertTaxConfigReq taxConfig,
+                        UpsertBookingConfigReq bookingConfig) {
+        }
 
-    // ===== Policy =====
-    public record UpsertHotelPolicyReq(
-            String checkInFrom,     // "14:00"
-            String checkOutUntil,   // "12:00"
-            List<UpsertPolicyItemReq> items
-    ) {}
+        // ===== Content blocks =====
+        public record UpsertContentBlockReq(
+                        String type, // HEADING/PARAGRAPH/IMAGE/GALLERY/QUOTE/DIVIDER/INFOBOX/MAP
+                        String section, // OVERVIEW/STORY/OTHER
+                        String text,
+                        ImageReq image, // for IMAGE
+                        List<ImageReq> gallery, // for GALLERY
+                        Double mapLat, // for MAP
+                        Double mapLon, // for MAP
+                        Integer sortOrder) {
+        }
 
-    public record UpsertPolicyItemReq(
-            String section,         // PolicySection enum name
-            String title,
-            String content
-    ) {}
+        // ===== Nearby =====
+        public record UpsertNearbyPlaceReq(
+                        String placeSlug,
+                        @NotBlank String name,
+                        String category,
+                        Double distanceMeters) {
+        }
 
-    // ===== General info =====
-    public record UpsertGeneralInfoReq(
-            String mainFacilitiesSummary,
-            Double distanceToCityCenterKm,
-            String popularAreaSummary,
-            Integer totalRooms,
-            Integer totalFloors,
-            String otherHighlightFacilities,
-            String interestingPlacesSummary
-    ) {}
+        // ===== Policy =====
+        public record UpsertHotelPolicyReq(
+                        String checkInFrom, // "14:00"
+                        String checkOutUntil, // "12:00"
+                        List<UpsertPolicyItemReq> items) {
+        }
 
-    // ===== FAQ =====
-    public record UpsertFaqReq(
-            @NotBlank String question,
-            @NotBlank String answer
-    ) {}
+        public record UpsertPolicyItemReq(
+                        String section, // PolicySection enum name
+                        String title,
+                        String content) {
+        }
 
-    // ===== Tax config =====
-    public record UpsertTaxConfigReq(
-            BigDecimal defaultVatPercent,
-            BigDecimal defaultServiceFeePercent,
-            Boolean showPricePreTax
-    ) {}
+        // ===== General info =====
+        public record UpsertGeneralInfoReq(
+                        String mainFacilitiesSummary,
+                        Double distanceToCityCenterKm,
+                        String popularAreaSummary,
+                        Integer totalRooms,
+                        Integer totalFloors,
+                        String otherHighlightFacilities,
+                        String interestingPlacesSummary) {
+        }
 
-    // ===== Booking config =====
-    public record UpsertBookingConfigReq(
-            Boolean allowFullPayment,
-            Boolean allowDeposit,
-            BigDecimal depositPercent,
-            Integer freeCancelMinutes
-    ) {}
+        // ===== FAQ =====
+        public record UpsertFaqReq(
+                        @NotBlank String question,
+                        @NotBlank String answer) {
+        }
 
-    // ===== Room types =====
-    public record UpsertRoomTypeReq(
-            String id,                 // null => backend gen
-            @NotBlank String name,
-            String shortDescription,
-            String description,
+        // ===== Tax config =====
+        public record UpsertTaxConfigReq(
+                        BigDecimal defaultVatPercent,
+                        BigDecimal defaultServiceFeePercent,
+                        Boolean showPricePreTax) {
+        }
 
-            Double areaSqm,
+        // ===== Booking config =====
+        public record UpsertBookingConfigReq(
+                        Boolean allowFullPayment,
+                        Boolean allowDeposit,
+                        BigDecimal depositPercent,
+                        Integer freeCancelMinutes) {
+        }
 
-            String bedType,
-            Integer bedsCount,
+        // ===== Room types =====
+        public record UpsertRoomTypeReq(
+                        String id, // null => backend gen
+                        @NotBlank String name,
+                        String shortDescription,
+                        String description,
 
-            String bedLayoutDescription,
-            List<UpsertBedOptionReq> bedOptions,
+                        Double areaSqm,
 
-            Integer maxAdults,
-            Integer maxChildren,
-            Integer maxGuests,
-            Integer totalRooms,
+                        String bedType,
+                        Integer bedsCount,
 
-            List<ImageReq> images,
-            List<String> amenityCodes,
-            List<UpsertRatePlanReq> ratePlans
-    ) {}
+                        String bedLayoutDescription,
+                        List<UpsertBedOptionReq> bedOptions,
 
-    public record UpsertBedOptionReq(
-            String type,
-            Integer count
-    ) {}
+                        Integer maxAdults,
+                        Integer maxChildren,
+                        Integer maxGuests,
+                        Integer totalRooms,
 
-    // ===== Rate plans =====
-    public record UpsertRatePlanReq(
-            String id,
-            @NotBlank String name,
+                        List<ImageReq> images,
+                        List<String> amenityCodes,
+                        List<UpsertRatePlanReq> ratePlans) {
+        }
 
-            String boardType,
-            String paymentType,
-            Boolean refundable,
-            String cancellationPolicy,
+        public record UpsertBedOptionReq(
+                        String type,
+                        Integer count) {
+        }
 
-            BigDecimal pricePerNight,
-            BigDecimal referencePricePerNight,
-            Integer discountPercent,
+        // ===== Rate plans =====
+        public record UpsertRatePlanReq(
+                        String id,
+                        @NotBlank String name,
 
-            BigDecimal taxPercent,
-            BigDecimal serviceFeePercent,
-            Boolean priceIncludesTax,
-            Boolean priceIncludesServiceFee,
+                        String boardType,
+                        String paymentType,
+                        Boolean refundable,
+                        String cancellationPolicy,
 
-            List<UpsertLengthOfStayDiscountReq> lengthOfStayDiscounts,
+                        BigDecimal pricePerNight,
+                        BigDecimal referencePricePerNight,
+                        Integer discountPercent,
 
-            String promoLabel,
-            Boolean showLowAvailability
-    ) {}
+                        BigDecimal taxPercent,
+                        BigDecimal serviceFeePercent,
+                        Boolean priceIncludesTax,
+                        Boolean priceIncludesServiceFee,
 
-    public record UpsertLengthOfStayDiscountReq(
-            Integer minNights,
-            Integer maxNights,
-            Integer discountPercent
-    ) {}
+                        List<UpsertLengthOfStayDiscountReq> lengthOfStayDiscounts,
 
-    // =========================================================
-    //                      SERVICE RESPONSES (giữ như bạn có)
-    // =========================================================
+                        String promoLabel,
+                        Boolean showLowAvailability) {
+        }
 
-    public record PartnerServiceSummary(
-            String id,
-            String name,
-            String slug,
-            ServiceStatus status,
-            PendingReason pendingReason,
-            String rejectionReason,
-            Boolean active,
-            Instant createdAt,
-            Instant updatedAt
-    ) {}
+        public record UpsertLengthOfStayDiscountReq(
+                        Integer minNights,
+                        Integer maxNights,
+                        Integer discountPercent) {
+        }
 
-    // =========================================================
-    //                     BOOKING/STATS (giữ như bạn có)
-    // =========================================================
+        // ===
+        // SERVICE RESPONSES (giữ như bạn có)
+        // ===
 
-    public record CancelBookingReq(@NotBlank String reason) {}
+        public record PartnerServiceSummary(
+                        String id,
+                        String name,
+                        String slug,
+                        ServiceStatus status,
+                        PendingReason pendingReason,
+                        String rejectionReason,
+                        Boolean active,
+                        Instant createdAt,
+                        Instant updatedAt) {
+        }
 
-    public enum BookingType { HOTEL, RESTAURANT }
+        // ===
+        // BOOKING/STATS (giữ như bạn có)
+        // ===
 
-    public record PartnerBookingSummary(
-            BookingType type,
-            String bookingCode,
-            String serviceId,
-            String serviceName,
-            String serviceSlug,
-            String customerName,
-            String customerPhone,
-            String customerEmail,
-            LocalDate dateFrom,
-            LocalDate dateTo,
-            String status,
-            String paymentStatus,
-            BigDecimal amountPaid,
-            Instant createdAt
-    ) {}
+        public record CancelBookingReq(@NotBlank String reason) {
+        }
 
-    public record StatusCount(String status, Long count) {}
+        public enum BookingType {
+                HOTEL, RESTAURANT
+        }
 
-    public record PartnerBookingStatsResponse(
-            List<StatusCount> bookingStatusCounts,
-            List<StatusCount> paymentStatusCounts
-    ) {}
+        public record PartnerBookingSummary(
+                        BookingType type,
+                        String bookingCode,
+                        String serviceId,
+                        String serviceName,
+                        String serviceSlug,
+                        String customerName,
+                        String customerPhone,
+                        String customerEmail,
+                        LocalDate dateFrom,
+                        LocalDate dateTo,
+                        String status,
+                        String paymentStatus,
+                        BigDecimal amountPaid,
+                        Instant createdAt) {
+        }
 
-    public record PartnerRevenueResponse(
-            BigDecimal hotelRevenue,
-            BigDecimal restaurantRevenue,
-            BigDecimal totalRevenue
-    ) {}
+        public record StatusCount(String status, Long count) {
+        }
 
-    // =========================================================
-    //                   RESTAURANT – REQUESTS
-    // =========================================================
+        public record PartnerBookingStatsResponse(
+                        List<StatusCount> bookingStatusCounts,
+                        List<StatusCount> paymentStatusCounts) {
+        }
 
-    public record UpsertRestaurantReq(
-            @NotBlank String name,
-            String slug,
+        public record PartnerRevenueResponse(
+                        BigDecimal hotelRevenue,
+                        BigDecimal restaurantRevenue,
+                        BigDecimal totalRevenue) {
+        }
 
-            // link & location
-            @NotBlank String destinationSlug,
-            String cityName,
-            String districtName,
-            String wardName,
-            String addressLine,
-            Double latitude,
-            Double longitude,
+        // ===
+        // RESTAURANT – REQUESTS
+        // ===
 
-            // basic
-            String shortDescription,
-            String description,
-            String phone,
-            String email,
-            String website,
+        public record UpsertRestaurantReq(
+                        @NotBlank String name,
+                        String slug,
 
-            BigDecimal minPrice,
-            BigDecimal maxPrice,
+                        // link & location
+                        @NotBlank String destinationSlug,
+                        String cityName,
+                        String districtName,
+                        String wardName,
+                        String addressLine,
+                        Double latitude,
+                        Double longitude,
 
-            List<ImageReq> images,
+                        // basic
+                        String shortDescription,
+                        String description,
+                        String phone,
+                        String email,
+                        String website,
 
-            // extras
-            List<String> amenityCodes,
-            List<UpsertTableTypeReq> tableTypes,
-            UpsertRestaurantBookingConfigReq bookingConfig
-    ) {}
+                        BigDecimal minPrice,
+                        BigDecimal maxPrice,
 
-    public record UpsertTableTypeReq(
-            String id,
-            @NotBlank String name,
-            Integer seats,
-            Integer minPeople,
-            Integer maxPeople,
-            Integer totalTables,
-            BigDecimal depositPrice,
-            String currencyCode,
-            Boolean vip,
-            Boolean privateRoom,
-            List<Integer> allowedDurationsMinutes,
-            Integer defaultDurationMinutes,
-            String note
-    ) {}
+                        List<ImageReq> images,
 
-    public record UpsertRestaurantBookingConfigReq(
-            Integer slotMinutes,
-            List<Integer> allowedDurationsMinutes,
-            Integer defaultDurationMinutes,
-            Integer minBookingLeadTimeMinutes,
-            Integer graceArrivalMinutes,
-            Integer freeCancelMinutes,
-            Integer pendingPaymentExpireMinutes,
-            Boolean depositOnly,
-            Integer maxTablesPerBooking
-    ) {}
+                        // extras
+                        List<String> amenityCodes,
+                        List<UpsertTableTypeReq> tableTypes,
+                        UpsertRestaurantBookingConfigReq bookingConfig) {
+        }
+
+        public record UpsertTableTypeReq(
+                        String id,
+                        @NotBlank String name,
+                        Integer seats,
+                        Integer minPeople,
+                        Integer maxPeople,
+                        Integer totalTables,
+                        BigDecimal depositPrice,
+                        String currencyCode,
+                        Boolean vip,
+                        Boolean privateRoom,
+                        List<Integer> allowedDurationsMinutes,
+                        Integer defaultDurationMinutes,
+                        String note) {
+        }
+
+        public record UpsertRestaurantBookingConfigReq(
+                        Integer slotMinutes,
+                        List<Integer> allowedDurationsMinutes,
+                        Integer defaultDurationMinutes,
+                        Integer minBookingLeadTimeMinutes,
+                        Integer graceArrivalMinutes,
+                        Integer freeCancelMinutes,
+                        Integer pendingPaymentExpireMinutes,
+                        Boolean depositOnly,
+                        Integer maxTablesPerBooking) {
+        }
 }

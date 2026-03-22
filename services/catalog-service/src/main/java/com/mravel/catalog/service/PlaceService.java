@@ -120,7 +120,7 @@ public class PlaceService {
     return toAdminResponse(saved);
   }
 
-  // ===================== UPDATE =====================
+  // === UPDATE ===
   @Transactional
   public PlaceAdminResponse update(String id, UpsertPlaceRequest req) {
     PlaceDoc existing = repo.findById(id)

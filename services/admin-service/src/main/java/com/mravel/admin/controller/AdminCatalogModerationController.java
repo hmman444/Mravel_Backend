@@ -18,7 +18,7 @@ public class AdminCatalogModerationController {
 
     private final CatalogClient catalogClient;
 
-    // =============== LIST (giữ nguyên như trước) ===============
+    // LIST (giữ nguyên như trước)
     @GetMapping("/hotels")
     public ResponseEntity<ApiResponse<?>> listHotels(
             @RequestParam(required = false) String status,
@@ -63,7 +63,7 @@ public class AdminCatalogModerationController {
         return catalogClient.adminGetRestaurantDetail(id, extractToken(request));
     }
 
-    // =============== HOTEL ACTIONS ===============
+    // HOTEL ACTIONS
     @PostMapping("/hotels/{id}:approve")
     public ResponseEntity<ApiResponse<?>> approveHotel(@PathVariable String id, HttpServletRequest request) {
         Long adminId = currentUserId();

@@ -11,44 +11,47 @@ import java.util.List;
 
 public final class RestaurantBookingMapper {
 
-    private RestaurantBookingMapper() {}
+    private RestaurantBookingMapper() {
+    }
 
     /*
-     * ✅ DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho RestaurantBookingSummaryDTO:
+     * ✅ DTO EXPECTED (SUMMARY) - bạn cần update record/constructor cho
+     * RestaurantBookingSummaryDTO:
      * RestaurantBookingSummaryDTO(
-     *   String code,
-     *   String restaurantId,
-     *   String restaurantName,
-     *   String restaurantSlug,
+     * String code,
+     * String restaurantId,
+     * String restaurantName,
+     * String restaurantSlug,
      *
-     *   java.time.LocalDate reservationDate,
-     *   java.time.LocalTime reservationTime,
-     *   Integer durationMinutes,
-     *   Integer people,
-     *   Integer tablesCount,
+     * java.time.LocalDate reservationDate,
+     * java.time.LocalTime reservationTime,
+     * Integer durationMinutes,
+     * Integer people,
+     * Integer tablesCount,
      *
-     *   String contactName,
-     *   String contactPhone,
-     *   String contactEmail,
+     * String contactName,
+     * String contactPhone,
+     * String contactEmail,
      *
-     *   java.math.BigDecimal totalAmount,
-     *   java.math.BigDecimal depositAmount,
-     *   java.math.BigDecimal amountPayable,
-     *   java.math.BigDecimal amountPaid,
-     *   String currencyCode,
+     * java.math.BigDecimal totalAmount,
+     * java.math.BigDecimal depositAmount,
+     * java.math.BigDecimal amountPayable,
+     * java.math.BigDecimal amountPaid,
+     * String currencyCode,
      *
-     *   String bookingStatus,
-     *   String paymentStatus,
-     *   java.time.Instant createdAt,
-     *   java.time.Instant paidAt,
-     *   java.time.Instant cancelledAt,
-     *   String cancelReason
+     * String bookingStatus,
+     * String paymentStatus,
+     * java.time.Instant createdAt,
+     * java.time.Instant paidAt,
+     * java.time.Instant cancelledAt,
+     * String cancelReason
      * )
      */
 
-    // ===================== SUMMARY (CHO LIST) =====================
+    // === SUMMARY (CHO LIST) ===
     public static RestaurantBookingSummaryDTO toSummary(RestaurantBooking b) {
-        if (b == null) return null;
+        if (b == null)
+            return null;
 
         return new RestaurantBookingSummaryDTO(
                 b.getCode(),
@@ -78,21 +81,22 @@ public final class RestaurantBookingMapper {
                 b.getCreatedAt(),
                 b.getPaidAt(),
                 b.getCancelledAt(),
-                b.getCancelReason()
-        );
+                b.getCancelReason());
     }
 
-    // ===================== DETAIL (CHO DETAIL) =====================
+    // === DETAIL (CHO DETAIL) ===
     public static RestaurantBookingDetailDTO toDetail(RestaurantBooking b) {
         return toDetailDTO(b);
     }
 
     public static RestaurantBookingDetailDTO toDetailDTO(RestaurantBooking b) {
-        if (b == null) return null;
+        if (b == null)
+            return null;
 
         List<BookingTableLine> lines = mapLines(b.getTables());
 
-        // Nếu DTO detail của bạn hiện CHƯA có updatedAt/totalAmount/currencyCode/payOption...
+        // Nếu DTO detail của bạn hiện CHƯA có
+        // updatedAt/totalAmount/currencyCode/payOption...
         // thì bạn có 2 lựa chọn:
         // 1) Update DTO cho "đầy đủ" như Hotel (khuyến nghị)
         // 2) Giữ signature cũ và bỏ bớt field tương ứng
@@ -131,12 +135,12 @@ public final class RestaurantBookingMapper {
                 b.getCancelReason(),
 
                 b.getInventoryDeducted(),
-                lines
-        );
+                lines);
     }
 
     private static List<BookingTableLine> mapLines(List<BookingTable> tables) {
-        if (tables == null || tables.isEmpty()) return Collections.emptyList();
+        if (tables == null || tables.isEmpty())
+            return Collections.emptyList();
 
         return tables.stream()
                 .filter(t -> t != null)
@@ -147,8 +151,7 @@ public final class RestaurantBookingMapper {
                         t.getSeats(),
                         t.getQuantity(),
                         t.getDepositPrice(),
-                        t.getTotalDeposit()
-                ))
+                        t.getTotalDeposit()))
                 .toList();
     }
 }

@@ -14,7 +14,7 @@ public class HotelMapper {
         private HotelMapper() {
         }
 
-        // ================== SUMMARY ==================
+        // SUMMARY
 
         public static HotelSummaryDTO toSummary(HotelDoc h) {
                 String cover = null;
@@ -73,7 +73,7 @@ public class HotelMapper {
                                 highlightTags);
         }
 
-        // ================== DETAIL ==================
+        // DETAIL
         /**
          * Resolve amenityCodes -> AmenityDTO bằng catalogMap (đã query từ DB).
          *
@@ -194,7 +194,7 @@ public class HotelMapper {
                                 bookingConfigDTO);
         }
 
-        // ================== HELPERS: RESOLVE AMENITIES ==================
+        // HELPERS: RESOLVE AMENITIES
 
         private static List<AmenityDTO> resolveAmenities(List<String> codes,
                         Map<String, AmenityCatalogDoc> catalogMap) {
@@ -225,7 +225,7 @@ public class HotelMapper {
                                 a.getIcon());
         }
 
-        // ================== SUB MAPPERS ==================
+        // SUB MAPPERS
 
         public static ImageDTO toImage(HotelDoc.Image img) {
                 return new ImageDTO(
@@ -414,7 +414,7 @@ public class HotelMapper {
                                 lastActionAt);
         }
 
-        // ================== OPTIONAL: build catalogMap helper ==================
+        // OPTIONAL: build catalogMap helper
         public static Map<String, AmenityCatalogDoc> toCatalogMap(List<AmenityCatalogDoc> items) {
                 if (items == null)
                         return Map.of();
