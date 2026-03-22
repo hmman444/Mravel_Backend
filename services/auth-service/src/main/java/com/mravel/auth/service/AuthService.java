@@ -394,7 +394,6 @@ public class AuthService {
 
                     userRepository.save(newUser);
 
-                    // Outbox tạo profile user-service (nếu bạn muốn đồng bộ)
                     try {
                         UserRegisteredEvent event = UserRegisteredEvent.builder()
                                 .id(newUser.getId())
@@ -403,8 +402,6 @@ public class AuthService {
                                 .avatar(profile.getPicture())
                                 .provider(request.getProvider())
                                 .providerId(profile.getProviderId())
-                                // nếu event có role thì set luôn
-                                // .role(newUser.getRole().name())
                                 .build();
 
                         String payload = new ObjectMapper().writeValueAsString(event);

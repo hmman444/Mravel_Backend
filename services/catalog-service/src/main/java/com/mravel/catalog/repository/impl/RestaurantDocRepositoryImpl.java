@@ -26,15 +26,16 @@ public class RestaurantDocRepositoryImpl implements RestaurantDocRepositoryCusto
 
     @Override
     public Page<RestaurantDoc> searchRestaurants(
-            String location, Integer people, Set<String> cuisineSlugs, Pageable pageable
-    ) {
+            String location, Integer people, Set<String> cuisineSlugs, Pageable pageable) {
         final Pageable pb = (pageable == null) ? Pageable.unpaged() : pageable;
 
         Query q = new Query();
 
         // áp paging/sort lên query find (giữ nguyên logic)
-        if (pb.isPaged()) q.with(pb);
-        else q.with(pb.getSort());
+        if (pb.isPaged())
+            q.with(pb);
+        else
+            q.with(pb.getSort());
 
         List<Criteria> cs = new ArrayList<>();
         cs.add(where("active").is(true));
@@ -50,16 +51,14 @@ public class RestaurantDocRepositoryImpl implements RestaurantDocRepositoryCusto
                     where("cityName").regex(loc, "i"),
                     where("districtName").regex(loc, "i"),
                     where("wardName").regex(loc, "i"),
-                    where("addressLine").regex(loc, "i")
-            ));
+                    where("addressLine").regex(loc, "i")));
         }
 
         // people
         if (people != null && people > 0) {
             cs.add(new Criteria().orOperator(
                     where("capacity.maxGroupSize").gte(people),
-                    where("capacity.totalCapacity").gte(people)
-            ));
+                    where("capacity.totalCapacity").gte(people)));
         }
 
         // cuisines
@@ -69,7 +68,7 @@ public class RestaurantDocRepositoryImpl implements RestaurantDocRepositoryCusto
 
         q.addCriteria(Objects.requireNonNull(and(cs)));
 
-        // ✅ count phải bỏ limit/skip (giống HotelDocRepositoryImpl)
+        // count phải bỏ limit/skip (giống HotelDocRepositoryImpl)
         Query countQ = Query.of(q).limit(-1).skip(-1);
         long total = mongo.count(countQ, RestaurantDoc.class);
 

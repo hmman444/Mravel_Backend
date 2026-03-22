@@ -118,7 +118,6 @@ public class RestaurantService {
                         new ArrayList<>(codes));
 
         Map<String, AmenityCatalogDoc> catalogMap = HotelMapper.toCatalogMap(catalog);
-        // dùng lại helper map code->doc của bạn cũng được
 
         return RestaurantMapper.toDetail(r, catalogMap);
     }

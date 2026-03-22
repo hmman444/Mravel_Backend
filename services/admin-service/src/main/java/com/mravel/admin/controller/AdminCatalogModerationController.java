@@ -127,7 +127,7 @@ public class AdminCatalogModerationController {
     private Long currentUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof JwtUserPrincipal p)
-            return p.getId(); // hoặc getId() tuỳ class của bạn
+            return p.getId();
         throw new RuntimeException("Missing principal");
     }
 

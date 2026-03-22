@@ -57,17 +57,16 @@ public class MomoGatewayClient {
             orderInfo = "Thanh toan " + orderId;
         }
 
-        String rawSignature =
-            "accessKey=" + ACCESS_KEY +
-            "&amount=" + amountStr +
-            "&extraData=" + extraData +
-            "&ipnUrl=" + IPN_URL +
-            "&orderId=" + orderId +
-            "&orderInfo=" + orderInfo +
-            "&partnerCode=" + PARTNER_CODE +
-            "&redirectUrl=" + REDIRECT_URL +
-            "&requestId=" + requestId +
-            "&requestType=" + REQUEST_TYPE;
+        String rawSignature = "accessKey=" + ACCESS_KEY +
+                "&amount=" + amountStr +
+                "&extraData=" + extraData +
+                "&ipnUrl=" + IPN_URL +
+                "&orderId=" + orderId +
+                "&orderInfo=" + orderInfo +
+                "&partnerCode=" + PARTNER_CODE +
+                "&redirectUrl=" + REDIRECT_URL +
+                "&requestId=" + requestId +
+                "&requestType=" + REQUEST_TYPE;
 
         String signature = hmacSHA256(SECRET_KEY, rawSignature);
 
@@ -93,13 +92,13 @@ public class MomoGatewayClient {
 
         log.info("[MoMo] createPayment request: orderId={}, amount={}", orderId, amountStr);
 
-         try {
+        try {
             ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
-                ENDPOINT,
-                HttpMethod.POST,
-                new HttpEntity<>(body, headers),
-                new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
+                    ENDPOINT,
+                    HttpMethod.POST,
+                    new HttpEntity<>(body, headers),
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             Map<String, Object> respBody = Objects.requireNonNull(resp.getBody(), "MoMo response body is null");
 
@@ -118,7 +117,7 @@ public class MomoGatewayClient {
             return payUrl;
 
         } catch (HttpStatusCodeException ex) {
-            // ✅ MoMo trả 4xx/5xx → đọc được body JSON ở đây
+            // MoMo trả 4xx/5xx → đọc được body JSON ở đây
             String momoBody = ex.getResponseBodyAsString();
             log.error("[MoMo] error status={}, body={}", ex.getStatusCode(), momoBody);
             throw new IllegalStateException("MoMo declined: " + momoBody, ex);
@@ -126,8 +125,10 @@ public class MomoGatewayClient {
     }
 
     private static int asInt(Object obj, int defaultVal) {
-        if (obj == null) return defaultVal;
-        if (obj instanceof Number n) return n.intValue();
+        if (obj == null)
+            return defaultVal;
+        if (obj instanceof Number n)
+            return n.intValue();
         try {
             return Integer.parseInt(String.valueOf(obj));
         } catch (Exception ignore) {
@@ -138,13 +139,13 @@ public class MomoGatewayClient {
     private static String hmacSHA256(String secretKey, String data) {
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec =
-                    new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             hmac.init(secretKeySpec);
 
             byte[] hash = hmac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder(2 * hash.length);
-            for (byte b : hash) sb.append(String.format("%02x", b & 0xff));
+            for (byte b : hash)
+                sb.append(String.format("%02x", b & 0xff));
             return sb.toString();
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi generate HMAC SHA256", e);

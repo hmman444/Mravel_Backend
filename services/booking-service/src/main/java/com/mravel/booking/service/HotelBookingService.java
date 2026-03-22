@@ -163,12 +163,12 @@ public class HotelBookingService {
         HotelBooking b = hotelBookingRepository.findByCode(code.trim())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
-        // ✅ chỉ cho resume khi còn pending
+        // chỉ cho resume khi còn pending
         if (b.getStatus() != BookingStatus.PENDING_PAYMENT || b.getPaymentStatus() != PaymentStatus.PENDING) {
             throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
         }
 
-        // ✅ quyền: nếu booking thuộc account => cần userId đúng
+        // quyền: nếu booking thuộc account => cần userId đúng
         if (b.getUserId() != null) {
             if (userId == null || !userId.equals(b.getUserId())) {
                 throw new IllegalStateException("Bạn không có quyền tiếp tục thanh toán booking này");
@@ -181,7 +181,7 @@ public class HotelBookingService {
             }
         }
 
-        // ✅ trong 30 phút
+        // trong 30 phút
         Instant deadline = b.getCreatedAt().plus(PENDING_EXPIRE_MINUTES, ChronoUnit.MINUTES);
         Instant now = Instant.now();
         if (now.isAfter(deadline))
@@ -247,12 +247,12 @@ public class HotelBookingService {
         HotelBooking booking = hotelBookingRepository.findByCode(bookingCode.trim())
                 .orElseThrow(() -> new IllegalArgumentException("Booking không tồn tại"));
 
-        // ✅ quyền: user booking
+        // quyền: user booking
         if (booking.getUserId() != null) {
             if (userId == null || !userId.equals(booking.getUserId()))
                 throw new IllegalStateException("Bạn không có quyền hủy booking này");
         } else {
-            // ✅ quyền: guest booking
+            // quyền: guest booking
             if (guestSid == null || guestSid.isBlank()
                     || booking.getGuestSessionId() == null
                     || !guestSid.equals(booking.getGuestSessionId()))
@@ -289,10 +289,10 @@ public class HotelBookingService {
         booking.setCancelReason(reason);
         booking.setCancelledAt(Instant.now());
 
-        // ✅ status nói “ai huỷ”
+        // status nói “ai huỷ”
         booking.setStatus(BookingStatus.CANCELLED_BY_GUEST);
 
-        // ✅ paymentStatus nói “hoàn tiền hay không”
+        // paymentStatus nói “hoàn tiền hay không”
         boolean shouldRefund;
         if (minutesFromCreate <= FREE_CANCEL_MINUTES) {
             shouldRefund = true;

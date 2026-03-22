@@ -214,8 +214,8 @@ public class PartnerCatalogDtos {
                         // location/link
                         String destinationSlug,
 
-                        // ✅ thống nhất cityName, nhưng vẫn nhận provinceName nếu client cũ gửi lên
-                        @JsonAlias( {
+                        // thống nhất cityName, nhưng vẫn nhận provinceName nếu client cũ gửi lên
+                        @JsonAlias({
                                         "provinceName" }) String cityName,
 
                         String districtName,
@@ -238,7 +238,7 @@ public class PartnerCatalogDtos {
 
                         List<String> amenityCodes,
                         List<UpsertTableTypeReq> tableTypes,
-                        UpsertRestaurantBookingConfigReq bookingConfig){
+                        UpsertRestaurantBookingConfigReq bookingConfig) {
         }
 
         public record UpsertTableTypeReq(

@@ -7,6 +7,9 @@ import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
 import com.mravel.plan.dto.board.PlanRecentView;
+import com.mravel.plan.exception.BadRequestException;
+import com.mravel.plan.exception.ForbiddenException;
+import com.mravel.plan.exception.NotFoundException;
 import com.mravel.plan.model.ExtraCost;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanCard;
@@ -138,7 +141,7 @@ public class PlanService {
                 Long viewerId = currentUser.getId();
 
                 Plan plan = planRepository.findById(id)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 RelationshipType relationship = friendClient.getRelationship(
                                 authorizationHeader,
@@ -147,7 +150,7 @@ public class PlanService {
                 boolean isFriend = relationship == RelationshipType.FRIEND;
 
                 if (!permissionService.canView(id, viewerId, isFriend)) {
-                        throw new RuntimeException("You don't have permission to view this plan.");
+                        throw new ForbiddenException("You don't have permission to view this plan.");
                 }
 
                 return planMapper.toFeedItem(plan);
@@ -157,10 +160,10 @@ public class PlanService {
         public PlanFeedItem createPlan(CreatePlanRequest req, Long userId) {
 
                 if (req.getStartDate() == null || req.getEndDate() == null)
-                        throw new RuntimeException("Start and end date are required");
+                        throw new BadRequestException("Start and end date are required");
 
                 if (req.getEndDate().isBefore(req.getStartDate()))
-                        throw new RuntimeException("endDate must be >= startDate");
+                        throw new BadRequestException("endDate must be >= startDate");
 
                 int days = (int) (req.getEndDate().toEpochDay() - req.getStartDate().toEpochDay() + 1);
 
@@ -220,10 +223,10 @@ public class PlanService {
         @Transactional
         public PlanFeedItem updateVisibility(Long planId, Long userId, Visibility visibility) {
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 if (!userId.equals(plan.getAuthorId()))
-                        throw new RuntimeException("Only the owner can change visibility.");
+                        throw new ForbiddenException("Only the owner can change visibility.");
 
                 plan.setVisibility(visibility);
                 planRepository.save(plan);
@@ -234,7 +237,7 @@ public class PlanService {
         public PlanFeedItem copyPlan(Long planId, Long userId, String authorizationHeader) {
 
                 Plan source = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
 
@@ -254,7 +257,7 @@ public class PlanService {
                 // - FRIENDS: bạn bè xem/copy
                 // - PRIVATE: chỉ member/owner xem/copy
                 if (!permissionService.canView(planId, userId, isFriend) && !isMember) {
-                        throw new RuntimeException("You don't have permission to copy this plan.");
+                        throw new ForbiddenException("You don't have permission to copy this plan.");
                 }
 
                 // ========= TẠO PLAN MỚI =========
@@ -381,13 +384,13 @@ public class PlanService {
                         Long parentId) {
 
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 PlanComment parent = null;
                 if (parentId != null) {
                         parent = entityManager.find(PlanComment.class, parentId);
                         if (parent == null)
-                                throw new RuntimeException("Parent comment not found");
+                                throw new NotFoundException("Parent comment not found");
                 }
 
                 PlanComment comment = PlanComment.builder()
@@ -441,12 +444,12 @@ public class PlanService {
         @Transactional
         public PlanFeedItem react(Long planId, String key, Long userId) {
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 // Gọi sang user-service lấy thông tin user
                 UserProfileResponse user = userProfileClient.getUserById(userId);
                 if (user == null)
-                        throw new RuntimeException("User not found: " + userId);
+                        throw new NotFoundException("User not found: " + userId);
 
                 Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
                 boolean created = false;
@@ -478,7 +481,7 @@ public class PlanService {
 
         public void increaseView(Long planId) {
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
                 planRepository.save(plan);
@@ -576,10 +579,10 @@ public class PlanService {
         public void deletePlan(Long planId, Long userId) {
                 inviteTokenRepository.deleteByPlanId(planId);
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 if (!Objects.equals(plan.getAuthorId(), userId)) {
-                        throw new RuntimeException("Only the owner can delete this plan.");
+                        throw new ForbiddenException("Only the owner can delete this plan.");
                 }
 
                 recentViewRepository.deleteByPlanId(planId);
