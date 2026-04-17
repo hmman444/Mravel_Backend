@@ -11,4 +11,7 @@ public final class KafkaTopics {
 
     /** v2 — revisioned envelope with patch payload (Phase 2+) */
     public static final String PLAN_BOARD_EVENTS_V2 = "plan-board-events-v2";
+
+    /** Elasticsearch sync — UPSERT or DELETE a plan document. */
+    public static final String PLAN_INDEX_EVENTS = "plan.v1.index-events";
 }

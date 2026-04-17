@@ -140,6 +140,10 @@ public class PlanMapper {
                                 .reactions(reactionSummary)
                                 .reactionUsers(reactionUsers)
                                 .comments(commentDtos)
+                                .budgetTotal(p.getBudgetTotal())
+                                .budgetPerPerson(p.getBudgetPerPerson())
+                                .budgetCurrency(p.getBudgetCurrency() != null ? p.getBudgetCurrency() : "VND")
+                                .thumbnail(p.getThumbnail())
                                 .build();
         }
 

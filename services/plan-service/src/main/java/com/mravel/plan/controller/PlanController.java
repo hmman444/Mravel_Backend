@@ -1,15 +1,20 @@
 package com.mravel.plan.controller;
 
 import com.mravel.common.response.ApiResponse;
+import com.mravel.plan.document.PlanDocument;
 import com.mravel.plan.dto.*;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.security.CurrentUserService;
+import com.mravel.plan.service.PlanSearchService;
 import com.mravel.plan.service.PlanService;
+import com.mravel.plan.util.CursorUtils;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,29 +24,91 @@ import org.springframework.web.bind.annotation.*;
 public class PlanController {
 
         private final PlanService planService;
+        private final PlanSearchService planSearchService;
         private final CurrentUserService currentUser;
 
+        /**
+         * Advanced search endpoint backed by Elasticsearch (cursor-based pagination).
+         * All filter parameters are optional — omit them to get the full accessible feed.
+         *
+         * Query params:
+         *   q             – free-text keyword
+         *   budgetMin/Max – VND range
+         *   daysMin/Max   – trip duration range
+         *   startDateFrom/To – ISO-8601 date range (yyyy-MM-dd)
+         *   destinations  – repeated param for destination names
+         *   sortBy        – RELEVANCE | NEWEST | MOST_VIEWED | BUDGET_ASC | BUDGET_DESC
+         *   cursor        – opaque pagination cursor from previous response (null = first page)
+         *   size          – page size (default 10, max 50)
+         *   userLimit     – max user results returned alongside plan results
+         */
         @GetMapping("/search")
         public ResponseEntity<ApiResponse<PlanSearchResponse>> search(
                         @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                         @RequestParam(name = "q", defaultValue = "") String q,
-                        @RequestParam(defaultValue = "1") int page,
+                        @RequestParam(required = false) Long budgetMin,
+                        @RequestParam(required = false) Long budgetMax,
+                        @RequestParam(required = false) Integer daysMin,
+                        @RequestParam(required = false) Integer daysMax,
+                        @RequestParam(required = false) String startDateFrom,
+                        @RequestParam(required = false) String startDateTo,
+                        @RequestParam(required = false) List<String> destinations,
+                        @RequestParam(defaultValue = "RELEVANCE") String sortBy,
+                        @RequestParam(required = false) String cursor,
                         @RequestParam(defaultValue = "10") int size,
                         @RequestParam(defaultValue = "8") int userLimit) {
+
                 Long viewerId = currentUser.getId();
 
-                Page<PlanFeedItem> data = planService.searchFeed(page, size, viewerId, authorizationHeader, q);
-
-                PageResponse<PlanFeedItem> pageResponse = PageResponse.<PlanFeedItem>builder()
-                                .items(data.getContent())
-                                .page(page)
+                PlanFilterRequest filter = PlanFilterRequest.builder()
+                                .q(q.isBlank() ? null : q.trim())
+                                .budgetMin(budgetMin)
+                                .budgetMax(budgetMax)
+                                .daysMin(daysMin)
+                                .daysMax(daysMax)
+                                .startDateFrom(startDateFrom)
+                                .startDateTo(startDateTo)
+                                .destinations(destinations)
+                                .sortBy(sortBy)
+                                .cursor(cursor)
                                 .size(size)
-                                .total(data.getTotalElements())
-                                .hasMore(page * size < data.getTotalElements())
                                 .build();
 
-                var users = planService.searchUsersFromUserService(authorizationHeader, q,
-                                Math.max(1, Math.min(userLimit, 30)));
+                // Resolve visibility context
+                List<Long> memberPlanIds = planService.getMemberPlanIds(viewerId);
+                List<Long> friendIds     = planService.getFriendIds(authorizationHeader);
+
+                SearchHits<PlanDocument> hits = planSearchService.search(filter, viewerId, friendIds, memberPlanIds);
+
+                List<SearchHit<PlanDocument>> hitList = hits.getSearchHits();
+
+                List<PlanFeedItem> planItems = hitList.stream()
+                                .map(SearchHit::getContent)
+                                .map(planService::toFeedItemFromDocument)
+                                .toList();
+
+                // Extract nextCursor from the last hit's sort values.
+                // If we got fewer items than requested, there are no more results.
+                String nextCursor = null;
+                boolean hasMore = planItems.size() == size;
+                if (hasMore && !hitList.isEmpty()) {
+                        nextCursor = CursorUtils.encode(
+                                hitList.get(hitList.size() - 1).getSortValues());
+                }
+
+                PageResponse<PlanFeedItem> pageResponse = PageResponse.<PlanFeedItem>builder()
+                                .items(planItems)
+                                .size(size)
+                                .total(hits.getTotalHits())
+                                .hasMore(hasMore)
+                                .nextCursor(nextCursor)
+                                .build();
+
+                // Users are only fetched on the first page (cursor == null) to avoid duplication
+                var users = (cursor == null)
+                                ? planService.searchUsersFromUserService(authorizationHeader, q,
+                                                Math.max(1, Math.min(userLimit, 30)))
+                                : List.<com.mravel.common.response.UserProfileResponse>of();
 
                 PlanSearchResponse resp = PlanSearchResponse.builder()
                                 .query(q)
@@ -216,5 +283,12 @@ public class PlanController {
 
                 return ResponseEntity.ok(
                                 ApiResponse.success("Plan deleted successfully", null));
+        }
+
+        @PostMapping("/_sync")
+        public ResponseEntity<ApiResponse<String>> syncAll() {
+                planService.syncAllToElasticsearch();
+                return ResponseEntity.ok(
+                                ApiResponse.success("Đồng bộ dữ liệu sang Elasticsearch thành công", "Cứu dữ liệu xong!"));
         }
 }

@@ -4,12 +4,15 @@ import com.mravel.common.response.RelationshipType;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.plan.client.FriendClient;
 import com.mravel.plan.client.UserProfileClient;
+import com.mravel.plan.document.PlanDocument;
 import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
+import com.mravel.plan.kafka.PlanIndexPublisher;
 import com.mravel.plan.dto.board.PlanRecentView;
 import com.mravel.plan.exception.BadRequestException;
 import com.mravel.plan.exception.ForbiddenException;
 import com.mravel.plan.exception.NotFoundException;
+import com.mravel.plan.model.Destination;
 import com.mravel.plan.model.ExtraCost;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanCard;
@@ -21,6 +24,7 @@ import com.mravel.plan.model.SplitType;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanCardRepository;
 import com.mravel.plan.repository.PlanInviteTokenRepository;
+import com.mravel.plan.repository.PlanEsRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRecentViewRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -56,6 +60,8 @@ public class PlanService {
         private final CurrentUserService currentUser;
         private final FriendClient friendClient;
         private final PlanNotificationService planNotificationService;
+        private final PlanIndexPublisher planIndexPublisher;
+        private final PlanEsRepository planEsRepository;
 
         // EntityManager để truy vấn trực tiếp cho comment
         @PersistenceContext
@@ -216,6 +222,7 @@ public class PlanService {
                                                 .build());
 
                 permissionService.ensureOwner(plan.getId(), userId);
+                planIndexPublisher.publishUpsert(plan.getId());
 
                 return planMapper.toFeedItem(plan);
         }
@@ -230,6 +237,7 @@ public class PlanService {
 
                 plan.setVisibility(visibility);
                 planRepository.save(plan);
+                planIndexPublisher.publishUpsert(planId);
                 return planMapper.toFeedItem(plan);
         }
 
@@ -372,6 +380,8 @@ public class PlanService {
                                                 .title("Trash")
                                                 .dayDate(null)
                                                 .build());
+
+                planIndexPublisher.publishUpsert(copy.getId());
 
                 return planMapper.toFeedItem(copy);
         }
@@ -588,8 +598,119 @@ public class PlanService {
                 recentViewRepository.deleteByPlanId(planId);
 
                 planRepository.delete(plan);
-
                 planRepository.flush();
+
+                // Remove from Elasticsearch index
+                planIndexPublisher.publishDelete(planId);
         }
 
+        // ─────────────── helpers exposed to PlanController ───────────────────────
+
+        /** Returns plan IDs where viewerId is a non-owner member (empty-safe). */
+        public List<Long> getMemberPlanIds(Long viewerId) {
+                if (viewerId == null)
+                        return List.of(-1L);
+                List<Long> ids = memberRepository.findPlanIdsByUserId(viewerId);
+                return ids.isEmpty() ? List.of(-1L) : ids;
+        }
+
+        /** Fetches friend IDs from friend-service; returns empty list on failure. */
+        public List<Long> getFriendIds(String authorizationHeader) {
+                if (authorizationHeader == null)
+                        return List.of();
+                try {
+                        List<Long> ids = friendClient.getFriendIds(authorizationHeader);
+                        return ids == null || ids.isEmpty() ? List.of() : ids;
+                } catch (Exception ignored) {
+                        return List.of();
+                }
+        }
+
+        /**
+         * Converts a PlanDocument (from ES) back into a PlanFeedItem by loading the
+         * full Plan from MySQL. Falls back to a lightweight DTO if the plan is missing.
+         */
+        public PlanFeedItem toFeedItemFromDocument(PlanDocument doc) {
+                try {
+                        Long planId = Long.parseLong(doc.getId());
+                        return planRepository.findById(planId)
+                                        .map(planMapper::toFeedItem)
+                                        .orElse(documentToLightweightFeedItem(doc));
+                } catch (NumberFormatException e) {
+                        return documentToLightweightFeedItem(doc);
+                }
+        }
+
+        /**
+         * Lightweight mapping from PlanDocument when the MySQL record is unavailable.
+         */
+        private PlanFeedItem documentToLightweightFeedItem(PlanDocument doc) {
+                return PlanFeedItem.builder()
+                                .id(Long.parseLong(doc.getId()))
+                                .title(doc.getTitle())
+                                .description(doc.getDescription())
+                                .visibility(doc.getVisibility())
+                                .views(doc.getViews() != null ? doc.getViews() : 0L)
+                                .startDate(doc.getStartDate() != null ? doc.getStartDate().toString() : null)
+                                .endDate(doc.getEndDate() != null ? doc.getEndDate().toString() : null)
+                                .days(doc.getDays() != null ? doc.getDays() : 0)
+                                .createdAt(doc.getCreatedAt())
+                                .budgetTotal(doc.getBudgetTotal())
+                                .budgetCurrency(doc.getBudgetCurrency() != null ? doc.getBudgetCurrency() : "VND")
+                                .thumbnail(doc.getThumbnail())
+                                .images(List.of())
+                                .destinations(doc.getDestinationNames() == null ? List.of()
+                                                : doc.getDestinationNames().stream()
+                                                                .map(n -> PlanFeedItem.Destination.builder().name(n)
+                                                                                .build())
+                                                                .toList())
+                                .reactions(Map.of())
+                                .reactionUsers(List.of())
+                                .comments(List.of())
+                                .build();
+        }
+
+        /**
+         * Đồng bộ thủ công 100% dữ liệu từ MySQL sang Elasticsearch
+         */
+        @Transactional
+        public void syncAllToElasticsearch() {
+                List<Plan> allPlans = planRepository.findAll();
+                List<PlanDocument> docs = new ArrayList<>();
+
+                for (Plan plan : allPlans) {
+                        List<String> destNames = plan.getDestinations() == null
+                                        ? Collections.emptyList()
+                                        : plan.getDestinations().stream()
+                                                        .map(Destination::getName)
+                                                        .filter(n -> n != null && !n.isBlank())
+                                                        .toList();
+
+                        PlanDocument doc = PlanDocument.builder()
+                                        .id(String.valueOf(plan.getId()))
+                                        .title(plan.getTitle())
+                                        .titleRaw(plan.getTitle())
+                                        .description(plan.getDescription())
+                                        .descriptionRaw(plan.getDescription())
+                                        .visibility(plan.getVisibility() != null ? plan.getVisibility().name()
+                                                        : "PRIVATE")
+                                        .authorId(plan.getAuthorId())
+                                        .views(plan.getViews() != null ? plan.getViews() : 0L)
+                                        .startDate(plan.getStartDate())
+                                        .endDate(plan.getEndDate())
+                                        .days(plan.getDays())
+                                        .budgetTotal(plan.getBudgetTotal())
+                                        .budgetCurrency(plan.getBudgetCurrency())
+                                        .createdAt(plan.getCreatedAt())
+                                        .destinationNames(destNames)
+                                        .thumbnail(plan.getThumbnail())
+                                        .build();
+
+                        docs.add(doc);
+                }
+
+                if (!docs.isEmpty()) {
+                        planEsRepository.saveAll(docs);
+                }
+        }
 }

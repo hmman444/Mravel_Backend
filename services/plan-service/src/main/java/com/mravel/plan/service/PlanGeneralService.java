@@ -3,6 +3,7 @@ package com.mravel.plan.service;
 import com.mravel.plan.dto.board.UpdateBudgetRequest;
 import com.mravel.plan.exception.BadRequestException;
 import com.mravel.plan.exception.NotFoundException;
+import com.mravel.plan.kafka.PlanIndexPublisher;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -26,6 +27,7 @@ public class PlanGeneralService {
     private final PlanPermissionService permission;
     private final PlanListRepository listRepo;
     private final PlanBoardService planBoardService;
+    private final PlanIndexPublisher planIndexPublisher;
 
     // helper
     private Plan loadPlan(Long planId) {
@@ -56,6 +58,7 @@ public class PlanGeneralService {
         long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_TITLE_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("planTitle", title), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -67,7 +70,7 @@ public class PlanGeneralService {
         long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_DESCRIPTION_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("description", desc), revision);
-
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -92,6 +95,7 @@ public class PlanGeneralService {
         long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
         planBoardService.publishBoard(planId, userId, "PLAN_THUMBNAIL_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("thumbnail", url), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -161,6 +165,7 @@ public class PlanGeneralService {
             long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -190,6 +195,7 @@ public class PlanGeneralService {
             long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -209,6 +215,7 @@ public class PlanGeneralService {
             long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -266,6 +273,7 @@ public class PlanGeneralService {
             long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
         }
     }
 
@@ -303,6 +311,7 @@ public class PlanGeneralService {
         budgetPatch.put("budgetTotal", plan.getBudgetTotal());
         budgetPatch.put("budgetPerPerson", plan.getBudgetPerPerson());
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", budgetPatch, revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
 }

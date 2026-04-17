@@ -20,6 +20,10 @@ public class PlanFeedItem {
     private long views;
     private Instant createdAt;
     private Author author;
+    private Long budgetTotal;
+    private Long budgetPerPerson;
+    private String budgetCurrency;
+    private String thumbnail;
     private List<String> images;
     private List<Destination> destinations;
     private Map<String, Long> reactions;
