@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    // ❗Quan trọng nhất: bắt lỗi do AOP/TX wrap vào — cái gây ra 500 hiện tại
+    // bắt lỗi do AOP/TX wrap vào — cái gây ra 500 hiện tại
     @ExceptionHandler({ AopInvocationException.class, UndeclaredThrowableException.class })
     public ResponseEntity<ApiResponse<?>> handleAopWrapper(Exception ex) {
         Throwable root = ex.getCause() != null ? ex.getCause() : ex;

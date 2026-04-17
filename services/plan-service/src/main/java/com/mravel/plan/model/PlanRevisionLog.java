@@ -5,20 +5,10 @@ import lombok.*;
 
 import java.time.Instant;
 
-/**
- * Phase 2b — stores v2 event envelopes for gap recovery.
- * Retention: 1 hour (purged by PlanRevisionLogPurgeJob).
- * Unique constraint on (plan_id, revision) ensures monotonicity.
- */
 @Entity
-@Table(
-        name = "plan_revision_log",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_plan_revision",
-                columnNames = {"plan_id", "revision"}
-        ),
-        indexes = @Index(name = "idx_plan_created", columnList = "plan_id, created_at")
-)
+@Table(name = "plan_revision_log", uniqueConstraints = @UniqueConstraint(name = "uq_plan_revision", columnNames = {
+                "plan_id",
+                "revision" }), indexes = @Index(name = "idx_plan_created", columnList = "plan_id, created_at"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,25 +16,25 @@ import java.time.Instant;
 @Builder
 public class PlanRevisionLog {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
 
-    @Column(name = "plan_id", nullable = false)
-    private Long planId;
+        @Column(name = "plan_id", nullable = false)
+        private Long planId;
 
-    @Column(nullable = false)
-    private Long revision;
+        @Column(nullable = false)
+        private Long revision;
 
-    /**
-     * Full serialized PlanBoardEventV2 JSON.
-     * Stored as TEXT so gap recovery can return it without re-deserializing.
-     */
-    @Lob
-    @Column(name = "event_envelope", columnDefinition = "TEXT", nullable = false)
-    private String eventEnvelope;
+        /**
+         * Full serialized PlanBoardEventV2 JSON.
+         * Stored as TEXT so gap recovery can return it without re-deserializing.
+         */
+        @Lob
+        @Column(name = "event_envelope", columnDefinition = "TEXT", nullable = false)
+        private String eventEnvelope;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+        @Column(name = "created_at", nullable = false, updatable = false)
+        @Builder.Default
+        private Instant createdAt = Instant.now();
 }

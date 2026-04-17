@@ -19,17 +19,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Phase 3d — granular command endpoints.
- *
- * All mutating endpoints:
- *  - accept an optional {@code Idempotency-Key} header (UUID string)
- *  - return a {@link CommandResponse} with patch-only payload, revision, and operationId
- *  - are idempotent: a repeated call with the same key returns the cached response
- *
- * Routes are under /api/plans/{planId}/board/cmd to coexist with the legacy
- * /api/plans/{planId}/board/* endpoints during the Phase 3–4 migration window.
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/plans/{planId}/board/cmd")
@@ -40,11 +29,12 @@ public class PlanBoardCommandController {
     private final IdempotencyService idempotencyService;
     private final CurrentUserService currentUser;
 
-    // ── List commands ──────────────────────────────────────────────────────────
+    // List commands
 
     /**
      * POST /api/plans/{planId}/board/cmd/lists
-     * Creates a new list. Returns CommandResponse with patch containing the created list.
+     * Creates a new list. Returns CommandResponse with patch containing the created
+     * list.
      */
     @PostMapping("/lists")
     public ResponseEntity<ApiResponse<CommandResponse>> createList(
@@ -136,7 +126,7 @@ public class PlanBoardCommandController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thứ tự danh sách thành công", response));
     }
 
-    // ── Card commands ──────────────────────────────────────────────────────────
+    // Card commands
 
     /**
      * POST /api/plans/{planId}/board/cmd/lists/{listId}/cards
@@ -165,7 +155,8 @@ public class PlanBoardCommandController {
 
     /**
      * PATCH /api/plans/{planId}/board/cmd/lists/{listId}/cards/{cardId}
-     * Updates a card's fields. Supports optimistic locking via If-Match header (card version).
+     * Updates a card's fields. Supports optimistic locking via If-Match header
+     * (card version).
      */
     @PatchMapping("/lists/{listId}/cards/{cardId}")
     public ResponseEntity<ApiResponse<CommandResponse>> updateCard(
@@ -224,8 +215,10 @@ public class PlanBoardCommandController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         Long userId = currentUser.getId();
-        // toggleDone is NOT idempotent in the strict sense (toggle flips state on each call),
-        // but we still honour an explicit Idempotency-Key to handle client retries after a timeout.
+        // toggleDone is NOT idempotent in the strict sense (toggle flips state on each
+        // call),
+        // but we still honour an explicit Idempotency-Key to handle client retries
+        // after a timeout.
         String operationId = resolveOperationId(idempotencyKey);
 
         Optional<CommandResponse> cached = idempotencyService.findCached(operationId);
@@ -240,7 +233,8 @@ public class PlanBoardCommandController {
 
     /**
      * PATCH /api/plans/{planId}/board/cmd/cards/{cardId}/move
-     * Moves a card to a different list (and optional position). Supports optimistic locking via
+     * Moves a card to a different list (and optional position). Supports optimistic
+     * locking via
      * {@code version} field in request body.
      */
     @PatchMapping("/cards/{cardId}/move")
@@ -287,11 +281,12 @@ public class PlanBoardCommandController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thứ tự thẻ thành công", response));
     }
 
-    // ── helper ─────────────────────────────────────────────────────────────────
+    // helper ─
 
     /**
      * Uses the caller-supplied key if present; otherwise generates a random UUID.
-     * A random UUID means no deduplication, which is acceptable for calls without a key.
+     * A random UUID means no deduplication, which is acceptable for calls without a
+     * key.
      */
     private String resolveOperationId(String idempotencyKey) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {

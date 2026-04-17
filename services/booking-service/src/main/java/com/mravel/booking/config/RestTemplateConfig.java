@@ -25,11 +25,10 @@ public class RestTemplateConfig {
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
 
-        // giữ nguyên logic: Apache HC5 + Buffering để log request/response body
+        // Apache HC5 + Buffering để log request/response body
         HttpClient httpClient = HttpClients.createDefault();
 
-        HttpComponentsClientHttpRequestFactory baseFactory =
-                new HttpComponentsClientHttpRequestFactory(httpClient);
+        HttpComponentsClientHttpRequestFactory baseFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
 
         RestTemplate rt = builder
                 .requestFactory(() -> new BufferingClientHttpRequestFactory(baseFactory))

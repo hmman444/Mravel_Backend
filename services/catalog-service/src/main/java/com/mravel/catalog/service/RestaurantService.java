@@ -65,7 +65,7 @@ public class RestaurantService {
                 cuisineSlugs = null;
         }
 
-        // ===== NEW: parse visitDate + visitTime =====
+        // NEW: parse visitDate + visitTime
         LocalDate visitDate = parseDate(request.visitDate()); // "YYYY-MM-DD"
         LocalTime visitTime = parseTime(request.visitTime()); // "HH:mm"
 
@@ -75,7 +75,7 @@ public class RestaurantService {
                     .map(RestaurantMapper::toSummary);
         }
 
-        // ===== NEW: để lọc giờ cho đúng paging -> lấy hết rồi tự paginate =====
+        // NEW: để lọc giờ cho đúng paging -> lấy hết rồi tự paginate
         // (dataset đồ án thường nhỏ nên cách này ok)
         List<RestaurantDoc> allMatched = restaurantRepo
                 .searchRestaurants(location, people, cuisineSlugs, Pageable.unpaged())

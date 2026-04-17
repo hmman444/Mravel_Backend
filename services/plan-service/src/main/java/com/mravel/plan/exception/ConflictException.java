@@ -6,10 +6,6 @@ import org.springframework.http.HttpStatus;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Phase 3a — thrown when optimistic lock version mismatch is detected.
- * Maps to HTTP 409 Conflict.
- */
 @Getter
 public class ConflictException extends ApiException {
 

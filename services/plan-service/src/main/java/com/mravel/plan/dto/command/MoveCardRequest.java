@@ -2,7 +2,6 @@ package com.mravel.plan.dto.command;
 
 import lombok.Data;
 
-/** Phase 3 — request body for PATCH /cards/{cardId}/move */
 @Data
 public class MoveCardRequest {
     /** Destination list id */

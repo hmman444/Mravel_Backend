@@ -125,18 +125,6 @@ public class PlanBoardService {
         trash.setPosition(dayLists.size());
     }
 
-    /**
-     * Phase 1d — increments boardRevision inside the caller's transaction.
-     * No @CacheEvict here: the parent @Transactional mutation methods already carry
-     * 
-     * @CacheEvict(beforeInvocation = true), so the cache is evicted before this
-     *                              runs.
-     *                              The next call to getBoardSnapshot() (inside
-     *                              publishBoard) re-populates it with
-     *                              the new revision value.
-     *                              Must only be called from within an
-     *                              active @Transactional context.
-     */
     public long incrementBoardRevision(Long planId) {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found: " + planId));
@@ -1189,7 +1177,7 @@ public class PlanBoardService {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new NotFoundException("Plan not found"));
         syncDayLists(plan);
-        long revision = incrementBoardRevision(planId); // Phase 1d
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "REORDER_LIST");
 
         List<Map<String, Object>> positions = lists.stream()
@@ -1241,7 +1229,7 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-        long revision = incrementBoardRevision(planId); // Phase 1d
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "REORDER_CARD");
 
         if (source.getId().equals(dest.getId())) {

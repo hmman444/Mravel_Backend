@@ -28,16 +28,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Phase 1b/1c — validates JWT on STOMP CONNECT; enforces membership on
- * SUBSCRIBE.
- *
- * CONNECT: verifies JWT signature locally (no auth-service round trip).
- * Attaches userId to session attributes.
- * SUBSCRIBE to /topic/plans/{planId}/board or /board/v2:
- * calls plan-service access-check endpoint to verify membership.
- * Rejects subscription if plan is not accessible.
- */
 @Slf4j
 @Component
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
@@ -72,7 +62,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (command == null)
             return message;
 
-        // ── CONNECT: validate JWT ──────────────────────────────────────────────
+        // CONNECT: validate JWT
         if (StompCommand.CONNECT.equals(command)) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -114,7 +104,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             }
         }
 
-        // ── SUBSCRIBE: enforce plan membership ────────────────────────────────
+        // SUBSCRIBE: enforce plan membership
         if (StompCommand.SUBSCRIBE.equals(command)) {
             String destination = accessor.getDestination();
             if (destination == null)
@@ -144,7 +134,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
+    // helpers ─
 
     private Long extractUserId(Claims claims) {
         // Backward/forward compatible claim extraction:

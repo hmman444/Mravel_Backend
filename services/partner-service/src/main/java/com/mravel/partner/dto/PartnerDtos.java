@@ -66,7 +66,7 @@ public class PartnerDtos {
         }
 
         public record UpsertHotelReq(
-                        // --- link & location ---
+                        // link & location
                         @NotBlank String destinationSlug,
                         String cityName,
                         String districtName,
@@ -75,7 +75,7 @@ public class PartnerDtos {
                         Double latitude,
                         Double longitude,
 
-                        // --- basic ---
+                        // basic
                         @NotBlank String name,
                         String slug, // optional: nếu null -> backend gen
                         String hotelType, // HOTEL/HOMESTAY/...
@@ -86,33 +86,33 @@ public class PartnerDtos {
                         String email,
                         String website,
 
-                        // --- checkin/out flags ---
+                        // checkin/out flags
                         String defaultCheckInTime, // "14:00"
                         String defaultCheckOutTime, // "12:00"
                         Boolean hasOnlineCheckin,
 
-                        // --- media/content ---
+                        // media/content
                         List<ImageReq> images,
                         List<UpsertContentBlockReq> content,
 
-                        // --- amenities ---
+                        // amenities
                         List<String> amenityCodes, // scope HOTEL
 
-                        // --- rooms ---
+                        // rooms
                         List<UpsertRoomTypeReq> roomTypes,
 
-                        // --- nearby/policy/info/faq ---
+                        // nearby/policy/info/faq
                         List<UpsertNearbyPlaceReq> nearbyPlaces,
                         UpsertHotelPolicyReq policy,
                         UpsertGeneralInfoReq generalInfo,
                         List<UpsertFaqReq> faqs,
 
-                        // --- configs ---
+                        // configs
                         UpsertTaxConfigReq taxConfig,
                         UpsertBookingConfigReq bookingConfig) {
         }
 
-        // ===== Content blocks =====
+        // Content blocks
         public record UpsertContentBlockReq(
                         String type, // HEADING/PARAGRAPH/IMAGE/GALLERY/QUOTE/DIVIDER/INFOBOX/MAP
                         String section, // OVERVIEW/STORY/OTHER
@@ -124,7 +124,7 @@ public class PartnerDtos {
                         Integer sortOrder) {
         }
 
-        // ===== Nearby =====
+        // Nearby
         public record UpsertNearbyPlaceReq(
                         String placeSlug,
                         @NotBlank String name,
@@ -132,7 +132,7 @@ public class PartnerDtos {
                         Double distanceMeters) {
         }
 
-        // ===== Policy =====
+        // Policy
         public record UpsertHotelPolicyReq(
                         String checkInFrom, // "14:00"
                         String checkOutUntil, // "12:00"
@@ -145,7 +145,7 @@ public class PartnerDtos {
                         String content) {
         }
 
-        // ===== General info =====
+        // General info
         public record UpsertGeneralInfoReq(
                         String mainFacilitiesSummary,
                         Double distanceToCityCenterKm,
@@ -156,20 +156,20 @@ public class PartnerDtos {
                         String interestingPlacesSummary) {
         }
 
-        // ===== FAQ =====
+        // FAQ
         public record UpsertFaqReq(
                         @NotBlank String question,
                         @NotBlank String answer) {
         }
 
-        // ===== Tax config =====
+        // Tax config
         public record UpsertTaxConfigReq(
                         BigDecimal defaultVatPercent,
                         BigDecimal defaultServiceFeePercent,
                         Boolean showPricePreTax) {
         }
 
-        // ===== Booking config =====
+        // Booking config
         public record UpsertBookingConfigReq(
                         Boolean allowFullPayment,
                         Boolean allowDeposit,
@@ -177,7 +177,7 @@ public class PartnerDtos {
                         Integer freeCancelMinutes) {
         }
 
-        // ===== Room types =====
+        // Room types
         public record UpsertRoomTypeReq(
                         String id, // null => backend gen
                         @NotBlank String name,
@@ -207,7 +207,7 @@ public class PartnerDtos {
                         Integer count) {
         }
 
-        // ===== Rate plans =====
+        // Rate plans
         public record UpsertRatePlanReq(
                         String id,
                         @NotBlank String name,

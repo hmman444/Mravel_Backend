@@ -61,7 +61,7 @@ public class PlanIndexConsumer {
         }
     }
 
-    // ───────────────────────── mapping ─────────────────────────
+    // ─ mapping ─
 
     private PlanDocument toDocument(Plan plan) {
         List<String> destNames = plan.getDestinations() == null

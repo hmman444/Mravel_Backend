@@ -6,13 +6,6 @@ import lombok.Data;
 
 import java.util.Map;
 
-/**
- * Phase 3 — unified response shape for all granular command endpoints.
- *
- * On success the controller returns HTTP 200 with this body.
- * On idempotent replay the same stored body is returned.
- * Clients use {@code revision} to advance their local lastRevision counter.
- */
 @Data
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -24,7 +17,10 @@ public class CommandResponse {
     /** PK of the mutated entity. */
     private Long entityId;
 
-    /** The operation that was performed: CREATE, UPDATE, DELETE, REORDER, MOVE, DUPLICATE */
+    /**
+     * The operation that was performed: CREATE, UPDATE, DELETE, REORDER, MOVE,
+     * DUPLICATE
+     */
     private String operationType;
 
     /**

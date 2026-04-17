@@ -53,10 +53,10 @@ public class PlanSearchService {
 
         BoolQuery.Builder root = new BoolQuery.Builder();
 
-        // ── 1. Visibility gate — always applied ─────────────────────────────────
+        // 1. Visibility gate — always applied ─
         root.must(visibilityQuery(viewerId, friendIds, memberPlanIds));
 
-        // ── 2. Full-text search ──────────────────────────────────────────────────
+        // 2. Full-text search
         String q = filter.getQ();
         if (q != null && !q.isBlank()) {
             String rawPattern = wildcardPattern(q.trim());
@@ -82,7 +82,7 @@ public class PlanSearchService {
                             .boost(2.0f))))));
         }
 
-        // ── 3. Budget range ──────────────────────────────────────────────────────
+        // 3. Budget range
         if (filter.getBudgetMin() != null || filter.getBudgetMax() != null) {
             root.filter(Query.of(fq -> fq.range(r -> {
                 r.field("budgetTotal");
@@ -94,7 +94,7 @@ public class PlanSearchService {
             })));
         }
 
-        // ── 4. Duration range (days) ─────────────────────────────────────────────
+        // 4. Duration range (days) ─
         if (filter.getDaysMin() != null || filter.getDaysMax() != null) {
             root.filter(Query.of(fq -> fq.range(r -> {
                 r.field("days");
@@ -106,7 +106,7 @@ public class PlanSearchService {
             })));
         }
 
-        // ── 5. Start-date range ──────────────────────────────────────────────────
+        // 5. Start-date range
         if (filter.getStartDateFrom() != null || filter.getStartDateTo() != null) {
             root.filter(Query.of(fq -> fq.range(r -> {
                 r.field("startDate");
@@ -118,7 +118,7 @@ public class PlanSearchService {
             })));
         }
 
-        // ── 6. Destination filter (OR — any matching destination) ────────────────
+        // 6. Destination filter (OR — any matching destination)
         // Uses case-insensitive wildcard per destination so that user-entered names
         // like "TP.HCM" match stored values like "tp hcm" or "TP. HCM".
         List<String> dests = filter.getDestinations();
@@ -144,7 +144,7 @@ public class PlanSearchService {
             }
         }
 
-        // ── 7. Build NativeQuery ─────────────────────────────────────────────────
+        // 7. Build NativeQuery ─
         int pageSize = Math.max(1, Math.min(50, filter.getSize()));
 
         NativeQueryBuilder nqBuilder = new NativeQueryBuilder()
@@ -153,13 +153,13 @@ public class PlanSearchService {
                 // search_after is present, but setting size via Pageable is required.
                 .withPageable(PageRequest.of(0, pageSize));
 
-        // ── 8. Sort — ALWAYS includes a stable _id tie-breaker ───────────────────
+        // 8. Sort — ALWAYS includes a stable _id tie-breaker ─
         // This guarantees deterministic ordering, which is mandatory for search_after.
         String sortBy = filter.getSortBy();
         List<SortOptions> sorts = buildSort(sortBy);
         sorts.forEach(nqBuilder::withSort);
 
-        // ── 9. Apply decoded cursor (search_after) ───────────────────────────────
+        // 9. Apply decoded cursor (search_after) ─
         List<Object> searchAfterValues = CursorUtils.decode(filter.getCursor());
         if (searchAfterValues != null) {
             nqBuilder.withSearchAfter(searchAfterValues);
@@ -169,7 +169,7 @@ public class PlanSearchService {
         return esOps.search(nativeQuery, PlanDocument.class);
     }
 
-    // ─────────────────────────── helpers ────────────────────────────────────────
+    // ─ helpers
 
     private Query visibilityQuery(Long viewerId, List<Long> friendIds, List<Long> memberPlanIds) {
         List<Query> shouldClauses = new ArrayList<>();

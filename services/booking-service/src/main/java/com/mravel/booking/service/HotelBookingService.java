@@ -372,7 +372,7 @@ public class HotelBookingService {
         hotelBookingRepository.saveAll(pendings);
     }
 
-    // ======= Helpers =======
+    // == Helpers ==
 
     private Payment.PaymentMethod parsePaymentMethod(String raw) {
         return PaymentMethodUtils.parseOrDefault(raw, Payment.PaymentMethod.MOMO_WALLET);

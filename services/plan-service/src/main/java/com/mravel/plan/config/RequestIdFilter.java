@@ -11,10 +11,6 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.UUID;
 
-/**
- * Phase 0 — propagates X-Request-ID through the request lifecycle.
- * Injects traceId into MDC so all log lines for a single request share it.
- */
 @Component
 @Order(1)
 @Slf4j

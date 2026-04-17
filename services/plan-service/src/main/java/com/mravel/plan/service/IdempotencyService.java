@@ -13,20 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Optional;
 
-/**
- * Phase 3b — checks and stores idempotency keys for command API calls.
- *
- * Usage pattern:
- * 
- * <pre>
- * Optional<CommandResponse> cached = idempotencyService.findCached(operationId);
- * if (cached.isPresent())
- *     return cached.get();
- * // ... execute command ...
- * idempotencyService.store(operationId, planId, response);
- * return response;
- * </pre>
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -35,11 +21,6 @@ public class IdempotencyService {
     private final PlanCommandRepository commandRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Returns a previously stored response for this operationId, if any.
-     * Uses REQUIRES_NEW so the lookup doesn't share the caller's transaction
-     * and can read committed rows from parallel requests.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<CommandResponse> findCached(String operationId) {
         if (operationId == null || operationId.isBlank())
@@ -57,10 +38,6 @@ public class IdempotencyService {
         });
     }
 
-    /**
-     * Persists the command response. Uses REQUIRES_NEW so a failure here
-     * does not roll back the caller's mutation transaction.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void store(String operationId, Long planId, CommandResponse response) {
         if (operationId == null || operationId.isBlank())

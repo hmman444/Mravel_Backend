@@ -24,7 +24,7 @@ public class MomoGatewayClient {
 
     private final RestTemplate restTemplate;
 
-    // --- SANDBOX CONFIG (demo) ---
+    // SANDBOX CONFIG (demo)
     private static final String ENDPOINT = "https://test-payment.momo.vn/v2/gateway/api/create";
     private static final String PARTNER_CODE = "MOMO";
     private static final String ACCESS_KEY = "F8BBA842ECF85";

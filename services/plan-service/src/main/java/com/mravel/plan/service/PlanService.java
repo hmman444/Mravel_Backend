@@ -268,7 +268,7 @@ public class PlanService {
                         throw new ForbiddenException("You don't have permission to copy this plan.");
                 }
 
-                // ========= TẠO PLAN MỚI =========
+                // TẠO PLAN MỚI
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
@@ -298,7 +298,7 @@ public class PlanService {
                 planRepository.save(copy);
                 permissionService.ensureOwner(copy.getId(), userId);
 
-                // ========= COPY LISTS (DAY) + CARDS =========
+                // COPY LISTS (DAY) + CARDS
                 List<PlanList> sourceLists = listRepository.findByPlanIdOrderByPositionAsc(source.getId());
 
                 List<PlanList> sourceDays = sourceLists.stream()
@@ -371,7 +371,7 @@ public class PlanService {
                         }
                 }
 
-                // ========= TRASH LIST =========
+                // TRASH LIST
                 listRepository.save(
                                 PlanList.builder()
                                                 .plan(copy)
@@ -604,7 +604,7 @@ public class PlanService {
                 planIndexPublisher.publishDelete(planId);
         }
 
-        // ─────────────── helpers exposed to PlanController ───────────────────────
+        // ─ helpers exposed to PlanController ─
 
         /** Returns plan IDs where viewerId is a non-owner member (empty-safe). */
         public List<Long> getMemberPlanIds(Long viewerId) {

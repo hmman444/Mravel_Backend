@@ -31,7 +31,7 @@ public class CatalogPartnerIdsClient {
         return listIds("/api/catalog/partners/restaurants", partnerId, bearer);
     }
 
-    // ===== helpers =====
+    // helpers
 
     private List<String> listIds(String path, Long partnerId, String bearer) {
         String base = Objects.requireNonNull(catalogBaseUrl, "mravel.services.catalog.base-url must not be null");
@@ -52,22 +52,24 @@ public class CatalogPartnerIdsClient {
         RequestEntity<Void> req = new RequestEntity<>(
                 headers,
                 Objects.requireNonNull(HttpMethod.GET),
-                Objects.requireNonNull(uri)
-        );
+                Objects.requireNonNull(uri));
 
         ResponseEntity<ApiResponse<?>> resp = restTemplate.exchange(
                 req,
-                new ParameterizedTypeReference<ApiResponse<?>>() {}
-        );
+                new ParameterizedTypeReference<ApiResponse<?>>() {
+                });
 
         ApiResponse<?> body = resp.getBody();
-        if (body == null) return List.of();
+        if (body == null)
+            return List.of();
 
         Object data = body.getData();
         // data là Page<?> dạng map -> lấy content[].id
-        if (!(data instanceof Map<?, ?> pageMap)) return List.of();
+        if (!(data instanceof Map<?, ?> pageMap))
+            return List.of();
         Object content = pageMap.get("content");
-        if (!(content instanceof List<?> list)) return List.of();
+        if (!(content instanceof List<?> list))
+            return List.of();
 
         return list.stream()
                 .filter(it -> it instanceof Map<?, ?>)

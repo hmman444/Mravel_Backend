@@ -28,36 +28,38 @@ public class AuthValidateClient {
                 .toUri();
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(extractBearer(authorizationHeader)); // luôn chuẩn "Bearer <token>"
+        headers.setBearerAuth(extractBearer(authorizationHeader));
 
         try {
             ResponseEntity<AuthResponse> resp = restTemplate.exchange(
                     uri,
                     HttpMethod.GET,
                     new HttpEntity<>(null, headers),
-                    AuthResponse.class
-            );
+                    AuthResponse.class);
 
             AuthResponse body = resp.getBody();
-            if (body == null || !body.isValid()) throw new SecurityException("Invalid token");
+            if (body == null || !body.isValid())
+                throw new SecurityException("Invalid token");
 
             if (body.getRole() == null || !"PARTNER".equalsIgnoreCase(body.getRole())) {
                 throw new SecurityException("Not partner");
             }
 
-            if (body.getId() == null) throw new SecurityException("Invalid token");
+            if (body.getId() == null)
+                throw new SecurityException("Invalid token");
             return body.getId();
 
         } catch (org.springframework.web.client.HttpStatusCodeException ex) {
-            // auth-service trả 401/403 -> map lại cho đúng, đừng để 500
             throw new SecurityException("Invalid token");
         }
     }
 
     private String extractBearer(String authorizationHeader) {
-        if (authorizationHeader == null) return "";
+        if (authorizationHeader == null)
+            return "";
         String s = authorizationHeader.trim();
-        if (s.toLowerCase().startsWith("bearer ")) return s.substring(7).trim();
+        if (s.toLowerCase().startsWith("bearer "))
+            return s.substring(7).trim();
         return s;
     }
 

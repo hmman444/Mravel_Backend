@@ -7,13 +7,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/**
- * Phase 1c — lightweight endpoint used by realtime-service to verify
- * WebSocket SUBSCRIBE permission without loading the full board.
- *
- * Called by StompAuthChannelInterceptor on every SUBSCRIBE to /topic/plans/{planId}/board.
- * Response is a simple {canAccess: true/false} — no board data loaded.
- */
 @RestController
 @RequestMapping("/api/plans")
 @RequiredArgsConstructor

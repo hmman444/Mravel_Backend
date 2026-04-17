@@ -163,7 +163,7 @@ public class AmenityCatalogService {
                 .build();
     }
 
-    // ---------------- helpers ----------------
+    // helpers
 
     private static String normalizeCode(String code) {
         if (!StringUtils.hasText(code))

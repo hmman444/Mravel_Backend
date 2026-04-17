@@ -18,7 +18,6 @@ public class KafkaConfig {
         return new NewTopic(KafkaTopics.PLAN_BOARD_EVENTS, 1, (short) 1);
     }
 
-    /** Phase 2c — v2 topic with same partition count; planId is the message key. */
     @Bean
     public NewTopic planBoardEventsV2Topic() {
         return new NewTopic(KafkaTopics.PLAN_BOARD_EVENTS_V2, 1, (short) 1);

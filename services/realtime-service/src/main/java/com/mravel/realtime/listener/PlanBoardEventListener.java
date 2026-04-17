@@ -34,7 +34,6 @@ public class PlanBoardEventListener {
             String destination = "/topic/plans/" + planId + "/board";
             String destinationV2 = "/topic/plans/" + planId + "/board/v2";
 
-            // Phase 0 — measure Kafka-produce → WS-send lag using event timestamp
             if (event.getTimestamp() != null) {
                 long lagMs = System.currentTimeMillis() - event.getTimestamp();
                 DistributionSummary.builder("realtime.ws_delivery_lag_ms")

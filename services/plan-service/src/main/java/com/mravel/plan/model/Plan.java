@@ -86,12 +86,6 @@ public class Plan {
     @Column(name = "thumbnail_url")
     private String thumbnail;
 
-    /**
-     * Phase 1d / Phase 2 — monotonically increasing counter incremented inside
-     * every board-mutating transaction.  Included in BoardResponse and every
-     * v2 Kafka event so clients can detect out-of-order or missing events.
-     * Starts at 0; never decrements.
-     */
     @Column(name = "board_revision", nullable = false)
     @Builder.Default
     private Long boardRevision = 0L;

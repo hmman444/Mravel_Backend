@@ -453,7 +453,7 @@ public class RestaurantBookingService {
         return PaymentMethodUtils.parseOrDefault(raw, Payment.PaymentMethod.MOMO_WALLET);
     }
 
-    // ===== DTO nội bộ gửi qua catalog-client (typed thay vì Object) =====
+    // DTO nội bộ gửi qua catalog-client (typed thay vì Object)
     public record TableReq(String tableTypeId, int quantity) {
     }
 

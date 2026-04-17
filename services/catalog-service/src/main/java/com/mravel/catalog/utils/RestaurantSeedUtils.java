@@ -29,7 +29,7 @@ public final class RestaurantSeedUtils {
     // CONTENT BLOCK HELPERS
     //
 
-    // ---- Không có section (dùng cho seed đơn giản) ----
+    // Không có section (dùng cho seed đơn giản)
     public static ContentBlock heading(String text) {
         return ContentBlock.builder()
                 .type(BlockType.HEADING)
@@ -64,7 +64,7 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ---- Có section (OVERVIEW / STORY / OTHER) ----
+    // Có section (OVERVIEW / STORY / OTHER)
     public static ContentBlock heading(ContentSection section, String text) {
         return ContentBlock.builder()
                 .type(BlockType.HEADING)
@@ -121,7 +121,7 @@ public final class RestaurantSeedUtils {
     // SEED HELPERS
     //
 
-    // ---- Opening hours ----
+    // Opening hours
     public static OpeningHour openingHour(
             DayOfWeek day,
             int openHour,
@@ -137,7 +137,7 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ---- SuitableFor ----
+    // SuitableFor
     public static SuitableFor suitable(String code, String label) {
         return SuitableFor.builder()
                 .code(code)
@@ -145,7 +145,7 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ---- Ambience ----
+    // Ambience
     public static AmbienceTag ambience(String code, String label) {
         return AmbienceTag.builder()
                 .code(code)
@@ -153,7 +153,7 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ---- Signature dishes ----
+    // Signature dishes
     public static SignatureDish signatureDish(String name) {
         return SignatureDish.builder()
                 .name(name)
@@ -172,7 +172,7 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ---- Blackout rule dương lịch ----
+    // Blackout rule dương lịch
     public static BlackoutDateRule blackoutGregorian(int month, int day, String desc) {
         return BlackoutDateRule.builder()
                 .dateType(BlackoutDateType.GREGORIAN_DATE)
@@ -182,7 +182,7 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // ---- Review keyword ----
+    // Review keyword
     public static ReviewKeywordStat keyword(String code, String label, Integer count) {
         return ReviewKeywordStat.builder()
                 .code(code)

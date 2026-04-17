@@ -87,7 +87,6 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- Actuator + Micrometer Prometheus (Phase 0 instrumentation) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
