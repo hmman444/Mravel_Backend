@@ -18,7 +18,6 @@ public class AdminCatalogModerationController {
 
     private final CatalogClient catalogClient;
 
-    // LIST (giữ nguyên như trước)
     @GetMapping("/hotels")
     public ResponseEntity<ApiResponse<?>> listHotels(
             @RequestParam(required = false) String status,

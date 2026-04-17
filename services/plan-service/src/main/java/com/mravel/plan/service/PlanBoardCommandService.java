@@ -18,22 +18,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Phase 3c — granular command service.
- *
- * Each method:
- * 1. Checks permissions via PlanPermissionService
- * 2. Performs the mutation
- * 3. Increments boardRevision in the same transaction
- * 4. Builds a patch-only CommandResponse
- * 5. Publishes a v2 Kafka event with patch payload (no full board snapshot)
- *
- * The v1 publishBoard() path is NOT called from here — these commands produce
- * patch-only v2 events. v1 consumers will receive nothing from these endpoints
- * until Phase 5 cleanup (that is acceptable: legacy clients fall back to
- * periodic
- * full reloads during the transition window).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -48,7 +32,7 @@ public class PlanBoardCommandService {
         private final KafkaProducer kafkaProducer;
         private final ObjectMapper objectMapper;
 
-        // ── List commands ─────────────────────────────────────────────────────────
+        // List commands ─
 
         @Transactional
         @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
@@ -176,7 +160,7 @@ public class PlanBoardCommandService {
                 return response;
         }
 
-        // ── Card commands ─────────────────────────────────────────────────────────
+        // Card commands ─
 
         @Transactional
         @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
@@ -379,7 +363,7 @@ public class PlanBoardCommandService {
                 return response;
         }
 
-        // ── helpers ───────────────────────────────────────────────────────────────
+        // helpers ─
 
         private long getRevision(Long planId) {
                 return planRepository.findById(planId)
@@ -387,9 +371,6 @@ public class PlanBoardCommandService {
                                 .orElse(0L);
         }
 
-        /**
-         * Phase 5 — publishes a patch-only v2 event. No full snapshot.
-         */
         private void publishPatchEvent(Long planId, Long actorId, String entityType,
                         Long entityId, String operationType,
                         Map<String, Object> patch, long revision, String operationId) {

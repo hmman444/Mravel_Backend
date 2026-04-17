@@ -35,7 +35,7 @@ public class PartnerBookingController {
     public record CancelReq(String reason) {
     }
 
-    // ----------------- LIST / DETAIL -----------------
+    // LIST / DETAIL
     @GetMapping("/hotels")
     public ResponseEntity<ApiResponse<?>> listHotelBookings(
             @RequestHeader("Authorization") String bearer,
@@ -70,7 +70,7 @@ public class PartnerBookingController {
         return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetail(b)));
     }
 
-    // ----------------- CANCEL (FIX #3 ở đây) -----------------
+    // CANCEL (FIX #3 ở đây)
 
     @PostMapping("/hotels/{code}/cancel")
     public ResponseEntity<ApiResponse<?>> cancelHotel(
@@ -99,7 +99,7 @@ public class PartnerBookingController {
             b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
         }
 
-        // --- FIX #3: set reason + cancelledAt (nếu entity có field/setter) ---
+        // FIX #3: set reason + cancelledAt (nếu entity có field/setter)
         String reason = (body == null) ? null : body.reason();
         try {
             b.setCancelReason(reason);
@@ -176,7 +176,7 @@ public class PartnerBookingController {
             b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
         }
 
-        // --- FIX #3: set reason + cancelledAt (nếu entity có field/setter) ---
+        // FIX #3: set reason + cancelledAt (nếu entity có field/setter)
         String reason = (body == null) ? null : body.reason();
         try {
             b.setCancelReason(reason);
@@ -193,7 +193,7 @@ public class PartnerBookingController {
         return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toSummary(b)));
     }
 
-    // ----------------- STATS (FIX #2 ở đây) -----------------
+    // STATS (FIX #2 ở đây)
 
     @GetMapping("/stats/status")
     public ResponseEntity<ApiResponse<?>> statsByStatus(
@@ -409,7 +409,7 @@ public class PartnerBookingController {
         };
     }
 
-    // ----------------- helpers -----------------
+    // helpers
 
     private static boolean inRange(Instant createdAt, LocalDate from, LocalDate to, ZoneId zone) {
         if (createdAt == null)

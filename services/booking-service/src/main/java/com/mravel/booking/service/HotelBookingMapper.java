@@ -47,7 +47,7 @@ public final class HotelBookingMapper {
      * )
      */
 
-    // === SUMMARY (CHO LIST) ===
+    // SUMMARY (CHO LIST)
     public static HotelBookingSummaryDTO toSummary(HotelBooking b) {
         if (b == null)
             return null;
@@ -82,7 +82,7 @@ public final class HotelBookingMapper {
                 b.getCancelReason());
     }
 
-    // === CREATED (SAU KHI TẠO) ===
+    // CREATED (SAU KHI TẠO)
     public static HotelBookingCreatedDTO toCreatedDTO(
             HotelBooking b,
             String paymentMethod,
@@ -107,7 +107,7 @@ public final class HotelBookingMapper {
                 paymentUrl);
     }
 
-    // === DETAIL (CHO DETAIL) ===
+    // DETAIL (CHO DETAIL)
     public static HotelBookingDetailDTO toDetail(HotelBooking b) {
         return toDetailDTO(b);
     }

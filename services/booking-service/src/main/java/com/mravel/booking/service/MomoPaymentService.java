@@ -77,7 +77,7 @@ public class MomoPaymentService {
         resolveAndMarkPaid(orderId, paidAmount, amountLong);
     }
 
-    // ======= core logic =======
+    // == core logic ==
     private void resolveAndMarkPaid(String orderId, BigDecimal paidAmountHotel, Long amountLongForRestaurant) {
         // 0) ưu tiên PaymentAttempt (Payment) trước
         var p = paymentRepository.findByProviderRequestId(orderId).orElse(null);

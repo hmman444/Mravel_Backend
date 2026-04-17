@@ -27,12 +27,9 @@ public class SecurityConfig {
         .formLogin(form -> form.disable())
         .httpBasic(basic -> basic.disable())
         .authorizeHttpRequests(auth -> auth
-            // mở đúng endpoint login
             .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-            // mở các endpoint auth khác (register, refresh, verify...)
             .requestMatchers("/api/auth/**").permitAll()
-            .anyRequest().authenticated()
-        )
+            .anyRequest().authenticated())
         .build();
   }
 }

@@ -5,16 +5,8 @@ import lombok.*;
 
 import java.time.Instant;
 
-/**
- * Phase 3b — idempotency store for command API calls.
- * TTL 24h; cleaned by PlanCommandPurgeJob.
- * Unique on operation_id — duplicate POSTs with same key return stored response.
- */
 @Entity
-@Table(
-        name = "plan_commands",
-        indexes = @Index(name = "idx_cmd_created_at", columnList = "created_at")
-)
+@Table(name = "plan_commands", indexes = @Index(name = "idx_cmd_created_at", columnList = "created_at"))
 @Getter
 @Setter
 @NoArgsConstructor

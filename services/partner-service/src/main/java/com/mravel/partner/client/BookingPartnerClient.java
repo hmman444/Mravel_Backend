@@ -24,12 +24,13 @@ public class BookingPartnerClient {
     @Value("${mravel.services.booking.base-url}")
     private String baseUrl;
 
-    // ----------------- LIST / DETAIL -----------------
+    // LIST / DETAIL
 
     public ResponseEntity<ApiResponse<?>> listHotelBookings(String status, Integer page, Integer size, String bearer) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(baseUrl + "/api/booking/partners/hotels")
-                .queryParamIfPresent("status", (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
+                .queryParamIfPresent("status",
+                        (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
                 .queryParamIfPresent("page", Optional.ofNullable(page))
                 .queryParamIfPresent("size", Optional.ofNullable(size))
                 .toUriString();
@@ -43,10 +44,12 @@ public class BookingPartnerClient {
         return exchangeAbsolute(url, HttpMethod.GET, null, bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> listRestaurantBookings(String status, Integer page, Integer size, String bearer) {
+    public ResponseEntity<ApiResponse<?>> listRestaurantBookings(String status, Integer page, Integer size,
+            String bearer) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(baseUrl + "/api/booking/partners/restaurants")
-                .queryParamIfPresent("status", (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
+                .queryParamIfPresent("status",
+                        (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
                 .queryParamIfPresent("page", Optional.ofNullable(page))
                 .queryParamIfPresent("size", Optional.ofNullable(size))
                 .toUriString();
@@ -60,21 +63,23 @@ public class BookingPartnerClient {
         return exchangeAbsolute(url, HttpMethod.GET, null, bearer);
     }
 
-    // ----------------- CANCEL -----------------
+    // CANCEL
 
-    public ResponseEntity<ApiResponse<?>> cancelHotelBooking(String bookingCode, PartnerDtos.CancelBookingReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> cancelHotelBooking(String bookingCode, PartnerDtos.CancelBookingReq req,
+            String bearer) {
         // JSON body: { "reason": "..." }
         return exchangeAbsolute(baseUrl + "/api/booking/partners/hotels/" + bookingCode + "/cancel",
                 HttpMethod.POST, req, bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> cancelRestaurantBooking(String bookingCode, PartnerDtos.CancelBookingReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> cancelRestaurantBooking(String bookingCode, PartnerDtos.CancelBookingReq req,
+            String bearer) {
         // JSON body: { "reason": "..." }
         return exchangeAbsolute(baseUrl + "/api/booking/partners/restaurants/" + bookingCode + "/cancel",
                 HttpMethod.POST, req, bearer);
     }
 
-    // ----------------- STATS -----------------
+    // STATS
 
     public ResponseEntity<ApiResponse<?>> statsByStatus(LocalDate from, LocalDate to, String bearer) {
         String url = UriComponentsBuilder
@@ -90,14 +95,16 @@ public class BookingPartnerClient {
                 .fromHttpUrl(baseUrl + "/api/booking/partners/stats/revenue")
                 .queryParamIfPresent("from", Optional.ofNullable(from))
                 .queryParamIfPresent("to", Optional.ofNullable(to))
-                .queryParamIfPresent("group", (group == null || group.isBlank()) ? Optional.empty() : Optional.of(group))
+                .queryParamIfPresent("group",
+                        (group == null || group.isBlank()) ? Optional.empty() : Optional.of(group))
                 .toUriString();
         return exchangeAbsolute(url, HttpMethod.GET, null, bearer);
     }
 
-    // ----------------- shared helpers -----------------
+    // shared helpers
 
-    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body, String bearerToken) {
+    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body,
+            String bearerToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(extractBearer(bearerToken));
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -120,9 +127,11 @@ public class BookingPartnerClient {
     }
 
     private String extractBearer(String authorizationHeader) {
-        if (authorizationHeader == null) return "";
+        if (authorizationHeader == null)
+            return "";
         String s = authorizationHeader.trim();
-        if (s.toLowerCase().startsWith("bearer ")) return s.substring(7).trim();
+        if (s.toLowerCase().startsWith("bearer "))
+            return s.substring(7).trim();
         return s;
     }
 }

@@ -52,7 +52,7 @@ public class CatalogInventoryClient {
         post("/api/catalog/hotels/inventory/rollback", req);
     }
 
-    // ===== helpers =====
+    // helpers
 
     private <T> void post(String path, T req) {
         Objects.requireNonNull(path, "path must not be null");

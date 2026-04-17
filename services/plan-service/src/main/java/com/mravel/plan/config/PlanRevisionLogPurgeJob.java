@@ -11,11 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
-/**
- * Phase 2b / Phase 3b — purges ephemeral tables on a fixed schedule.
- *   plan_revision_log : retention 1h  (gap recovery window)
- *   plan_commands      : retention 24h (idempotency window)
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

@@ -20,7 +20,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
-        // Phase 1a — origin locked down; override via WS_ALLOWED_ORIGINS env var.
         String allowedOrigins = System.getenv("WS_ALLOWED_ORIGINS");
         String[] origins = (allowedOrigins != null && !allowedOrigins.isBlank())
                 ? allowedOrigins.split(",")
@@ -50,7 +49,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
-        // Phase 1b — validate JWT on CONNECT; check membership on SUBSCRIBE
         registration.interceptors(stompAuthChannelInterceptor);
     }
 

@@ -4,10 +4,6 @@ import lombok.Data;
 
 import java.util.Map;
 
-/**
- * Phase 5 — v2 patch-only event envelope received from Kafka topic plan-board-events-v2.
- * Forwarded verbatim to WebSocket topic /topic/plans/{planId}/board/v2.
- */
 @Data
 public class PlanBoardEventV2 {
 

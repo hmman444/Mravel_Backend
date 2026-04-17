@@ -7,16 +7,6 @@ import lombok.Data;
 
 import java.util.Map;
 
-/**
- * Phase 5 — v2 patch-only event envelope with monotonic revision and operationId.
- *
- * Produced to topic: plan-board-events-v2 (exclusively by PlanBoardCommandService).
- * WS destination:   /topic/plans/{planId}/board/v2
- *
- * v2 events are ALWAYS patch-only: the {@code board} full-snapshot field has been
- * removed. Legacy v1 events (plan-board-events) continue to carry full snapshots
- * for backward-compat with any remaining v1 consumers.
- */
 @Data
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)

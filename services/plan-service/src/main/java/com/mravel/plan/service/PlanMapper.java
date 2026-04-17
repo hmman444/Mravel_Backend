@@ -52,7 +52,7 @@ public class PlanMapper {
                 // Cache cục bộ cho tất cả user (reactions + comments) của 1 plan
                 Map<Long, UserProfileResponse> localUserCache = new HashMap<>();
 
-                // ===== Reactions summary =====
+                // Reactions summary
                 Map<String, Long> reactionSummary = p.getReactions() == null
                                 ? Map.of()
                                 : p.getReactions().stream()
@@ -60,7 +60,7 @@ public class PlanMapper {
                                                                 PlanReaction::getType,
                                                                 Collectors.counting()));
 
-                // ===== Reaction users (chi tiết từng user react) =====
+                // Reaction users (chi tiết từng user react)
                 List<PlanFeedItem.ReactionUser> reactionUsers = p.getReactions() == null
                                 ? List.of()
                                 : p.getReactions().stream()
@@ -83,7 +83,7 @@ public class PlanMapper {
                                                 })
                                                 .collect(Collectors.toList());
 
-                // ===== Author =====
+                // Author
                 PlanFeedItem.Author authorDto = null;
                 if (p.getAuthorId() != null) {
                         UserProfileResponse profile = resolveUserProfile(
@@ -106,7 +106,7 @@ public class PlanMapper {
                         }
                 }
 
-                // ===== Comments (root + replies đệ quy) =====
+                // Comments (root + replies đệ quy)
                 List<PlanFeedItem.Comment> commentDtos = p.getComments() == null
                                 ? List.of()
                                 : p.getComments().stream()
@@ -140,6 +140,10 @@ public class PlanMapper {
                                 .reactions(reactionSummary)
                                 .reactionUsers(reactionUsers)
                                 .comments(commentDtos)
+                                .budgetTotal(p.getBudgetTotal())
+                                .budgetPerPerson(p.getBudgetPerPerson())
+                                .budgetCurrency(p.getBudgetCurrency() != null ? p.getBudgetCurrency() : "VND")
+                                .thumbnail(p.getThumbnail())
                                 .build();
         }
 

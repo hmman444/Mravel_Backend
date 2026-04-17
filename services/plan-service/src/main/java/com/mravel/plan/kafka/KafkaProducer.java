@@ -26,17 +26,11 @@ public class KafkaProducer {
     private final ObjectMapper objectMapper;
     private final PlanRevisionLogRepository revisionLogRepository;
 
-    /**
-     * Phase 2c — publishes to v2 topic (revisioned envelope) AND persists to
-     * plan_revision_log for gap recovery.  Also still produces to v1 topic so
-     * legacy clients are unaffected during Phase 2–4 transition.
-     */
     public void publishBoardEventV2(PlanBoardEventV2 event) {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             String json = objectMapper.writeValueAsString(event);
 
-            // Measure v2 payload size (should be same as v1 in Phase 2; shrinks in Phase 5)
             DistributionSummary.builder("plan.board_event.payload_bytes")
                     .tag("operation_type", event.getOperationType() != null ? event.getOperationType() : "UNKNOWN")
                     .tag("envelope_version", "2")
@@ -67,8 +61,10 @@ public class KafkaProducer {
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize PlanBoardEventV2 for planId={}", event.getPlanId(), e);
         } catch (Exception e) {
-            // Catches DataIntegrityViolationException from duplicate (planId, revision) in revision log,
-            // or Kafka send failures. Logged and swallowed to avoid contaminating the caller's JPA tx.
+            // Catches DataIntegrityViolationException from duplicate (planId, revision) in
+            // revision log,
+            // or Kafka send failures. Logged and swallowed to avoid contaminating the
+            // caller's JPA tx.
             log.warn("Failed to publish PlanBoardEventV2 planId={} revision={}: {}",
                     event.getPlanId(), event.getRevision(), e.getMessage());
         } finally {
@@ -93,7 +89,6 @@ public class KafkaProducer {
     public void publishBoardEvent(PlanBoardEvent event) {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            // Measure serialized payload size for baseline metrics (Phase 0)
             try {
                 byte[] bytes = objectMapper.writeValueAsBytes(event);
                 DistributionSummary.builder("plan.board_event.payload_bytes")

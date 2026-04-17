@@ -3,6 +3,7 @@ package com.mravel.plan.service;
 import com.mravel.plan.dto.board.UpdateBudgetRequest;
 import com.mravel.plan.exception.BadRequestException;
 import com.mravel.plan.exception.NotFoundException;
+import com.mravel.plan.kafka.PlanIndexPublisher;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -26,6 +27,7 @@ public class PlanGeneralService {
     private final PlanPermissionService permission;
     private final PlanListRepository listRepo;
     private final PlanBoardService planBoardService;
+    private final PlanIndexPublisher planIndexPublisher;
 
     // helper
     private Plan loadPlan(Long planId) {
@@ -53,9 +55,10 @@ public class PlanGeneralService {
     public void updateTitle(Long planId, Long userId, String title) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setTitle(title);
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_TITLE_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("planTitle", title), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -64,10 +67,10 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setDescription(desc);
 
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_DESCRIPTION_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("description", desc), revision);
-
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -76,7 +79,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setStatus(status);
 
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_STATUS_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("status", status.name()),
                 revision);
@@ -89,9 +92,10 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setThumbnail(url);
 
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_THUMBNAIL_UPDATED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("thumbnail", url), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -101,7 +105,7 @@ public class PlanGeneralService {
         Plan plan = loadPlan(planId);
         plan.getImages().add(url);
 
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_ADDED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()),
                 revision);
@@ -113,7 +117,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         Plan plan = loadPlan(planId);
         plan.getImages().remove(url);
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_REMOVED");
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()),
                 revision);
@@ -141,9 +145,9 @@ public class PlanGeneralService {
         boolean startChanged = !startNew.equals(startOld);
         boolean durationUnchanged = newCount == oldCount;
 
-        // -------------------------------------------------------------
+        //
         // CASE A — USER CHỈ ĐỔI startDate → GIỮ NGUYÊN duration
-        // -------------------------------------------------------------
+        //
         if (startChanged && durationUnchanged) {
 
             int shift = (int) (startNew.toEpochDay() - startOld.toEpochDay());
@@ -158,16 +162,17 @@ public class PlanGeneralService {
 
             trash.setPosition(oldCount);
 
-            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
-        // -------------------------------------------------------------
+        //
         // CASE B — LOGIC THAY ĐỔI endDate (tăng/giảm/tối ưu ngày)
         // (Toàn bộ các logic cũ giữ nguyên)
-        // -------------------------------------------------------------
+        //
 
         // CASE 1 — ÉP VỀ 1 NGÀY
         if (newCount == 1 && oldCount > 1) {
@@ -187,9 +192,10 @@ public class PlanGeneralService {
             plan.setEndDate(startNew);
             trash.setPosition(1);
 
-            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -206,9 +212,10 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
-            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -238,7 +245,7 @@ public class PlanGeneralService {
             if (startChanged)
                 planBoardService.syncDayLists(plan);
 
-            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
             return;
@@ -263,9 +270,10 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
-            long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
             planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
         }
     }
 
@@ -295,7 +303,7 @@ public class PlanGeneralService {
         if (perPerson != null) {
             plan.setBudgetPerPerson(perPerson);
         }
-        long revision = planBoardService.incrementBoardRevision(planId); // Phase 1d
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_BUDGET_UPDATED");
 
         Map<String, Object> budgetPatch = new HashMap<>();
@@ -303,6 +311,7 @@ public class PlanGeneralService {
         budgetPatch.put("budgetTotal", plan.getBudgetTotal());
         budgetPatch.put("budgetPerPerson", plan.getBudgetPerPerson());
         planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", budgetPatch, revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
 }

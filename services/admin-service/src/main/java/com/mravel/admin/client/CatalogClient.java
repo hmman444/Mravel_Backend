@@ -271,7 +271,7 @@ public class CatalogClient {
         return (v == null || v.isBlank()) ? Optional.empty() : Optional.of(v);
     }
 
-    // ===== common exchange helpers =====
+    // common exchange helpers
     private ResponseEntity<ApiResponse<?>> exchange(String path, HttpMethod method, Object body, String bearerToken) {
         String url = requireBaseUrl() + Objects.requireNonNull(path, "path must not be null");
         return exchangeAbsolute(url, method, body, bearerToken);

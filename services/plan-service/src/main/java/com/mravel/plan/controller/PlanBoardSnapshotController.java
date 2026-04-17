@@ -15,15 +15,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Phase 2d — gap recovery endpoint.
- *
- * GET /api/plans/{planId}/board/snapshot
- * ?afterRevision={r} → returns incremental events if gap ≤ 200 entries
- * → returns full snapshot if gap > 200 or no revision given
- *
- * GET /api/plans/{planId}/board (unchanged — existing full snapshot endpoint)
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/plans")

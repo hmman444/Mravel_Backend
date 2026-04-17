@@ -34,8 +34,8 @@ public class UserController {
     private final FriendService friendService;
     private final PlanProfileClient planProfileClient;
 
-    // ---------------------------------- basic query
-    // ----------------------------------
+    // basic query
+    //
 
     @GetMapping("/by-email")
     public UserProfileResponse getUserByEmail(@RequestParam("email") String email) {
@@ -101,9 +101,8 @@ public class UserController {
 
         return toResponse(user);
     }
-
-    // ------------------------------ profile-page cho FE
-    // ------------------------------
+    // profile-page cho FE
+    //
 
     @GetMapping("/{id}/profile-page")
     public UserProfilePageResponse getUserProfilePage(
@@ -219,7 +218,7 @@ public class UserController {
                 .build();
     }
 
-    // ------------------------------ helpers ------------------------------
+    // helpers
 
     private UserProfileResponse toResponse(UserProfile user) {
         return UserProfileResponse.builder()

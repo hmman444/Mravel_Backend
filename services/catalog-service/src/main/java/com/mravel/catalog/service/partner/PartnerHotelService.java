@@ -42,7 +42,7 @@ public class PartnerHotelService {
         doc.setDeletedAt(null);
         doc.setCurrencyCode("VND");
 
-        // --- location ---
+        // location
         doc.setDestinationSlug(req.destinationSlug());
         doc.setCityName(req.cityName());
         doc.setDistrictName(req.districtName());
@@ -54,7 +54,7 @@ public class PartnerHotelService {
             doc.setLocation(null);
         }
 
-        // --- basic ---
+        // basic
         doc.setName(req.name());
         String slugBase = (req.slug() != null && !req.slug().isBlank()) ? req.slug() : req.name();
         doc.setSlug(genUniqueSlugForCreate(slugBase));
@@ -67,16 +67,16 @@ public class PartnerHotelService {
         doc.setEmail(req.email());
         doc.setWebsite(req.website());
 
-        // --- check-in/out ---
+        // check-in/out
         doc.setDefaultCheckInTime(parseTimeOrNull(req.defaultCheckInTime()));
         doc.setDefaultCheckOutTime(parseTimeOrNull(req.defaultCheckOutTime()));
         doc.setHasOnlineCheckin(req.hasOnlineCheckin() != null && req.hasOnlineCheckin());
 
-        // --- media/content ---
+        // media/content
         doc.setImages(req.images() == null ? List.of() : mapImages(req.images()));
         doc.setContent(req.content() == null ? List.of() : mapContentBlocks(req.content()));
 
-        // --- amenities (hotel) ---
+        // amenities (hotel)
         if (req.amenityCodes() != null) {
             amenityCatalogService.validateCodes(AmenityScope.HOTEL, req.amenityCodes());
             doc.setAmenityCodes(normalizeCodes(req.amenityCodes()));
@@ -84,13 +84,13 @@ public class PartnerHotelService {
             doc.setAmenityCodes(List.of());
         }
 
-        // --- nearby/policy/info/faq ---
+        // nearby/policy/info/faq
         doc.setNearbyPlaces(req.nearbyPlaces() == null ? List.of() : mapNearbyPlaces(req.nearbyPlaces()));
         doc.setPolicy(mapPolicy(req.policy()));
         doc.setGeneralInfo(mapGeneralInfo(req.generalInfo()));
         doc.setFaqs(req.faqs() == null ? List.of() : mapFaqs(req.faqs()));
 
-        // --- taxConfig ---
+        // taxConfig
         doc.setTaxConfig(req.taxConfig() != null
                 ? mapTaxConfig(req.taxConfig())
                 : HotelDoc.TaxAndFeeConfig.builder()
@@ -108,7 +108,7 @@ public class PartnerHotelService {
                         .freeCancelMinutes(null)
                         .build());
 
-        // --- roomTypes ---
+        // roomTypes
         if (req.roomTypes() != null) {
             // validate ROOM codes
             List<String> roomCodes = req.roomTypes().stream()
@@ -125,7 +125,7 @@ public class PartnerHotelService {
         // recompute denormalized fields
         recomputeHotelAggregates(doc);
 
-        // --- publisher: enrich from user-service ---
+        // publisher: enrich from user-service
         var user = userServiceClient.getUserById(partnerId, bearer);
         HotelDoc.PublisherInfo pub = HotelDoc.PublisherInfo.builder()
                 .partnerId(String.valueOf(partnerId))
@@ -265,7 +265,7 @@ public class PartnerHotelService {
                 .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
         assertOwner(doc, partnerId);
 
-        // --- basic ---
+        // basic
         if (req.name() != null)
             doc.setName(req.name());
 
@@ -294,7 +294,7 @@ public class PartnerHotelService {
         if (req.website() != null)
             doc.setWebsite(req.website());
 
-        // --- location ---
+        // location
         if (req.destinationSlug() != null)
             doc.setDestinationSlug(req.destinationSlug());
         if (req.cityName() != null)
@@ -313,7 +313,7 @@ public class PartnerHotelService {
             // flag
         }
 
-        // --- check-in/out ---
+        // check-in/out
         if (req.defaultCheckInTime() != null)
             doc.setDefaultCheckInTime(parseTimeOrNull(req.defaultCheckInTime()));
         if (req.defaultCheckOutTime() != null)
@@ -321,19 +321,19 @@ public class PartnerHotelService {
         if (req.hasOnlineCheckin() != null)
             doc.setHasOnlineCheckin(req.hasOnlineCheckin());
 
-        // --- media/content ---
+        // media/content
         if (req.images() != null)
             doc.setImages(mapImages(req.images()));
         if (req.content() != null)
             doc.setContent(mapContentBlocks(req.content()));
 
-        // --- amenities ---
+        // amenities
         if (req.amenityCodes() != null) {
             amenityCatalogService.validateCodes(AmenityScope.HOTEL, req.amenityCodes());
             doc.setAmenityCodes(req.amenityCodes() == null ? List.of() : normalizeCodes(req.amenityCodes()));
         }
 
-        // --- nearby/policy/info/faq ---
+        // nearby/policy/info/faq
         if (req.nearbyPlaces() != null)
             doc.setNearbyPlaces(mapNearbyPlaces(req.nearbyPlaces()));
         if (req.policy() != null)
@@ -343,16 +343,16 @@ public class PartnerHotelService {
         if (req.faqs() != null)
             doc.setFaqs(mapFaqs(req.faqs()));
 
-        // --- taxConfig ---
+        // taxConfig
         if (req.taxConfig() != null)
             doc.setTaxConfig(mapTaxConfig(req.taxConfig()));
 
-        // --- bookingConfig ---
+        // bookingConfig
         if (req.bookingConfig() != null) {
             doc.setBookingConfig(mapBookingConfig(req.bookingConfig()));
         }
 
-        // --- roomTypes ---
+        // roomTypes
         if (req.roomTypes() != null) {
             List<String> roomCodes = req.roomTypes().stream()
                     .filter(Objects::nonNull)
@@ -626,8 +626,8 @@ public class PartnerHotelService {
                 .build();
     }
 
-    // ===== recompute denormalized
-    // (minNightlyPrice/referenceNightlyPrice/filterFacets) =====
+    // recompute denormalized
+    // (minNightlyPrice/referenceNightlyPrice/filterFacets)
     private void recomputeHotelAggregates(HotelDoc doc) {
         BigDecimal min = null;
         BigDecimal refMin = null;
@@ -722,7 +722,7 @@ public class PartnerHotelService {
         }
     }
 
-    // ===== slug utils =====
+    // slug utils
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 

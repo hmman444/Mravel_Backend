@@ -30,13 +30,13 @@ public class NotificationService {
             mailSender.send(msg);
             log.info("OTP email sent to {}", toEmail);
         } catch (Exception ex) {
-            // Don't throw — fail softly and log (consistent with plan-service)
             log.error("Cannot send OTP email to {}: {}", toEmail, ex.getMessage(), ex);
         }
     }
 
     /**
-     * Test SMTP connection using the configured JavaMailSenderImpl (returns true if connection successful)
+     * Test SMTP connection using the configured JavaMailSenderImpl (returns true if
+     * connection successful)
      */
     public boolean testSmtpConnection() {
         if (!(mailSender instanceof JavaMailSenderImpl)) {

@@ -64,7 +64,8 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
     List<Criteria> cs = new ArrayList<>();
 
     cs.add(where("active").is(true));
-    if (kind != null) cs.add(where("kind").is(kind)); // POI mặc định
+    if (kind != null)
+      cs.add(where("kind").is(kind)); // POI mặc định
     cs.add(where("parentSlug").is(parentSlug)); // ràng theo destination
 
     final Criteria[] arr = cs.toArray(Criteria[]::new);
@@ -90,7 +91,7 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
     return new PageImpl<>(mongo.find(q, PlaceDoc.class), pb, total);
   }
 
-  // ===== helpers =====
+  // helpers
   private static Criteria and(List<Criteria> cs) {
     final Criteria[] arr = cs.toArray(Criteria[]::new);
     Objects.requireNonNull(arr, "criteria array must not be null");

@@ -17,4 +17,10 @@ public class PageResponse<T> {
     private int size;
     private long total;
     private boolean hasMore;
+
+    /**
+     * Opaque cursor for cursor-based pagination (Elasticsearch search_after).
+     * Null when using offset-based pagination or when there are no more results.
+     */
+    private String nextCursor;
 }

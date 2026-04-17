@@ -335,7 +335,7 @@ public class PlaceService {
         p.getChildrenCount());
   }
 
-  // --- mapping lists to embedded docs ---
+  // mapping lists to embedded docs
   private List<PlaceDoc.Image> mapImages(List<com.mravel.catalog.dto.place.PlaceAdminDtos.ImageReq> imgs) {
     if (imgs == null)
       return List.of();

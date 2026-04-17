@@ -59,7 +59,7 @@ public class HotelService {
                         : guestsNormalized)
                 : null;
 
-        // ==== NEW: availability filter nếu có ngày ====
+        // NEW: availability filter nếu có ngày
         var checkIn = request.checkIn();
         var checkOut = request.checkOut();
 

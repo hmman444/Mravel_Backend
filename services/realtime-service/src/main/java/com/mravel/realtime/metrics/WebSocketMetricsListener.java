@@ -10,10 +10,6 @@ import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
-/**
- * Phase 0 — counts WebSocket connect / disconnect / subscribe events.
- * Metrics: realtime.ws_connections (connect/disconnect), realtime.ws_subscriptions
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
