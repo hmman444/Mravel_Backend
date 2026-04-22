@@ -34,7 +34,7 @@ public class AuthService {
     private final GoogleAuthService googleAuthService;
     private final FacebookAuthService facebookAuthService;
     private final OutboxRepository outboxRepository;
-    String defaultAvatar = "https://i.pinimg.com/736x/bc/43/98/bc439871417621836a0eeea768d60944.jpg";
+    String defaultAvatar = "https://ui-avatars.com/api/?name=Mravel+User&background=0D8ABC&color=fff";
 
     @Transactional
     public void register(RegisterRequest request) {

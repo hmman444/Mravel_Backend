@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import com.mravel.plan.client.NotificationClient;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlanNotificationService {
@@ -24,10 +26,12 @@ public class PlanNotificationService {
         if (recipientId == null || actorId == null)
             return;
         if (recipientId.equals(actorId))
-            return; // không tự notify
+            return; // do not self-notify
         try {
             notificationClient.createNotification(recipientId, actorId, type, title, message, data);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("[PlanNotificationService] Failed to send notification type={} recipient={}: {}",
+                    type, recipientId, e.getMessage());
         }
     }
 

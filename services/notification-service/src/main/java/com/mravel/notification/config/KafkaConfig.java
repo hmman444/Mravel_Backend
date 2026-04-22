@@ -9,6 +9,6 @@ public class KafkaConfig {
 
   @Bean
   public NewTopic notificationEventsTopic() {
-    return new NewTopic("notification.v1.events", 1, (short) 1);
+    return new NewTopic("notification-events", 1, (short) 1);
   }
 }
