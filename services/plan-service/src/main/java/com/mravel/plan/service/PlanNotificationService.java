@@ -88,6 +88,23 @@ public class PlanNotificationService {
                 data);
     }
 
+    public void notifyCommentReact(Long actorId, Long recipientId, Long planId, Long commentId, String reactionKey) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("actorId", actorId);
+        data.put("planId", planId);
+        data.put("commentId", commentId);
+        data.put("reactionKey", reactionKey);
+        data.put("deepLink", "/plans/" + planId + "?commentId=" + commentId);
+
+        safeCreate(
+                recipientId,
+                actorId,
+                "COMMENT_REACT",
+                "Thích bình luận",
+                "đã thích bình luận của bạn",
+                data);
+    }
+
     public void notifyPlanInvite(Long actorId, Long recipientId, Long planId, String role, String token) {
         Map<String, Object> data = new HashMap<>();
         data.put("actorId", actorId);

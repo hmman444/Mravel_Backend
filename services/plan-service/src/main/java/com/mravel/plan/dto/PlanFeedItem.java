@@ -84,6 +84,9 @@ public class PlanFeedItem {
         private Instant createdAt;
         private Long parentId;
         private List<Comment> replies;
+        private Map<String, Long> reactions;      // reaction counts by type
+        private String myReaction;               // current viewer's reaction type (null if none)
+        private List<ReactionUser> reactionUsers; // who reacted (reuse top-level inner class)
 
         @Data
         @Builder

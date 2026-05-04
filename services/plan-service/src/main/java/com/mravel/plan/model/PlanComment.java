@@ -37,4 +37,8 @@ public class PlanComment {
     @OrderBy("createdAt ASC")
     @Builder.Default
     private List<PlanComment> replies = new ArrayList<>();
+
+    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<PlanCommentReaction> reactions = new ArrayList<>();
 }
