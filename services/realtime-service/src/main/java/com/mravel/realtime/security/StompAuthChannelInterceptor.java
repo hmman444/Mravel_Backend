@@ -33,16 +33,20 @@ import java.util.regex.Pattern;
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final Pattern BOARD_TOPIC = Pattern.compile("^/topic/plans/(\\d+)/board(/v2)?$");
+    private static final Pattern CHAT_CONV_TOPIC = Pattern.compile("^/topic/conversations/(\\d+)/events$");
+    private static final Pattern CHAT_USER_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
 
     private final Key signingKey;
     private final RestTemplate restTemplate;
     private final String planServiceBaseUrl;
     private final String userServiceBaseUrl;
+    private final String chatServiceBaseUrl;
 
     public StompAuthChannelInterceptor(
             @Value("${mravel.jwt.secret}") String secret,
             @Value("${mravel.services.plan.base-url:http://localhost:8086}") String planServiceBaseUrl,
-            @Value("${mravel.services.user.base-url:http://localhost:8082}") String userServiceBaseUrl) {
+            @Value("${mravel.services.user.base-url:http://localhost:8082}") String userServiceBaseUrl,
+            @Value("${mravel.services.chat.base-url:http://localhost:8089}") String chatServiceBaseUrl) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(2000);
@@ -50,6 +54,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         this.restTemplate = new RestTemplate(requestFactory);
         this.planServiceBaseUrl = planServiceBaseUrl;
         this.userServiceBaseUrl = userServiceBaseUrl;
+        this.chatServiceBaseUrl = chatServiceBaseUrl;
     }
 
     @Override
@@ -128,6 +133,32 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 }
 
                 log.debug("WS SUBSCRIBE accepted planId={} userId={}", planId, userId);
+            }
+
+            // Chat conversation events topic
+            Matcher cm = CHAT_CONV_TOPIC.matcher(destination);
+            if (cm.matches()) {
+                long conversationId = Long.parseLong(cm.group(1));
+                Long userId = getUserIdFromSession(accessor);
+                if (userId == null) {
+                    throw new IllegalArgumentException("Unauthenticated SUBSCRIBE to chat topic");
+                }
+                if (!hasChatAccess(conversationId, userId)) {
+                    log.warn("ws_subscription_rejected convId={} userId={} reason=not_member",
+                            conversationId, userId);
+                    throw new IllegalArgumentException("Access denied to conversation " + conversationId);
+                }
+                log.debug("WS SUBSCRIBE accepted convId={} userId={}", conversationId, userId);
+            }
+
+            // Personal conversations list topic — only the owner can subscribe
+            Matcher um = CHAT_USER_TOPIC.matcher(destination);
+            if (um.matches()) {
+                long topicUserId = Long.parseLong(um.group(1));
+                Long sessionUserId = getUserIdFromSession(accessor);
+                if (sessionUserId == null || !sessionUserId.equals(topicUserId)) {
+                    throw new IllegalArgumentException("Access denied to user conversations topic");
+                }
             }
         }
 
@@ -219,6 +250,24 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             // Keep service available if access-check endpoint is temporarily unreachable.
             log.warn("Access check failed for planId={} userId={} — failing open: {}",
                     planId, userId, e.getMessage());
+            return true;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean hasChatAccess(long conversationId, long userId) {
+        try {
+            String url = chatServiceBaseUrl + "/api/chat/conversations/" + conversationId
+                    + "/access-check?userId=" + userId;
+            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
+            return body != null && Boolean.TRUE.equals(body.get("canAccess"));
+        } catch (Exception e) {
+            if (e instanceof HttpStatusCodeException ex) {
+                int code = ex.getStatusCode().value();
+                if (code == 401 || code == 403) return false;
+            }
+            log.warn("Chat access check failed for convId={} userId={} — failing open: {}",
+                    conversationId, userId, e.getMessage());
             return true;
         }
     }

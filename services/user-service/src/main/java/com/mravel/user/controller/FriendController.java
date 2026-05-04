@@ -1,5 +1,6 @@
 package com.mravel.user.controller;
 
+import com.mravel.user.dto.UserMiniResponse;
 import com.mravel.user.model.RelationshipType;
 import com.mravel.user.service.AuthTokenClient;
 import com.mravel.user.service.FriendService;
@@ -83,6 +84,14 @@ public class FriendController {
         Long currentUserId = getCurrentUserId(authorizationHeader);
         List<Long> ids = friendService.getFriendIds(currentUserId);
         return ApiResponse.success("Lấy friendIds thành công", ids);
+    }
+
+    @GetMapping("/list")
+    public ApiResponse<List<UserMiniResponse>> getFriendList(
+            @RequestHeader("Authorization") String authorizationHeader) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+        List<UserMiniResponse> friends = friendService.getFriendList(currentUserId);
+        return ApiResponse.success("Lấy danh sách bạn bè thành công", friends);
     }
 
 }
