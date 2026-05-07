@@ -25,6 +25,7 @@ public class PlanFeedItem {
     private String budgetCurrency;
     private String thumbnail;
     private List<String> images;
+    private List<String> videos;
     private List<Destination> destinations;
     private Map<String, Long> reactions;
     private List<ReactionUser> reactionUsers;

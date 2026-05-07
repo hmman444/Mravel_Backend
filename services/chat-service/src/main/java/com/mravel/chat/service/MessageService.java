@@ -38,11 +38,15 @@ public class MessageService {
     public MessageResponse sendMessage(Long conversationId, Long userId, SendMessageRequest req) {
         conversationService.requireActiveMember(conversationId, userId);
 
+        Message.MessageType type = resolveType(req.getMessageType());
+        validateMessageRequest(type, req);
+
         Message msg = messageRepo.save(Message.builder()
                 .conversationId(conversationId)
                 .senderId(userId)
                 .content(req.getContent())
-                .messageType(Message.MessageType.TEXT)
+                .messageType(type)
+                .mediaUrl(req.getMediaUrl())
                 .createdAt(Instant.now())
                 .deleted(false)
                 .build());
@@ -67,12 +71,34 @@ public class MessageService {
                         .senderAvatar(sender != null ? sender.getAvatar() : null)
                         .content(msg.getContent())
                         .messageType(msg.getMessageType().name())
+                        .mediaUrl(msg.getMediaUrl())
                         .createdAt(msg.getCreatedAt())
                         .deleted(false)
                         .build())
                 .build());
 
         return response;
+    }
+
+    private Message.MessageType resolveType(String raw) {
+        if (raw == null || raw.isBlank()) return Message.MessageType.TEXT;
+        try {
+            return Message.MessageType.valueOf(raw.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("messageType không hợp lệ: " + raw);
+        }
+    }
+
+    private void validateMessageRequest(Message.MessageType type, SendMessageRequest req) {
+        if (type == Message.MessageType.TEXT) {
+            if (req.getContent() == null || req.getContent().isBlank()) {
+                throw new IllegalArgumentException("Tin nhắn văn bản không được để trống");
+            }
+        } else if (type == Message.MessageType.IMAGE || type == Message.MessageType.VIDEO) {
+            if (req.getMediaUrl() == null || req.getMediaUrl().isBlank()) {
+                throw new IllegalArgumentException("mediaUrl không được để trống với tin nhắn media");
+            }
+        }
     }
 
     // ─── Load History ─────────────────────────────────────────────────────────
@@ -149,6 +175,7 @@ public class MessageService {
                 .senderAvatar(sender != null ? sender.getAvatar() : null)
                 .content(m.isDeleted() ? null : m.getContent())
                 .messageType(m.getMessageType() != null ? m.getMessageType().name() : "TEXT")
+                .mediaUrl(m.isDeleted() ? null : m.getMediaUrl())
                 .createdAt(m.getCreatedAt())
                 .deleted(m.isDeleted())
                 .seenBy(seenBy)

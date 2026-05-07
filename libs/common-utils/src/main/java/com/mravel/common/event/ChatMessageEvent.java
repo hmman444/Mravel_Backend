@@ -58,6 +58,7 @@ public class ChatMessageEvent {
         private String senderAvatar;
         private String content;
         private String messageType;
+        private String mediaUrl;
         private Instant createdAt;
         private boolean deleted;
     }

@@ -289,6 +289,7 @@ public class PlanBoardService {
                 .status(plan.getStatus().name())
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
+                .videos(plan.getVideos())
                 .myRole(null)
                 .boardRevision(plan.getBoardRevision())
                 .costSummary(costSummary)

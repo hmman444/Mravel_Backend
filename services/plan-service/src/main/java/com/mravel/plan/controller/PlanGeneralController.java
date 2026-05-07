@@ -74,6 +74,22 @@ public class PlanGeneralController {
         return ResponseEntity.ok(ApiResponse.success("Xóa ảnh thành công", null));
     }
 
+    @PostMapping("/videos")
+    public ResponseEntity<ApiResponse<?>> addVideo(
+            @PathVariable Long planId,
+            @RequestBody AddVideoRequest req) {
+        service.addVideo(planId, currentUser.getId(), req.getUrl());
+        return ResponseEntity.ok(ApiResponse.success("Thêm video thành công", null));
+    }
+
+    @DeleteMapping("/videos")
+    public ResponseEntity<ApiResponse<?>> removeVideo(
+            @PathVariable Long planId,
+            @RequestBody RemoveVideoRequest req) {
+        service.removeVideo(planId, currentUser.getId(), req.getUrl());
+        return ResponseEntity.ok(ApiResponse.success("Xóa video thành công", null));
+    }
+
     @PutMapping("/budget")
     public ResponseEntity<ApiResponse<?>> updateBudget(
             @PathVariable Long planId,

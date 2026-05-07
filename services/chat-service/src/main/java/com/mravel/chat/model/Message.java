@@ -29,6 +29,9 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageType messageType;
 
+    @Column(name = "media_url", length = 2000)
+    private String mediaUrl;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -37,6 +40,6 @@ public class Message {
     private boolean deleted = false;
 
     public enum MessageType {
-        TEXT, SYSTEM
+        TEXT, IMAGE, VIDEO, SYSTEM
     }
 }

@@ -129,6 +129,7 @@ public class PlanMapper {
                                 .createdAt(p.getCreatedAt())
                                 .author(authorDto)
                                 .images(p.getImages() != null ? p.getImages() : List.of())
+                                .videos(p.getVideos() != null ? p.getVideos() : List.of())
                                 .destinations(p.getDestinations() == null ? List.of()
                                                 : p.getDestinations().stream()
                                                                 .map(d -> PlanFeedItem.Destination.builder()

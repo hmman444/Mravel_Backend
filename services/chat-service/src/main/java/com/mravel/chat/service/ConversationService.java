@@ -421,6 +421,7 @@ public class ConversationService {
                     .senderName(sender != null ? sender.getFullname() : "User " + lastMsg.getSenderId())
                     .content(lastMsg.isDeleted() ? null : lastMsg.getContent())
                     .messageType(lastMsg.getMessageType() != null ? lastMsg.getMessageType().name() : "TEXT")
+                    .mediaUrl(lastMsg.isDeleted() ? null : lastMsg.getMediaUrl())
                     .createdAt(lastMsg.getCreatedAt())
                     .deleted(lastMsg.isDeleted())
                     .build();

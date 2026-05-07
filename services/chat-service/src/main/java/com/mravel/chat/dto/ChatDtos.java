@@ -28,8 +28,12 @@ public class ChatDtos {
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class SendMessageRequest {
-        @NotBlank @Size(max = 4000)
+        @Size(max = 4000)
         private String content;
+        /** TEXT (default) | IMAGE | VIDEO */
+        private String messageType;
+        @Size(max = 2000)
+        private String mediaUrl;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
@@ -80,6 +84,7 @@ public class ChatDtos {
         private String senderName;
         private String content;
         private String messageType;
+        private String mediaUrl;
         private Instant createdAt;
         private boolean deleted;
     }
@@ -108,6 +113,7 @@ public class ChatDtos {
         private String senderAvatar;
         private String content;
         private String messageType;
+        private String mediaUrl;
         private Instant createdAt;
         private boolean deleted;
         /** Map of userId → readAt for seen receipts. */
