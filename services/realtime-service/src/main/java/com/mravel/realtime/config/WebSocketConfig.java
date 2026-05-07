@@ -50,6 +50,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
         registration.interceptors(stompAuthChannelInterceptor);
+        // Larger pool handles concurrent CONNECT/SUBSCRIBE during traffic bursts.
+        // Each SUBSCRIBE can block briefly on the HTTP access-check (2s timeout).
+        registration.taskExecutor()
+                .corePoolSize(8)
+                .maxPoolSize(32)
+                .keepAliveSeconds(60)
+                .queueCapacity(500);
     }
 
     @Override

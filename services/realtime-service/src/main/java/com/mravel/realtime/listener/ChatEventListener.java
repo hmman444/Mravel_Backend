@@ -18,7 +18,11 @@ public class ChatEventListener {
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "${mravel.topics.chat-events}", groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(
+            topics = "${mravel.topics.chat-events}",
+            groupId = "${spring.kafka.consumer.group-id}",
+            concurrency = "${mravel.kafka.chat-listener-concurrency:3}"
+    )
     public void handle(String messageJson) {
         try {
             ChatMessageEvent event = objectMapper.readValue(messageJson, ChatMessageEvent.class);

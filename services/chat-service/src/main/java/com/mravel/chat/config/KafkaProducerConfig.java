@@ -9,6 +9,9 @@ public class KafkaProducerConfig {
 
     @Bean
     public NewTopic chatEventsTopic() {
-        return new NewTopic("chat-events", 1, (short) 1);
+        // 8 partitions allows parallel consumption by up to 8 consumer threads.
+        // NOTE: existing single-partition deployments require manual kafka-topics.sh --alter
+        // to take effect. New deployments get 8 partitions automatically.
+        return new NewTopic("chat-events", 8, (short) 1);
     }
 }

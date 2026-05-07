@@ -47,10 +47,7 @@ public class MessageService {
                 .deleted(false)
                 .build());
 
-        conversationRepo.findById(conversationId).ifPresent(conv -> {
-            conv.setUpdatedAt(msg.getCreatedAt());
-            conversationRepo.save(conv);
-        });
+        conversationRepo.updateUpdatedAt(conversationId, msg.getCreatedAt());
 
         UserMiniResponse sender = fetchUser(userId);
         MessageResponse response = toResponse(msg, sender, List.of());
@@ -117,16 +114,13 @@ public class MessageService {
     @Transactional
     public void markSeen(Long conversationId, Long userId, Long lastMessageId) {
         conversationService.requireActiveMember(conversationId, userId);
-
         readStatusRepo.upsertLastRead(conversationId, userId, lastMessageId);
-
-        List<Long> recipientIds = memberRepo.findActiveUserIdsByConversationId(conversationId);
+        // SEEN_UPDATE is broadcast only to the conversation topic; recipientIds not needed
         eventProducer.publish(ChatMessageEvent.builder()
                 .eventType("SEEN_UPDATE")
                 .conversationId(conversationId)
                 .actorId(userId)
                 .timestamp(Instant.now())
-                .recipientIds(recipientIds)
                 .lastSeenMessageId(lastMessageId)
                 .seenByUserId(userId)
                 .build());
@@ -134,13 +128,12 @@ public class MessageService {
 
     public void sendTypingIndicator(Long conversationId, Long userId) {
         conversationService.requireActiveMember(conversationId, userId);
-        List<Long> recipientIds = memberRepo.findActiveUserIdsByConversationId(conversationId);
+        // TYPING is broadcast only to the conversation topic; recipientIds not needed
         eventProducer.publish(ChatMessageEvent.builder()
                 .eventType("TYPING")
                 .conversationId(conversationId)
                 .actorId(userId)
                 .timestamp(Instant.now())
-                .recipientIds(recipientIds)
                 .typing(true)
                 .build());
     }

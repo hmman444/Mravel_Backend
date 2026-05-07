@@ -25,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,11 +37,16 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private static final Pattern CHAT_CONV_TOPIC = Pattern.compile("^/topic/conversations/(\\d+)/events$");
     private static final Pattern CHAT_USER_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
 
+    private static final long CHAT_ACCESS_CACHE_TTL_MS = 30_000L;
+
     private final Key signingKey;
     private final RestTemplate restTemplate;
     private final String planServiceBaseUrl;
     private final String userServiceBaseUrl;
     private final String chatServiceBaseUrl;
+
+    /** Cache: "{convId}:{userId}" -> expiry epoch ms (positive = allow, negative = deny) */
+    private final ConcurrentHashMap<String, Long> chatAccessCache = new ConcurrentHashMap<>();
 
     public StompAuthChannelInterceptor(
             @Value("${mravel.jwt.secret}") String secret,
@@ -143,7 +149,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 if (userId == null) {
                     throw new IllegalArgumentException("Unauthenticated SUBSCRIBE to chat topic");
                 }
-                if (!hasChatAccess(conversationId, userId)) {
+                if (!hasChatAccessCached(conversationId, userId)) {
                     log.warn("ws_subscription_rejected convId={} userId={} reason=not_member",
                             conversationId, userId);
                     throw new IllegalArgumentException("Access denied to conversation " + conversationId);
@@ -252,6 +258,27 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                     planId, userId, e.getMessage());
             return true;
         }
+    }
+
+    private boolean hasChatAccessCached(long conversationId, long userId) {
+        String key = conversationId + ":" + userId;
+        Long cached = chatAccessCache.get(key);
+        long now = System.currentTimeMillis();
+        if (cached != null) {
+            long expiry = Math.abs(cached);
+            if (now < expiry) {
+                return cached > 0; // positive = allow, negative (stored as -expiry) = deny
+            }
+            chatAccessCache.remove(key);
+        }
+        boolean result = hasChatAccess(conversationId, userId);
+        long expiry = now + CHAT_ACCESS_CACHE_TTL_MS;
+        chatAccessCache.put(key, result ? expiry : -expiry);
+        // Evict stale entries periodically to prevent memory growth
+        if (chatAccessCache.size() > 5000) {
+            chatAccessCache.entrySet().removeIf(e -> now > Math.abs(e.getValue()));
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")

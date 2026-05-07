@@ -95,11 +95,11 @@ public class ConversationService {
         Map<Long, Conversation> convMap = conversationRepo.findAllById(convIds).stream()
                 .collect(Collectors.toMap(Conversation::getId, c -> c));
 
-        // Collect all member userIds for batch user-service call
-        Map<Long, List<ConversationMember>> membersByConv = new HashMap<>();
-        for (Long cid : convIds) {
-            membersByConv.put(cid, memberRepo.findActiveByConversationId(cid));
-        }
+        // Single batch query for all members across all conversations (eliminates N+1)
+        Map<Long, List<ConversationMember>> membersByConv = memberRepo
+                .findActiveByConversationIdIn(convIds).stream()
+                .collect(Collectors.groupingBy(ConversationMember::getConversationId));
+
         Set<Long> allUserIds = membersByConv.values().stream()
                 .flatMap(List::stream).map(ConversationMember::getUserId)
                 .collect(Collectors.toSet());
@@ -109,13 +109,19 @@ public class ConversationService {
                 .findByUserIdAndConversationIdIn(userId, convIds).stream()
                 .collect(Collectors.toMap(MessageReadStatus::getConversationId, rs -> rs));
 
+        // Single batch query for last messages across all conversations (eliminates N+1)
+        Map<Long, Message> lastMessageMap = messageRepo
+                .findLastMessagesByConversationIds(convIds).stream()
+                .collect(Collectors.toMap(Message::getConversationId, m -> m));
+
         return myMemberships.stream()
                 .map(membership -> {
                     Conversation conv = convMap.get(membership.getConversationId());
                     if (conv == null) return null;
-                    List<ConversationMember> members = membersByConv.get(conv.getId());
+                    List<ConversationMember> members = membersByConv.getOrDefault(conv.getId(), List.of());
                     MessageReadStatus rs = readStatusMap.get(conv.getId());
-                    return buildResponseFull(conv, userId, members, userMap, rs);
+                    Message lastMsg = lastMessageMap.get(conv.getId());
+                    return buildResponseFull(conv, userId, members, userMap, rs, lastMsg);
                 })
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(ConversationResponse::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -131,7 +137,8 @@ public class ConversationService {
         Set<Long> userIds = members.stream().map(ConversationMember::getUserId).collect(Collectors.toSet());
         Map<Long, UserMiniResponse> userMap = fetchUsers(userIds);
         MessageReadStatus rs = readStatusRepo.findByConversationIdAndUserId(conversationId, userId).orElse(null);
-        return buildResponseFull(conv, userId, members, userMap, rs);
+        Message lastMsg = messageRepo.findTopByConversationIdOrderByIdDesc(conversationId).orElse(null);
+        return buildResponseFull(conv, userId, members, userMap, rs, lastMsg);
     }
 
     // ─── Group Management ─────────────────────────────────────────────────────
@@ -146,9 +153,11 @@ public class ConversationService {
         conv.setUpdatedAt(Instant.now());
         conversationRepo.save(conv);
 
+        List<Long> activeMembers = memberRepo.findActiveUserIdsByConversationId(conversationId);
         UserMiniResponse actor = fetchUsers(List.of(userId)).get(userId);
         String actorName = actor != null ? actor.getFullname() : "User " + userId;
-        publishSystemMessage(conv, userId, actorName + " đã cập nhật thông tin nhóm", List.of());
+        publishSystemMessageWithRecipients(conv, userId, actorName + " đã cập nhật thông tin nhóm", List.of(), activeMembers);
+        publishTypedEvent("GROUP_UPDATED", conv, userId, List.of(), activeMembers);
         return buildResponse(conv, userId);
     }
 
@@ -176,13 +185,16 @@ public class ConversationService {
         conv.setUpdatedAt(Instant.now());
         conversationRepo.save(conv);
 
+        // Query after save — new members are already active so they're included as recipients
+        List<Long> activeMembers = memberRepo.findActiveUserIdsByConversationId(conversationId);
         Map<Long, UserMiniResponse> userMap = fetchUsers(combineIds(userId, newUserIds));
         String actorName = userName(userMap, userId);
         List<String> targetNames = newUserIds.stream().map(id -> userName(userMap, id)).toList();
         String content = targetNames.isEmpty()
             ? actorName + " đã thêm thành viên vào nhóm"
             : actorName + " đã thêm " + String.join(", ", targetNames) + " vào nhóm";
-        publishSystemMessage(conv, userId, content, newUserIds);
+        publishSystemMessageWithRecipients(conv, userId, content, newUserIds, activeMembers);
+        publishTypedEvent("MEMBER_ADDED", conv, userId, newUserIds, activeMembers);
     }
 
     @Transactional
@@ -204,10 +216,16 @@ public class ConversationService {
         conv.setUpdatedAt(Instant.now());
         conversationRepo.save(conv);
 
+        // Query active members AFTER soft-delete, then add removed user explicitly so they receive events
+        List<Long> remainingMembers = memberRepo.findActiveUserIdsByConversationId(conversationId);
+        List<Long> allRecipients = new ArrayList<>(remainingMembers);
+        if (!allRecipients.contains(targetUserId)) allRecipients.add(targetUserId);
+
         Map<Long, UserMiniResponse> userMap = fetchUsers(combineIds(userId, List.of(targetUserId)));
         String actorName = userName(userMap, userId);
         String targetName = userName(userMap, targetUserId);
-        publishSystemMessage(conv, userId, actorName + " đã xóa " + targetName + " khỏi nhóm", List.of(targetUserId));
+        publishSystemMessageWithRecipients(conv, userId, actorName + " đã xóa " + targetName + " khỏi nhóm", List.of(targetUserId), allRecipients);
+        publishTypedEvent("MEMBER_REMOVED", conv, userId, List.of(targetUserId), allRecipients);
     }
 
     @Transactional
@@ -238,9 +256,15 @@ public class ConversationService {
         conv.setUpdatedAt(Instant.now());
         conversationRepo.save(conv);
 
+        // Include the leaving user in recipients so they receive confirmation
+        List<Long> remainingMembers = memberRepo.findActiveUserIdsByConversationId(conversationId);
+        List<Long> allRecipients = new ArrayList<>(remainingMembers);
+        if (!allRecipients.contains(userId)) allRecipients.add(userId);
+
         UserMiniResponse actor = fetchUsers(List.of(userId)).get(userId);
         String actorName = actor != null ? actor.getFullname() : "User " + userId;
-        publishSystemMessage(conv, userId, actorName + " đã rời khỏi nhóm", List.of(userId));
+        publishSystemMessageWithRecipients(conv, userId, actorName + " đã rời khỏi nhóm", List.of(userId), allRecipients);
+        publishTypedEvent("MEMBER_LEFT", conv, userId, List.of(userId), allRecipients);
     }
 
     @Transactional
@@ -264,10 +288,12 @@ public class ConversationService {
         conv.setUpdatedAt(Instant.now());
         conversationRepo.save(conv);
 
+        List<Long> activeMembers = memberRepo.findActiveUserIdsByConversationId(conversationId);
         Map<Long, UserMiniResponse> userMap = fetchUsers(combineIds(userId, List.of(targetUserId)));
         String actorName = userName(userMap, userId);
         String targetName = userName(userMap, targetUserId);
-        publishSystemMessage(conv, userId, actorName + " đã thay đổi vai trò của " + targetName, List.of(targetUserId));
+        publishSystemMessageWithRecipients(conv, userId, actorName + " đã thay đổi vai trò của " + targetName, List.of(targetUserId), activeMembers);
+        publishTypedEvent("ROLE_CHANGED", conv, userId, List.of(targetUserId), activeMembers);
     }
 
     @Transactional
@@ -289,10 +315,12 @@ public class ConversationService {
         conv.setUpdatedAt(Instant.now());
         conversationRepo.save(conv);
 
+        List<Long> activeMembers = memberRepo.findActiveUserIdsByConversationId(conversationId);
         Map<Long, UserMiniResponse> userMap = fetchUsers(combineIds(userId, List.of(newOwnerId)));
         String actorName = userName(userMap, userId);
         String newOwnerName = userName(userMap, newOwnerId);
-        publishSystemMessage(conv, userId, actorName + " đã chuyển quyền chủ nhóm cho " + newOwnerName, List.of(newOwnerId));
+        publishSystemMessageWithRecipients(conv, userId, actorName + " đã chuyển quyền chủ nhóm cho " + newOwnerName, List.of(newOwnerId), activeMembers);
+        publishTypedEvent("ROLE_CHANGED", conv, userId, List.of(userId, newOwnerId), activeMembers);
     }
 
     // ─── Access Check (for realtime-service) ─────────────────────────────────
@@ -345,14 +373,16 @@ public class ConversationService {
         Set<Long> userIds = members.stream().map(ConversationMember::getUserId).collect(Collectors.toSet());
         Map<Long, UserMiniResponse> userMap = fetchUsers(userIds);
         MessageReadStatus rs = readStatusRepo.findByConversationIdAndUserId(conv.getId(), userId).orElse(null);
-        return buildResponseFull(conv, userId, members, userMap, rs);
+        Message lastMsg = messageRepo.findTopByConversationIdOrderByIdDesc(conv.getId()).orElse(null);
+        return buildResponseFull(conv, userId, members, userMap, rs, lastMsg);
     }
 
     private ConversationResponse buildResponseFull(Conversation conv, Long userId,
                                                      List<ConversationMember> members,
                                                      Map<Long, UserMiniResponse> userMap,
-                                                     MessageReadStatus readStatus) {
-        Optional<Message> lastMsg = messageRepo.findTopByConversationIdOrderByIdDesc(conv.getId());
+                                                     MessageReadStatus readStatus,
+                                                     Message lastMsg) {
+        // lastMsg is provided by caller — no per-conversation query needed
 
         long unread = computeUnread(conv.getId(), userId, readStatus);
 
@@ -383,17 +413,16 @@ public class ConversationService {
         }
 
         MessageSummary lastMessageSummary = null;
-        if (lastMsg.isPresent()) {
-            Message m = lastMsg.get();
-            UserMiniResponse sender = userMap.get(m.getSenderId());
+        if (lastMsg != null) {
+            UserMiniResponse sender = userMap.get(lastMsg.getSenderId());
             lastMessageSummary = MessageSummary.builder()
-                    .id(m.getId())
-                    .senderId(m.getSenderId())
-                    .senderName(sender != null ? sender.getFullname() : "User " + m.getSenderId())
-                    .content(m.isDeleted() ? null : m.getContent())
-                    .messageType(m.getMessageType() != null ? m.getMessageType().name() : "TEXT")
-                    .createdAt(m.getCreatedAt())
-                    .deleted(m.isDeleted())
+                    .id(lastMsg.getId())
+                    .senderId(lastMsg.getSenderId())
+                    .senderName(sender != null ? sender.getFullname() : "User " + lastMsg.getSenderId())
+                    .content(lastMsg.isDeleted() ? null : lastMsg.getContent())
+                    .messageType(lastMsg.getMessageType() != null ? lastMsg.getMessageType().name() : "TEXT")
+                    .createdAt(lastMsg.getCreatedAt())
+                    .deleted(lastMsg.isDeleted())
                     .build();
         }
 
@@ -418,38 +447,62 @@ public class ConversationService {
         return messageRepo.countUnread(conversationId, readStatus.getLastReadMessageId(), userId);
     }
 
-        private void publishSystemMessage(Conversation conv, Long actorId, String content, List<Long> affectedUserIds) {
+    private void publishSystemMessage(Conversation conv, Long actorId, String content, List<Long> affectedUserIds) {
+        publishSystemMessageWithRecipients(conv, actorId, content, affectedUserIds,
+                memberRepo.findActiveUserIdsByConversationId(conv.getId()));
+    }
+
+    private void publishSystemMessageWithRecipients(Conversation conv, Long actorId, String content,
+                                                     List<Long> affectedUserIds, List<Long> recipientIds) {
         Instant now = Instant.now();
         Message msg = messageRepo.save(Message.builder()
-            .conversationId(conv.getId())
-            .senderId(actorId)
-            .content(content)
-            .messageType(Message.MessageType.SYSTEM)
-            .createdAt(now)
-            .deleted(false)
-            .build());
+                .conversationId(conv.getId())
+                .senderId(actorId)
+                .content(content)
+                .messageType(Message.MessageType.SYSTEM)
+                .createdAt(now)
+                .deleted(false)
+                .build());
 
-        List<Long> recipientIds = memberRepo.findActiveUserIdsByConversationId(conv.getId());
         UserMiniResponse actor = fetchUsers(List.of(actorId)).get(actorId);
         String senderName = actor != null ? actor.getFullname() : "User " + actorId;
         eventProducer.publish(ChatMessageEvent.builder()
-            .eventType("NEW_MESSAGE")
+                .eventType("NEW_MESSAGE")
                 .conversationId(conv.getId())
                 .actorId(actorId)
-            .timestamp(now)
+                .timestamp(now)
                 .affectedUserIds(affectedUserIds)
                 .recipientIds(recipientIds)
-            .message(MessagePayload.builder()
-                .id(msg.getId())
+                .message(MessagePayload.builder()
+                        .id(msg.getId())
+                        .conversationId(conv.getId())
+                        .senderId(actorId)
+                        .senderName(senderName)
+                        .senderAvatar(actor != null ? actor.getAvatar() : null)
+                        .content(content)
+                        .messageType(Message.MessageType.SYSTEM.name())
+                        .createdAt(now)
+                        .deleted(false)
+                        .build())
+                .conversation(ConversationPayload.builder()
+                        .id(conv.getId())
+                        .type(conv.getType().name())
+                        .name(conv.getName())
+                        .avatarUrl(conv.getAvatarUrl())
+                        .ownerId(conv.getOwnerId())
+                        .build())
+                .build());
+    }
+
+    private void publishTypedEvent(String eventType, Conversation conv, Long actorId,
+                                    List<Long> affectedUserIds, List<Long> recipientIds) {
+        eventProducer.publish(ChatMessageEvent.builder()
+                .eventType(eventType)
                 .conversationId(conv.getId())
-                .senderId(actorId)
-                .senderName(senderName)
-                .senderAvatar(actor != null ? actor.getAvatar() : null)
-                .content(content)
-                .messageType(Message.MessageType.SYSTEM.name())
-                .createdAt(now)
-                .deleted(false)
-                .build())
+                .actorId(actorId)
+                .timestamp(Instant.now())
+                .affectedUserIds(affectedUserIds)
+                .recipientIds(recipientIds)
                 .conversation(ConversationPayload.builder()
                         .id(conv.getId())
                         .type(conv.getType().name())
