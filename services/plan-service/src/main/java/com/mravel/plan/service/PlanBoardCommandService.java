@@ -45,12 +45,12 @@ public class PlanBoardCommandService {
                 // boardService.createList.
                 long revision = getRevision(planId);
 
-                Map<String, Object> patch = Map.of(
-                                "listId", created.getId(),
-                                "title", created.getTitle(),
-                                "position", created.getPosition(),
-                                "type", created.getType(),
-                                "dayDate", created.getDayDate() != null ? created.getDayDate().toString() : "");
+                Map<String, Object> patch = new HashMap<>();
+                patch.put("listId", created.getId());
+                patch.put("title", created.getTitle());
+                patch.put("position", created.getPosition());
+                patch.put("type", created.getType());
+                patch.put("dayDate", created.getDayDate() != null ? created.getDayDate().toString() : "");
 
                 CommandResponse response = CommandResponse.builder()
                                 .entityType("LIST")

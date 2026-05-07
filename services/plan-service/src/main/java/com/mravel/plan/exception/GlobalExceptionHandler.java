@@ -147,7 +147,7 @@ public class GlobalExceptionHandler {
         public ResponseEntity<ApiResponse<ErrorPayload>> handleRuntime(RuntimeException ex,
                         HttpServletRequest request) {
                 RuntimeMapping mapped = mapLegacyRuntime(ex);
-                logWithLevel(mapped.status(), "runtime_exception code={} message={}", mapped.code(), ex.getMessage());
+                log.error("runtime_exception code={} message={}", mapped.code(), ex.getMessage(), ex);
                 return buildResponse(mapped.status(), mapped.code(), mapped.message(), request, Map.of());
         }
 
