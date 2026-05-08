@@ -19,10 +19,13 @@ import com.mravel.plan.model.PlanCard;
 import com.mravel.plan.model.PlanComment;
 import com.mravel.plan.model.PlanList;
 import com.mravel.plan.model.PlanListType;
+import com.mravel.plan.dto.CommentReactionResponse;
+import com.mravel.plan.model.PlanCommentReaction;
 import com.mravel.plan.model.PlanReaction;
 import com.mravel.plan.model.SplitType;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanCardRepository;
+import com.mravel.plan.repository.PlanCommentReactionRepository;
 import com.mravel.plan.repository.PlanInviteTokenRepository;
 import com.mravel.plan.repository.PlanEsRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
@@ -49,6 +52,7 @@ public class PlanService {
 
         private final PlanRepository planRepository;
         private final PlanReactionRepository reactionRepository;
+        private final PlanCommentReactionRepository commentReactionRepository;
         private final PlanMapper planMapper;
         private final PlanPermissionService permissionService;
         private final UserProfileClient userProfileClient;
@@ -90,7 +94,7 @@ public class PlanService {
                                 pageable);
 
                 List<PlanFeedItem> content = pageResult.getContent().stream()
-                                .map(planMapper::toFeedItem)
+                                .map(p -> planMapper.toFeedItem(p, viewerId))
                                 .toList();
 
                 return new PageImpl<>(content, pageable, pageResult.getTotalElements());
@@ -136,7 +140,7 @@ public class PlanService {
                 Page<Plan> pageResult = planRepository.findFeedForUser(viewerId, memberPlanIds, friendIds, pageable);
 
                 List<PlanFeedItem> content = pageResult.getContent().stream()
-                                .map(planMapper::toFeedItem)
+                                .map(p -> planMapper.toFeedItem(p, viewerId))
                                 .toList();
 
                 return new PageImpl<>(content, pageable, pageResult.getTotalElements());
@@ -159,7 +163,7 @@ public class PlanService {
                         throw new ForbiddenException("You don't have permission to view this plan.");
                 }
 
-                return planMapper.toFeedItem(plan);
+                return planMapper.toFeedItem(plan, viewerId);
         }
 
         @Transactional
@@ -489,6 +493,80 @@ public class PlanService {
                 return planMapper.toFeedItem(plan);
         }
 
+        @Transactional
+        public CommentReactionResponse reactComment(Long commentId, String type, Long userId) {
+                PlanComment comment = entityManager.find(PlanComment.class, commentId);
+                if (comment == null)
+                        throw new NotFoundException("Comment not found");
+
+                Optional<PlanCommentReaction> existingOpt =
+                        commentReactionRepository.findByComment_IdAndUserId(commentId, userId);
+
+                boolean created = false;
+                if (existingOpt.isPresent()) {
+                        PlanCommentReaction existing = existingOpt.get();
+                        if (existing.getType().equals(type)) {
+                                // Same type → toggle off
+                                commentReactionRepository.delete(existing);
+                        } else {
+                                // Different type → change reaction
+                                existing.setType(type);
+                                commentReactionRepository.save(existing);
+                                created = true;
+                        }
+                } else {
+                        PlanCommentReaction newReaction = PlanCommentReaction.builder()
+                                        .comment(comment)
+                                        .userId(userId)
+                                        .type(type)
+                                        .createdAt(Instant.now())
+                                        .build();
+                        commentReactionRepository.save(newReaction);
+                        created = true;
+                }
+
+                if (created) {
+                        planNotificationService.notifyCommentReact(
+                                        userId,
+                                        comment.getUserId(),
+                                        comment.getPlan().getId(),
+                                        commentId,
+                                        type);
+                }
+
+                // Build fresh summary
+                List<PlanCommentReaction> all = commentReactionRepository.findByComment_Id(commentId);
+                Map<String, Long> summary = all.stream()
+                                .collect(Collectors.groupingBy(PlanCommentReaction::getType, Collectors.counting()));
+                String myReaction = all.stream()
+                                .filter(r -> userId.equals(r.getUserId()))
+                                .findFirst()
+                                .map(PlanCommentReaction::getType)
+                                .orElse(null);
+
+                List<PlanFeedItem.ReactionUser> reactionUsers = all.stream()
+                                .map(r -> {
+                                        UserProfileResponse profile = null;
+                                        try {
+                                                profile = userProfileClient.getUserById(r.getUserId());
+                                        } catch (Exception ignored) {}
+                                        return PlanFeedItem.ReactionUser.builder()
+                                                        .userId(r.getUserId())
+                                                        .userName(profile != null ? profile.getFullname() : null)
+                                                        .userAvatar(profile != null ? profile.getAvatar() : null)
+                                                        .type(r.getType())
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                return CommentReactionResponse.builder()
+                                .commentId(commentId)
+                                .reactions(summary)
+                                .myReaction(myReaction)
+                                .reactionUsers(reactionUsers)
+                                .build();
+        }
+
         public void increaseView(Long planId) {
                 Plan plan = planRepository.findById(planId)
                                 .orElseThrow(() -> new NotFoundException("Plan not found"));
@@ -523,7 +601,7 @@ public class PlanService {
                 }
 
                 List<PlanFeedItem> items = plans.getContent().stream()
-                                .map(planMapper::toFeedItem)
+                                .map(p -> planMapper.toFeedItem(p, viewerId))
                                 .toList();
 
                 return new PageImpl<>(items, pageable, plans.getTotalElements());
@@ -572,7 +650,7 @@ public class PlanService {
                         if (!permissionService.canView(p.getId(), viewerId, isFriend))
                                 continue;
 
-                        result.add(planMapper.toFeedItem(p));
+                        result.add(planMapper.toFeedItem(p, viewerId));
                 }
 
                 return result;

@@ -45,6 +45,12 @@ public class Plan {
     private List<String> images = new ArrayList<>();
 
     @ElementCollection
+    @CollectionTable(name = "plan_videos", joinColumns = @JoinColumn(name = "plan_id"))
+    @Column(name = "url")
+    @Builder.Default
+    private List<String> videos = new ArrayList<>();
+
+    @ElementCollection
     @CollectionTable(name = "plan_destinations", joinColumns = @JoinColumn(name = "plan_id"))
     @Builder.Default
     private List<Destination> destinations = new ArrayList<>();

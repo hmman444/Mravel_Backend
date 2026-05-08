@@ -28,7 +28,11 @@ public class Notification {
     private Long actorId;
 
     @Column(name = "type", nullable = false, length = 64)
-    private String type; // PLAN_INVITE, COMMENT, FRIEND_REQUEST...
+    private String type; // BOOKING_CONFIRMED, FRIEND_REQUEST, ACCOUNT_LOCKED...
+
+    /** High-level grouping: SOCIAL, BOOKING, ACCOUNT, PARTNER, ADMIN */
+    @Column(name = "category", length = 32)
+    private String category;
 
     @Column(name = "title", nullable = false, length = 255)
     private String title;
@@ -37,7 +41,7 @@ public class Notification {
     private String message;
 
     @Column(name = "data_json", columnDefinition = "TEXT")
-    private String dataJson; // JSON string (planId, inviteId...)
+    private String dataJson; // JSON: bookingCode, planId, deepLink, etc.
 
     @Column(name = "is_read", nullable = false)
     private boolean read;

@@ -5,7 +5,9 @@ import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.PlanFeedItem;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanComment;
+import com.mravel.plan.model.PlanCommentReaction;
 import com.mravel.plan.model.PlanReaction;
+import com.mravel.plan.repository.PlanCommentReactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -17,16 +19,29 @@ import java.util.stream.Collectors;
 public class PlanMapper {
 
         private final UserProfileClient userProfileClient;
+        private final PlanCommentReactionRepository commentReactionRepository;
 
+        /**
+         * Convenience overload — no viewer context (myReaction will be null for all
+         * comments).
+         */
         public PlanFeedItem toFeedItem(Plan p) {
-                return toFeedItem(p, null);
+                return toFeedItemInternal(p, null, null);
+        }
+
+        /** Overload with viewer ID so comments include the viewer's own reaction. */
+        public PlanFeedItem toFeedItem(Plan p, Long viewerId) {
+                return toFeedItemInternal(p, null, viewerId);
         }
 
         public List<PlanFeedItem> toFeedItems(List<Plan> plans) {
+                return toFeedItems(plans, null);
+        }
+
+        public List<PlanFeedItem> toFeedItems(List<Plan> plans, Long viewerId) {
                 if (plans == null || plans.isEmpty())
                         return List.of();
 
-                // Cache sẵn profile của author theo từng plan (dùng cho list)
                 Map<Long, UserProfileResponse> authorProfileCache = plans.stream()
                                 .map(Plan::getAuthorId)
                                 .filter(Objects::nonNull)
@@ -42,17 +57,17 @@ public class PlanMapper {
                                                 }));
 
                 return plans.stream()
-                                .map(p -> toFeedItem(p, authorProfileCache))
+                                .map(p -> toFeedItemInternal(p, authorProfileCache, viewerId))
                                 .collect(Collectors.toList());
         }
 
-        private PlanFeedItem toFeedItem(Plan p,
-                        Map<Long, UserProfileResponse> authorProfileCache) {
+        private PlanFeedItem toFeedItemInternal(Plan p,
+                        Map<Long, UserProfileResponse> authorProfileCache,
+                        Long viewerId) {
 
-                // Cache cục bộ cho tất cả user (reactions + comments) của 1 plan
                 Map<Long, UserProfileResponse> localUserCache = new HashMap<>();
 
-                // Reactions summary
+                // Reactions summary for the plan itself
                 Map<String, Long> reactionSummary = p.getReactions() == null
                                 ? Map.of()
                                 : p.getReactions().stream()
@@ -60,7 +75,6 @@ public class PlanMapper {
                                                                 PlanReaction::getType,
                                                                 Collectors.counting()));
 
-                // Reaction users (chi tiết từng user react)
                 List<PlanFeedItem.ReactionUser> reactionUsers = p.getReactions() == null
                                 ? List.of()
                                 : p.getReactions().stream()
@@ -69,7 +83,6 @@ public class PlanMapper {
                                                                         r.getUserId(),
                                                                         authorProfileCache,
                                                                         localUserCache);
-
                                                         return PlanFeedItem.ReactionUser.builder()
                                                                         .userId(r.getUserId())
                                                                         .userName(profile != null
@@ -87,32 +100,21 @@ public class PlanMapper {
                 PlanFeedItem.Author authorDto = null;
                 if (p.getAuthorId() != null) {
                         UserProfileResponse profile = resolveUserProfile(
-                                        p.getAuthorId(),
-                                        authorProfileCache,
-                                        localUserCache);
-
-                        if (profile != null) {
-                                authorDto = PlanFeedItem.Author.builder()
-                                                .id(p.getAuthorId())
-                                                .name(profile.getFullname())
-                                                .avatar(profile.getAvatar())
-                                                .build();
-                        } else {
-                                authorDto = PlanFeedItem.Author.builder()
-                                                .id(p.getAuthorId())
-                                                .name(null)
-                                                .avatar(null)
-                                                .build();
-                        }
+                                        p.getAuthorId(), authorProfileCache, localUserCache);
+                        authorDto = PlanFeedItem.Author.builder()
+                                        .id(p.getAuthorId())
+                                        .name(profile != null ? profile.getFullname() : null)
+                                        .avatar(profile != null ? profile.getAvatar() : null)
+                                        .build();
                 }
 
-                // Comments (root + replies đệ quy)
+                // Comments (root-level only; replies are nested recursively)
                 List<PlanFeedItem.Comment> commentDtos = p.getComments() == null
                                 ? List.of()
                                 : p.getComments().stream()
-                                                .filter(c -> c.getParent() == null) // chỉ lấy root comment
+                                                .filter(c -> c.getParent() == null)
                                                 .sorted(Comparator.comparing(PlanComment::getCreatedAt))
-                                                .map(c -> mapComment(c, authorProfileCache, localUserCache))
+                                                .map(c -> mapComment(c, authorProfileCache, localUserCache, viewerId))
                                                 .collect(Collectors.toList());
 
                 return PlanFeedItem.builder()
@@ -125,10 +127,9 @@ public class PlanMapper {
                                 .visibility(PlanFeedItem.toUiVisibility(p.getVisibility()))
                                 .views(p.getViews() != null ? p.getViews() : 0L)
                                 .createdAt(p.getCreatedAt())
-
                                 .author(authorDto)
-
                                 .images(p.getImages() != null ? p.getImages() : List.of())
+                                .videos(p.getVideos() != null ? p.getVideos() : List.of())
                                 .destinations(p.getDestinations() == null ? List.of()
                                                 : p.getDestinations().stream()
                                                                 .map(d -> PlanFeedItem.Destination.builder()
@@ -149,12 +150,11 @@ public class PlanMapper {
 
         private PlanFeedItem.Comment mapComment(PlanComment c,
                         Map<Long, UserProfileResponse> authorProfileCache,
-                        Map<Long, UserProfileResponse> localUserCache) {
+                        Map<Long, UserProfileResponse> localUserCache,
+                        Long viewerId) {
 
                 UserProfileResponse profile = resolveUserProfile(
-                                c.getUserId(),
-                                authorProfileCache,
-                                localUserCache);
+                                c.getUserId(), authorProfileCache, localUserCache);
 
                 PlanFeedItem.Comment.User userDto = PlanFeedItem.Comment.User.builder()
                                 .id(c.getUserId())
@@ -162,11 +162,46 @@ public class PlanMapper {
                                 .avatar(profile != null ? profile.getAvatar() : null)
                                 .build();
 
+                // Always read comment reactions from repository for consistency with
+                // plan_comment_reactions table.
+                // This avoids empty lazy collections causing missing reactionUsers in feed
+                // responses.
+                List<PlanCommentReaction> commentReactions = c.getId() == null
+                                ? List.of()
+                                : commentReactionRepository.findByComment_Id(c.getId());
+
+                Map<String, Long> reactionSummary = commentReactions.stream()
+                                .collect(Collectors.groupingBy(PlanCommentReaction::getType, Collectors.counting()));
+
+                List<PlanFeedItem.ReactionUser> commentReactionUsers = commentReactions.stream()
+                                .map(r -> {
+                                        UserProfileResponse rp = resolveUserProfile(
+                                                        r.getUserId(), authorProfileCache, localUserCache);
+                                        return PlanFeedItem.ReactionUser.builder()
+                                                        .userId(r.getUserId())
+                                                        .userName(rp != null ? rp.getFullname() : null)
+                                                        .userAvatar(rp != null ? rp.getAvatar() : null)
+                                                        .type(r.getType())
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                String myReaction = null;
+                if (viewerId != null) {
+                        myReaction = commentReactions.stream()
+                                        .filter(r -> viewerId.equals(r.getUserId()))
+                                        .findFirst()
+                                        .map(PlanCommentReaction::getType)
+                                        .orElse(null);
+                }
+
+                // Replies (recursive)
                 List<PlanFeedItem.Comment> replyDtos = c.getReplies() == null
                                 ? List.of()
                                 : c.getReplies().stream()
                                                 .sorted(Comparator.comparing(PlanComment::getCreatedAt))
-                                                .map(child -> mapComment(child, authorProfileCache, localUserCache))
+                                                .map(child -> mapComment(child, authorProfileCache, localUserCache,
+                                                                viewerId))
                                                 .collect(Collectors.toList());
 
                 return PlanFeedItem.Comment.builder()
@@ -176,32 +211,21 @@ public class PlanMapper {
                                 .createdAt(c.getCreatedAt())
                                 .parentId(c.getParent() != null ? c.getParent().getId() : null)
                                 .replies(replyDtos)
+                                .reactions(reactionSummary)
+                                .reactionUsers(commentReactionUsers)
+                                .myReaction(myReaction)
                                 .build();
         }
 
-        /**
-         * Lấy UserProfile theo id với 3 tầng cache:
-         * - authorProfileCache: cache tác giả truyền từ toFeedItems (cross-plan)
-         * - localUserCache: cache cục bộ cho 1 plan (reactions + comments)
-         * - UserProfileClient: cache Caffeine 1m (cross-service)
-         */
         private UserProfileResponse resolveUserProfile(Long userId,
                         Map<Long, UserProfileResponse> authorProfileCache,
                         Map<Long, UserProfileResponse> localUserCache) {
                 if (userId == null)
                         return null;
-
-                // 1. cache author (dùng cho toFeedItems)
-                if (authorProfileCache != null && authorProfileCache.containsKey(userId)) {
+                if (authorProfileCache != null && authorProfileCache.containsKey(userId))
                         return authorProfileCache.get(userId);
-                }
-
-                // 2. cache cục bộ của plan
-                if (localUserCache.containsKey(userId)) {
+                if (localUserCache.containsKey(userId))
                         return localUserCache.get(userId);
-                }
-
-                // 3. gọi user-service (đã có @Cacheable userProfiles)
                 try {
                         UserProfileResponse profile = userProfileClient.getUserById(userId);
                         localUserCache.put(userId, profile);

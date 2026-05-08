@@ -24,5 +24,6 @@
     <module>admin-service</module>
     <module>notification-service</module>
     <module>partner-service</module>
+    <module>chat-service</module>
   </modules>
 </project>

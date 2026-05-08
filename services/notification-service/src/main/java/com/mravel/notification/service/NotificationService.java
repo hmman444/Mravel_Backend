@@ -1,6 +1,7 @@
 package com.mravel.notification.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mravel.common.notification.NotificationTypes;
 import com.mravel.notification.client.UserClient;
 import com.mravel.notification.dto.NotificationDtos;
 import com.mravel.notification.dto.NotificationDtos.*;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -37,6 +39,7 @@ public class NotificationService {
                     .recipientId(req.getRecipientId())
                     .actorId(req.getActorId())
                     .type(req.getType())
+                    .category(NotificationTypes.categoryOf(req.getType()))
                     .title(req.getTitle())
                     .message(req.getMessage())
                     .dataJson(dataJson)
@@ -53,10 +56,9 @@ public class NotificationService {
                 try {
                     List<UserMiniResponse> minis = userClient.batchMini(List.of(noti.getActorId()));
                     actorMap = minis.stream()
-                            .collect(java.util.stream.Collectors.toMap(UserMiniResponse::getId, x -> x));
+                            .collect(Collectors.toMap(UserMiniResponse::getId, x -> x));
                 } catch (Exception ex) {
-                    log.warn("User service batchMini failed: {}", ex.getMessage());
-                    // Continue without actor info so notification still gets created
+                    log.warn("user-service batchMini failed: {}", ex.getMessage());
                 }
             }
 
@@ -77,60 +79,32 @@ public class NotificationService {
         }
     }
 
-    public Page<NotificationResponse> list(Long recipientId, int page, int size) {
+    public Page<NotificationResponse> list(Long recipientId, String category, int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         long unread = repo.countByRecipientIdAndReadFalse(recipientId);
 
-        Page<Notification> p = repo.findByRecipientIdOrderByCreatedAtDesc(recipientId, pageable);
+        Page<Notification> p = (category != null && !category.isBlank())
+                ? repo.findByRecipientIdAndCategoryOrderByCreatedAtDesc(recipientId, category.toUpperCase(), pageable)
+                : repo.findByRecipientIdOrderByCreatedAtDesc(recipientId, pageable);
 
-        // 1) batch lấy actorIds
         List<Long> actorIds = p.getContent().stream()
                 .map(Notification::getActorId)
                 .filter(java.util.Objects::nonNull)
                 .distinct()
                 .toList();
 
-        java.util.Map<Long, UserMiniResponse> actorMap = java.util.Map.of();
+        Map<Long, UserMiniResponse> actorMap = Map.of();
         if (!actorIds.isEmpty()) {
-            List<UserMiniResponse> minis = userClient.batchMini(actorIds);
-            actorMap = minis.stream().collect(java.util.stream.Collectors.toMap(UserMiniResponse::getId, x -> x));
+            try {
+                List<UserMiniResponse> minis = userClient.batchMini(actorIds);
+                actorMap = minis.stream().collect(Collectors.toMap(UserMiniResponse::getId, x -> x));
+            } catch (Exception ex) {
+                log.warn("user-service batchMini failed: {}", ex.getMessage());
+            }
         }
 
-        final java.util.Map<Long, UserMiniResponse> finalActorMap = actorMap;
-
+        final Map<Long, UserMiniResponse> finalActorMap = actorMap;
         return p.map(n -> toResponse(n, unread, finalActorMap));
-    }
-
-    private NotificationResponse toResponse(Notification n, long unreadCount, Map<Long, UserMiniResponse> actorMap) {
-
-        UserMiniResponse mini = (n.getActorId() != null) ? actorMap.get(n.getActorId()) : null;
-
-        NotificationDtos.ActorSummary actor = (mini == null) ? null
-                : NotificationDtos.ActorSummary.builder()
-                        .id(mini.getId())
-                        .fullname(mini.getFullname())
-                        .avatar(mini.getAvatar())
-                        .build();
-
-        String deepLink = NotificationRenderHelper.deepLink(n.getType(), n.getActorId(), n.getDataJson());
-        String image = NotificationRenderHelper.image(n.getType(), actor != null ? actor.getAvatar() : null,
-                n.getDataJson());
-
-        return NotificationResponse.builder()
-                .id(n.getId())
-                .recipientId(n.getRecipientId())
-                .actorId(n.getActorId())
-                .actor(actor)
-                .type(n.getType())
-                .title(n.getTitle())
-                .message(n.getMessage())
-                .deepLink(deepLink)
-                .image(image)
-                .dataJson(n.getDataJson())
-                .read(n.isRead())
-                .createdAt(n.getCreatedAt())
-                .unreadCount(unreadCount)
-                .build();
     }
 
     @Transactional
@@ -152,25 +126,36 @@ public class NotificationService {
 
     @Transactional
     public long markAllRead(Long recipientId) {
-        // tối ưu: update query bulk sau, tạm làm đơn giản
-        repo.findByRecipientIdOrderByCreatedAtDesc(recipientId, PageRequest.of(0, 2000))
-                .forEach(n -> {
-                    if (!n.isRead())
-                        n.setRead(true);
-                });
-        // saveAll
-        // (JPA dirty-check sẽ flush)
+        repo.markAllReadByRecipientId(recipientId);
         return repo.countByRecipientIdAndReadFalse(recipientId);
     }
 
-    private NotificationResponse toResponse(Notification n, long unreadCount) {
+    private NotificationResponse toResponse(Notification n, long unreadCount,
+                                             Map<Long, UserMiniResponse> actorMap) {
+        UserMiniResponse mini = (n.getActorId() != null) ? actorMap.get(n.getActorId()) : null;
+
+        NotificationDtos.ActorSummary actor = (mini == null) ? null
+                : NotificationDtos.ActorSummary.builder()
+                        .id(mini.getId())
+                        .fullname(mini.getFullname())
+                        .avatar(mini.getAvatar())
+                        .build();
+
+        String deepLink = NotificationRenderHelper.deepLink(n.getType(), n.getActorId(), n.getDataJson());
+        String image = NotificationRenderHelper.image(n.getType(), actor != null ? actor.getAvatar() : null,
+                n.getDataJson());
+
         return NotificationResponse.builder()
                 .id(n.getId())
                 .recipientId(n.getRecipientId())
                 .actorId(n.getActorId())
+                .actor(actor)
                 .type(n.getType())
+                .category(n.getCategory())
                 .title(n.getTitle())
                 .message(n.getMessage())
+                .deepLink(deepLink)
+                .image(image)
                 .dataJson(n.getDataJson())
                 .read(n.isRead())
                 .createdAt(n.getCreatedAt())

@@ -107,6 +107,8 @@ public class KafkaProducer {
                     KafkaTopics.PLAN_BOARD_EVENTS,
                     String.valueOf(event.getPlanId()),
                     event);
+        } catch (Exception e) {
+            log.warn("Failed to publish PlanBoardEvent planId={}: {}", event.getPlanId(), e.getMessage());
         } finally {
             sample.stop(Timer.builder("plan.board_event.publish_latency_ms")
                     .tag("operation_type", event.getEventType() != null ? event.getEventType() : "UNKNOWN")

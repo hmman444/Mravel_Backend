@@ -5,6 +5,8 @@ import com.mravel.booking.client.CatalogInventoryClient;
 import com.mravel.booking.client.CatalogInventoryDtos.DeductInventoryRequest;
 import com.mravel.booking.client.CatalogInventoryDtos.RollbackInventoryRequest;
 import com.mravel.booking.client.CatalogInventoryDtos.RoomRequestDTO;
+import com.mravel.booking.client.NotificationClient;
+import com.mravel.common.notification.NotificationTypes;
 import com.mravel.booking.dto.HotelBookingDtos.CreateHotelBookingRequest;
 import com.mravel.booking.dto.HotelBookingDtos.HotelBookingCreatedDTO;
 import com.mravel.booking.dto.HotelBookingDtos.SelectedRoom;
@@ -45,6 +47,7 @@ public class HotelBookingService {
     private final HotelBookingRepository hotelBookingRepository;
     private final CatalogInventoryClient catalogInventoryClient;
     private final PaymentAttemptService paymentAttemptService;
+    private final NotificationClient notificationClient;
 
     @Transactional
     public HotelBookingCreatedDTO createHotelBooking(CreateHotelBookingRequest req, String guestSid) {
@@ -239,7 +242,21 @@ public class HotelBookingService {
         booking.setPendingPaymentUrl(null);
         booking.setPendingPaymentOrderId(null);
 
-        return hotelBookingRepository.save(booking);
+        HotelBooking confirmed = hotelBookingRepository.save(booking);
+
+        if (confirmed.getUserId() != null) {
+            notificationClient.createNotification(
+                    confirmed.getUserId(), null,
+                    NotificationTypes.BOOKING_CONFIRMED,
+                    "Đặt phòng thành công",
+                    "Booking " + confirmed.getCode() + " (" + confirmed.getHotelName() + ") đã được xác nhận",
+                    Map.of("bookingCode", confirmed.getCode(),
+                            "bookingType", "HOTEL",
+                            "hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "",
+                            "deepLink", "/my-bookings"));
+        }
+
+        return confirmed;
     }
 
     @Transactional
@@ -331,7 +348,20 @@ public class HotelBookingService {
         booking.setPendingPaymentUrl(null);
         booking.setPendingPaymentOrderId(null);
 
-        return hotelBookingRepository.save(booking);
+        HotelBooking cancelled = hotelBookingRepository.save(booking);
+
+        if (cancelled.getUserId() != null) {
+            notificationClient.createNotification(
+                    cancelled.getUserId(), null,
+                    NotificationTypes.BOOKING_CANCELLED,
+                    "Đơn đặt phòng đã hủy",
+                    "Booking " + cancelled.getCode() + " (" + cancelled.getHotelName() + ") đã được hủy thành công",
+                    Map.of("bookingCode", cancelled.getCode(),
+                            "bookingType", "HOTEL",
+                            "deepLink", "/my-bookings"));
+        }
+
+        return cancelled;
     }
 
     @Scheduled(fixedDelayString = "${mravel.booking.pending-expire-check-ms:60000}")
@@ -370,6 +400,19 @@ public class HotelBookingService {
         }
 
         hotelBookingRepository.saveAll(pendings);
+
+        for (HotelBooking b : pendings) {
+            if (b.getUserId() != null && b.getStatus() == BookingStatus.CANCELLED) {
+                notificationClient.createNotification(
+                        b.getUserId(), null,
+                        NotificationTypes.BOOKING_EXPIRED,
+                        "Đơn đặt phòng hết hạn",
+                        "Booking " + b.getCode() + " (" + b.getHotelName() + ") đã tự động hủy do không thanh toán",
+                        Map.of("bookingCode", b.getCode(),
+                                "bookingType", "HOTEL",
+                                "deepLink", "/my-bookings"));
+            }
+        }
     }
 
     // == Helpers ==

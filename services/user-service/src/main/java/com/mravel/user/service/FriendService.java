@@ -1,10 +1,13 @@
 package com.mravel.user.service;
 
+import com.mravel.user.dto.UserMiniResponse;
 import com.mravel.user.model.RelationshipType;
 import com.mravel.user.client.NotificationClient;
 import com.mravel.user.model.Friendship;
 import com.mravel.user.model.FriendshipStatus;
+import com.mravel.user.model.UserProfile;
 import com.mravel.user.repository.FriendshipRepository;
+import com.mravel.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +21,7 @@ public class FriendService {
 
     private final FriendshipRepository friendshipRepository;
     private final NotificationClient notificationClient;
+    private final UserRepository userRepository;
 
     private Long[] normalizePair(Long a, Long b) {
         if (a < b)
@@ -161,6 +165,19 @@ public class FriendService {
 
     public List<Long> getFriendIds(Long userId) {
         return friendshipRepository.findFriendIdsOf(userId);
+    }
+
+    public List<UserMiniResponse> getFriendList(Long userId) {
+        List<Long> ids = friendshipRepository.findFriendIdsOf(userId);
+        if (ids.isEmpty()) return List.of();
+        List<UserProfile> users = userRepository.findAllById(ids);
+        return users.stream()
+                .map(u -> UserMiniResponse.builder()
+                        .id(u.getId())
+                        .fullname(u.getFullname())
+                        .avatar(u.getAvatar())
+                        .build())
+                .toList();
     }
 
     public int countMutualFriends(Long viewerId, Long profileOwnerId) {

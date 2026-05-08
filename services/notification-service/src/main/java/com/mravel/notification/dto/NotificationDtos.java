@@ -33,13 +33,14 @@ public class NotificationDtos {
         private Long id;
         private Long recipientId;
         private Long actorId;
-        private ActorSummary actor; // NEW
+        private ActorSummary actor;
         private String type;
+        private String category; // SOCIAL, BOOKING, ACCOUNT, PARTNER, ADMIN
         private String title;
         private String message;
 
-        private String deepLink; // NEW (FE dùng để navigate)
-        private String image; // NEW (avatar/thumbnail tùy type)
+        private String deepLink; // frontend navigation target
+        private String image;   // avatar or thumbnail
 
         private String dataJson;
         private boolean read;

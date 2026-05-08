@@ -123,6 +123,31 @@ public class PlanGeneralService {
                 revision);
     }
 
+    @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
+    public void addVideo(Long planId, Long userId, String url) {
+        permission.checkPermission(planId, userId, PlanRole.EDITOR);
+        Plan plan = loadPlan(planId);
+        plan.getVideos().add(url);
+
+        long revision = planBoardService.incrementBoardRevision(planId);
+        planBoardService.publishBoard(planId, userId, "PLAN_VIDEO_ADDED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("videos", plan.getVideos()),
+                revision);
+    }
+
+    @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
+    public void removeVideo(Long planId, Long userId, String url) {
+        permission.checkPermission(planId, userId, PlanRole.EDITOR);
+        Plan plan = loadPlan(planId);
+        plan.getVideos().remove(url);
+        long revision = planBoardService.incrementBoardRevision(planId);
+        planBoardService.publishBoard(planId, userId, "PLAN_VIDEO_REMOVED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("videos", plan.getVideos()),
+                revision);
+    }
+
     // logic update date
     @Transactional
     @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)

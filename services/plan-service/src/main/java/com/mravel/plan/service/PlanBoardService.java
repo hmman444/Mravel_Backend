@@ -289,6 +289,7 @@ public class PlanBoardService {
                 .status(plan.getStatus().name())
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
+                .videos(plan.getVideos())
                 .myRole(null)
                 .boardRevision(plan.getBoardRevision())
                 .costSummary(costSummary)
@@ -672,6 +673,9 @@ public class PlanBoardService {
         PlanList trash = findTrash(planId);
 
         int index = dayLists.size();
+        if (plan.getEndDate() == null) {
+            throw new BadRequestException("Plan endDate is null — cannot add a new day.");
+        }
         LocalDate newDate = plan.getEndDate().plusDays(1);
 
         String title = (req.getTitle() != null && !req.getTitle().isBlank())

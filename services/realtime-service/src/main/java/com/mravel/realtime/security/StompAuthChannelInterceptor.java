@@ -25,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,16 +34,25 @@ import java.util.regex.Pattern;
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final Pattern BOARD_TOPIC = Pattern.compile("^/topic/plans/(\\d+)/board(/v2)?$");
+    private static final Pattern CHAT_CONV_TOPIC = Pattern.compile("^/topic/conversations/(\\d+)/events$");
+    private static final Pattern CHAT_USER_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
+
+    private static final long CHAT_ACCESS_CACHE_TTL_MS = 30_000L;
 
     private final Key signingKey;
     private final RestTemplate restTemplate;
     private final String planServiceBaseUrl;
     private final String userServiceBaseUrl;
+    private final String chatServiceBaseUrl;
+
+    /** Cache: "{convId}:{userId}" -> expiry epoch ms (positive = allow, negative = deny) */
+    private final ConcurrentHashMap<String, Long> chatAccessCache = new ConcurrentHashMap<>();
 
     public StompAuthChannelInterceptor(
             @Value("${mravel.jwt.secret}") String secret,
             @Value("${mravel.services.plan.base-url:http://localhost:8086}") String planServiceBaseUrl,
-            @Value("${mravel.services.user.base-url:http://localhost:8082}") String userServiceBaseUrl) {
+            @Value("${mravel.services.user.base-url:http://localhost:8082}") String userServiceBaseUrl,
+            @Value("${mravel.services.chat.base-url:http://localhost:8089}") String chatServiceBaseUrl) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(2000);
@@ -50,6 +60,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         this.restTemplate = new RestTemplate(requestFactory);
         this.planServiceBaseUrl = planServiceBaseUrl;
         this.userServiceBaseUrl = userServiceBaseUrl;
+        this.chatServiceBaseUrl = chatServiceBaseUrl;
     }
 
     @Override
@@ -128,6 +139,32 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 }
 
                 log.debug("WS SUBSCRIBE accepted planId={} userId={}", planId, userId);
+            }
+
+            // Chat conversation events topic
+            Matcher cm = CHAT_CONV_TOPIC.matcher(destination);
+            if (cm.matches()) {
+                long conversationId = Long.parseLong(cm.group(1));
+                Long userId = getUserIdFromSession(accessor);
+                if (userId == null) {
+                    throw new IllegalArgumentException("Unauthenticated SUBSCRIBE to chat topic");
+                }
+                if (!hasChatAccessCached(conversationId, userId)) {
+                    log.warn("ws_subscription_rejected convId={} userId={} reason=not_member",
+                            conversationId, userId);
+                    throw new IllegalArgumentException("Access denied to conversation " + conversationId);
+                }
+                log.debug("WS SUBSCRIBE accepted convId={} userId={}", conversationId, userId);
+            }
+
+            // Personal conversations list topic — only the owner can subscribe
+            Matcher um = CHAT_USER_TOPIC.matcher(destination);
+            if (um.matches()) {
+                long topicUserId = Long.parseLong(um.group(1));
+                Long sessionUserId = getUserIdFromSession(accessor);
+                if (sessionUserId == null || !sessionUserId.equals(topicUserId)) {
+                    throw new IllegalArgumentException("Access denied to user conversations topic");
+                }
             }
         }
 
@@ -219,6 +256,45 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             // Keep service available if access-check endpoint is temporarily unreachable.
             log.warn("Access check failed for planId={} userId={} — failing open: {}",
                     planId, userId, e.getMessage());
+            return true;
+        }
+    }
+
+    private boolean hasChatAccessCached(long conversationId, long userId) {
+        String key = conversationId + ":" + userId;
+        Long cached = chatAccessCache.get(key);
+        long now = System.currentTimeMillis();
+        if (cached != null) {
+            long expiry = Math.abs(cached);
+            if (now < expiry) {
+                return cached > 0; // positive = allow, negative (stored as -expiry) = deny
+            }
+            chatAccessCache.remove(key);
+        }
+        boolean result = hasChatAccess(conversationId, userId);
+        long expiry = now + CHAT_ACCESS_CACHE_TTL_MS;
+        chatAccessCache.put(key, result ? expiry : -expiry);
+        // Evict stale entries periodically to prevent memory growth
+        if (chatAccessCache.size() > 5000) {
+            chatAccessCache.entrySet().removeIf(e -> now > Math.abs(e.getValue()));
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean hasChatAccess(long conversationId, long userId) {
+        try {
+            String url = chatServiceBaseUrl + "/api/chat/conversations/" + conversationId
+                    + "/access-check?userId=" + userId;
+            Map<String, Object> body = restTemplate.getForObject(url, Map.class);
+            return body != null && Boolean.TRUE.equals(body.get("canAccess"));
+        } catch (Exception e) {
+            if (e instanceof HttpStatusCodeException ex) {
+                int code = ex.getStatusCode().value();
+                if (code == 401 || code == 403) return false;
+            }
+            log.warn("Chat access check failed for convId={} userId={} — failing open: {}",
+                    conversationId, userId, e.getMessage());
             return true;
         }
     }

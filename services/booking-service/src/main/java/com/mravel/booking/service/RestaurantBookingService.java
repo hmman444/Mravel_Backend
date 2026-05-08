@@ -2,15 +2,18 @@
 package com.mravel.booking.service;
 
 import com.mravel.booking.client.CatalogRestaurantInventoryClient;
+import com.mravel.booking.client.NotificationClient;
 import com.mravel.booking.dto.RestaurantBookingDtos.*;
 import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.model.*;
 import com.mravel.booking.payment.PaymentMethodUtils;
 import com.mravel.booking.repository.RestaurantBookingRepository;
+import com.mravel.common.notification.NotificationTypes;
 
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.scheduling.annotation.Scheduled;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +34,7 @@ public class RestaurantBookingService {
     private final RestaurantBookingRepository repo;
     private final CatalogRestaurantInventoryClient invClient;
     private final PaymentAttemptService paymentAttemptService;
+    private final NotificationClient notificationClient;
 
     @Transactional
     public RestaurantBookingCreatedDTO create(CreateRestaurantBookingRequest req, String guestSessionId) {
@@ -199,11 +203,23 @@ public class RestaurantBookingService {
             b.setAmountPaid(paid);
             b.setPaidAt(Instant.now());
             b.setPaymentStatus(BookingBase.PaymentStatus.SUCCESS);
-            b.setStatus(BookingBase.BookingStatus.CONFIRMED); // hoặc PAID rồi CONFIRMED tuỳ bạn
+            b.setStatus(BookingBase.BookingStatus.CONFIRMED);
             b.setInventoryDeducted(true);
             b.setPendingPaymentUrl(null);
             b.setPendingPaymentOrderId(null);
             repo.save(b);
+
+            if (b.getUserId() != null) {
+                notificationClient.createNotification(
+                        b.getUserId(), null,
+                        NotificationTypes.BOOKING_CONFIRMED,
+                        "Đặt bàn thành công",
+                        "Booking " + b.getCode() + " (" + b.getRestaurantName() + ") đã được xác nhận",
+                        Map.of("bookingCode", b.getCode(),
+                                "bookingType", "RESTAURANT",
+                                "restaurantName", b.getRestaurantName() != null ? b.getRestaurantName() : "",
+                                "deepLink", "/my-bookings"));
+            }
 
         } catch (Exception ex) {
             // payment OK nhưng commit fail => giữ lại trạng thái để admin xử lý (tối thiểu
@@ -394,7 +410,20 @@ public class RestaurantBookingService {
             b.setInventoryDeducted(false);
         }
 
-        return repo.save(b);
+        RestaurantBooking cancelled = repo.save(b);
+
+        if (cancelled.getUserId() != null) {
+            notificationClient.createNotification(
+                    cancelled.getUserId(), null,
+                    NotificationTypes.BOOKING_CANCELLED,
+                    "Đơn đặt bàn đã hủy",
+                    "Booking " + cancelled.getCode() + " (" + cancelled.getRestaurantName() + ") đã được hủy thành công",
+                    Map.of("bookingCode", cancelled.getCode(),
+                            "bookingType", "RESTAURANT",
+                            "deepLink", "/booking/my/" + cancelled.getCode()));
+        }
+
+        return cancelled;
     }
 
     @Scheduled(fixedDelayString = "${mravel.booking.pending-expire-check-ms:60000}")
@@ -447,6 +476,19 @@ public class RestaurantBookingService {
         }
 
         repo.saveAll(pendings);
+
+        for (var b : pendings) {
+            if (b.getUserId() != null && b.getStatus() == BookingBase.BookingStatus.CANCELLED) {
+                notificationClient.createNotification(
+                        b.getUserId(), null,
+                        NotificationTypes.BOOKING_EXPIRED,
+                        "Đơn đặt bàn hết hạn",
+                        "Booking " + b.getCode() + " (" + b.getRestaurantName() + ") đã tự động hủy do không thanh toán",
+                        Map.of("bookingCode", b.getCode(),
+                                "bookingType", "RESTAURANT",
+                                "deepLink", "/my-bookings"));
+            }
+        }
     }
 
     private Payment.PaymentMethod parsePaymentMethod(String raw) {

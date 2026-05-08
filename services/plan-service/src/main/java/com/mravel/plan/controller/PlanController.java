@@ -3,6 +3,7 @@ package com.mravel.plan.controller;
 import com.mravel.common.response.ApiResponse;
 import com.mravel.plan.document.PlanDocument;
 import com.mravel.plan.dto.*;
+import com.mravel.plan.dto.CommentReactionResponse;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.security.CurrentUserService;
 import com.mravel.plan.service.PlanSearchService;
@@ -199,6 +200,16 @@ public class PlanController {
 
                 return ResponseEntity.ok(
                                 ApiResponse.success("Thêm bình luận thành công", comment));
+        }
+
+        @PostMapping("/comments/{commentId}/reactions")
+        public ResponseEntity<ApiResponse<CommentReactionResponse>> reactComment(
+                        @PathVariable Long commentId,
+                        @RequestParam String type) {
+                Long userId = currentUser.getId();
+                CommentReactionResponse response = planService.reactComment(commentId, type, userId);
+                return ResponseEntity.ok(
+                                ApiResponse.success("Cập nhật reaction bình luận thành công", response));
         }
 
         @PostMapping("/{planId}/reactions")
