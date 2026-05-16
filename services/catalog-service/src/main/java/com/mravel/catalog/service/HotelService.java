@@ -1,4 +1,3 @@
-// src/main/java/com/mravel/catalog/service/HotelService.java
 package com.mravel.catalog.service;
 
 import java.time.LocalDate;
@@ -25,6 +24,8 @@ import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.repository.AmenityCatalogRepository;
 import com.mravel.catalog.repository.HotelDocRepository;
+import com.mravel.catalog.search.HotelSearchService;
+import com.mravel.catalog.search.dto.HotelSearchResult;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,110 +33,61 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class HotelService {
 
-    private final AmenityCatalogService amenityCatalogService;
+    private final HotelSearchService hotelSearchService;
     private final HotelInventoryService inventoryService;
     private final HotelDocRepository hotelRepo;
     private final MongoTemplate mongoTemplate;
     private final AmenityCatalogRepository amenityCatalogRepo;
+    private final AmenityCatalogService amenityCatalogService;
 
     public Page<HotelSummaryDTO> searchHotels(HotelSearchRequest request, Pageable pageable) {
-        if (request == null) {
-            return hotelRepo.searchHotels(null, null, null, pageable).map(HotelMapper::toSummary);
-        }
+        Page<HotelSearchResult> page = hotelSearchService.search(request, pageable);
 
-        String location = request.location();
-        Integer adults = safeInt(request.adults());
-        Integer children = safeInt(request.children());
-        Integer rooms = safeInt(request.rooms());
+        if (request != null
+                && request.checkIn() != null
+                && request.checkOut() != null
+                && request.checkOut().isAfter(request.checkIn())) {
 
-        int childEquivalent = (children <= 0) ? 0 : (int) Math.ceil(children / 2.0);
-        int guestsNormalized = adults + childEquivalent;
+            int roomsNeeded = request.rooms() != null && request.rooms() > 0 ? request.rooms() : 1;
+            Integer minGuests = request.calcMinGuestsPerRoom();
 
-        Integer requiredRooms = (rooms != null && rooms > 0) ? rooms : null;
-
-        Integer minGuestsPerRoom = (guestsNormalized > 0)
-                ? ((requiredRooms != null)
-                        ? (int) Math.ceil(guestsNormalized * 1.0 / requiredRooms)
-                        : guestsNormalized)
-                : null;
-
-        // ==== NEW: availability filter nếu có ngày ====
-        var checkIn = request.checkIn();
-        var checkOut = request.checkOut();
-
-        if (checkIn != null && checkOut != null && checkOut.isAfter(checkIn)) {
-            // 1) Lấy ALL candidates (unpaged) rồi tự paginate sau khi filter
-            Page<HotelDoc> all = hotelRepo.searchHotels(location, minGuestsPerRoom, requiredRooms, Pageable.unpaged());
-
-            int roomsNeeded = (requiredRooms != null && requiredRooms > 0) ? requiredRooms : 1;
-
-            List<HotelDoc> available = all.getContent().stream()
-                    .filter(h -> hasAnyRoomTypeAvailable(h, checkIn, checkOut, roomsNeeded, minGuestsPerRoom))
+            List<HotelSummaryDTO> filtered = page.getContent().stream()
+                    .filter(h -> hasAnyRoomTypeAvailable(h, request.checkIn(), request.checkOut(), roomsNeeded, minGuests))
+                    .map(HotelMapper::toSummary)
                     .toList();
-
-            // 2) paginate thủ công theo pageable hiện tại
-            int page = pageable.getPageNumber();
-            int size = pageable.getPageSize();
-            int from = Math.min(page * size, available.size());
-            int to = Math.min(from + size, available.size());
-
-            List<HotelSummaryDTO> slice = new ArrayList<>(
-                    available.subList(from, to).stream()
-                            .map(HotelMapper::toSummary)
-                            .toList());
-            return new PageImpl<>(slice, pageable, available.size());
+            return new PageImpl<>(filtered, pageable, page.getTotalElements());
         }
 
-        // fallback: như cũ
-        return hotelRepo.searchHotels(location, minGuestsPerRoom, requiredRooms, pageable)
-                .map(HotelMapper::toSummary);
+        return page.map(HotelMapper::toSummary);
     }
 
     private boolean hasAnyRoomTypeAvailable(
-            HotelDoc hotel,
+            HotelSearchResult hotel,
             LocalDate checkIn,
             LocalDate checkOut,
             int roomsNeeded,
             Integer minGuestsPerRoom) {
-        if (hotel.getRoomTypes() == null || hotel.getRoomTypes().isEmpty())
-            return false;
 
-        for (HotelDoc.RoomType rt : hotel.getRoomTypes()) {
-            if (rt == null || rt.getId() == null)
-                continue;
+        if (hotel.roomTypes() == null || hotel.roomTypes().isEmpty()) return false;
 
-            Integer maxGuests = rt.getMaxGuests();
-            Integer totalRooms = rt.getTotalRooms();
-
-            // giữ logic khớp với search (đừng check lung tung)
-            if (minGuestsPerRoom != null && (maxGuests == null || maxGuests < minGuestsPerRoom))
-                continue;
-            if (totalRooms != null && totalRooms < roomsNeeded)
-                continue;
+        for (HotelSearchResult.RoomTypeMini rt : hotel.roomTypes()) {
+            if (rt == null || rt.id() == null) continue;
+            if (minGuestsPerRoom != null && (rt.maxGuests() == null || rt.maxGuests() < minGuestsPerRoom)) continue;
+            if (rt.totalRooms() != null && rt.totalRooms() < roomsNeeded) continue;
 
             var av = inventoryService.getAvailability(
-                    hotel.getId(),
-                    hotel.getSlug(),
-                    rt.getId(),
-                    checkIn,
-                    checkOut,
-                    roomsNeeded);
-
-            if (Boolean.TRUE.equals(av.isEnough()))
-                return true;
+                    hotel.id(), hotel.slug(), rt.id(), checkIn, checkOut, roomsNeeded);
+            if (Boolean.TRUE.equals(av.isEnough())) return true;
         }
-
         return false;
     }
 
     public HotelDetailDTO getBySlug(String slug, boolean includeInactive) {
-
         HotelDoc h = (includeInactive
                 ? hotelRepo.findBySlugAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
                 : hotelRepo.findBySlugAndActiveTrueAndModeration_Status(slug, HotelDoc.HotelStatus.APPROVED)
         ).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
 
-        // phần map amenity giữ nguyên như bạn đang làm...
         Set<String> codes = new HashSet<>();
         if (h.getAmenityCodes() != null) codes.addAll(h.getAmenityCodes());
         if (h.getRoomTypes() != null) {
@@ -147,39 +99,30 @@ public class HotelService {
         List<AmenityCatalogDoc> catalog = codes.isEmpty()
                 ? List.of()
                 : amenityCatalogRepo.findByScopeInAndCodeInAndActiveTrue(
-                        List.of(AmenityScope.HOTEL, AmenityScope.ROOM),
-                        new ArrayList<>(codes));
+                        List.of(AmenityScope.HOTEL, AmenityScope.ROOM), new ArrayList<>(codes));
 
         Map<String, AmenityCatalogDoc> hotelCatalogMap = HotelMapper.toCatalogMapByScope(catalog, AmenityScope.HOTEL);
-        Map<String, AmenityCatalogDoc> roomCatalogMap = HotelMapper.toCatalogMapByScope(catalog, AmenityScope.ROOM);
+        Map<String, AmenityCatalogDoc> roomCatalogMap  = HotelMapper.toCatalogMapByScope(catalog, AmenityScope.ROOM);
 
         return HotelMapper.toDetail(h, hotelCatalogMap, roomCatalogMap);
     }
 
-    private Integer safeInt(Integer i) {
-        return i == null ? 0 : i;
-    }
-
     public void attachHotelAmenities(String hotelId, List<String> codes) {
-        // ensure hotel exists
         hotelRepo.findById(hotelId).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-
-        // validate codes
         amenityCatalogService.validateCodes(AmenityScope.HOTEL, codes);
         List<String> normalized = codes.stream().map(c -> c.trim().toUpperCase()).distinct().toList();
-
-        Query q = Query.query(Criteria.where("_id").is(hotelId));
-        Update u = new Update().addToSet("amenityCodes").each(normalized.toArray());
-        mongoTemplate.updateFirst(q, u, "hotels"); // collection name = "hotels" nếu HotelDoc @Document("hotels")
+        mongoTemplate.updateFirst(
+                Query.query(Criteria.where("_id").is(hotelId)),
+                new Update().addToSet("amenityCodes").each(normalized.toArray()),
+                "hotels");
     }
 
     public void detachHotelAmenities(String hotelId, List<String> codes) {
         hotelRepo.findById(hotelId).orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
-
         List<String> normalized = codes.stream().map(c -> c.trim().toUpperCase()).distinct().toList();
-
-        Query q = Query.query(Criteria.where("_id").is(hotelId));
-        Update u = new Update().pullAll("amenityCodes", normalized.toArray());
-        mongoTemplate.updateFirst(q, u, "hotels");
+        mongoTemplate.updateFirst(
+                Query.query(Criteria.where("_id").is(hotelId)),
+                new Update().pullAll("amenityCodes", normalized.toArray()),
+                "hotels");
     }
 }

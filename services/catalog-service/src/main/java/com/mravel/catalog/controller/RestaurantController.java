@@ -3,6 +3,7 @@ package com.mravel.catalog.controller;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,7 +39,7 @@ public class RestaurantController {
     @PostMapping("/search")
     public ResponseEntity<ApiResponse<Page<RestaurantSummaryDTO>>> searchRestaurants(
             @RequestBody(required = false) RestaurantSearchRequest request,
-            @ParameterObject Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         Page<RestaurantSummaryDTO> result = restaurantService.searchRestaurants(request, pageable);
         return ResponseEntity.ok(ApiResponse.success("Tìm kiếm nhà hàng thành công", result));
     }

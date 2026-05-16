@@ -5,6 +5,7 @@ import com.mravel.catalog.dto.partner.PartnerCatalogDtos;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.repository.HotelDocRepository;
+import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.catalog.service.AmenityCatalogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +29,7 @@ public class PartnerHotelService {
     private final HotelDocRepository repo;
     private final AmenityCatalogService amenityCatalogService;
     private final UserServiceClient userServiceClient;
+    private final IndexingService indexingService;
 
     // ================= LIST giữ nguyên như bạn đang làm =================
 
@@ -148,7 +150,9 @@ public class PartnerHotelService {
         // currency default nếu null
         if (doc.getCurrencyCode() == null) doc.setCurrencyCode("VND");
 
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public Page<HotelDoc> listMyHotels(Long partnerId, String status, Integer page, Integer size) {
@@ -200,7 +204,9 @@ public class PartnerHotelService {
         doc.setActive(false);
         touchPublisher(doc);
 
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.deleteHotel(saved.getId());
+        return saved;
     }
 
     public HotelDoc pause(String id, Long partnerId) {
@@ -214,7 +220,9 @@ public class PartnerHotelService {
 
         doc.setActive(false);
         touchPublisher(doc);
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public HotelDoc resume(String id, Long partnerId) {
@@ -228,7 +236,9 @@ public class PartnerHotelService {
 
         doc.setActive(true);
         touchPublisher(doc);
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public HotelDoc unlockRequest(String id, Long partnerId, String reason) {
@@ -244,7 +254,9 @@ public class PartnerHotelService {
         doc.getModeration().setUnlockRequestReason(reason);
         touchPublisher(doc);
 
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public HotelDoc getByIdForPartner(String id, Long partnerId) {
@@ -359,7 +371,9 @@ public class PartnerHotelService {
             doc.getPublisher().setPartnerEmail(user.email());
         }
 
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     // ================= MAPPERS =================

@@ -102,8 +102,8 @@
     <module>services/admin-service</module>
     <module>services/notification-service</module>
     <module>services/partner-service</module>
-    <!--<module>services/review-service</module>
-    <module>services/location-service</module>
+    <module>services/review-service</module>
+    <!--<module>services/location-service</module>
     <module>services/report-service</module> -->
 
     <!-- Admin & Partner -->

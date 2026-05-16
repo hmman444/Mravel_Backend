@@ -11,73 +11,64 @@ import com.mravel.catalog.dto.hotel.HotelDtos.AmenityDTO;
 import com.mravel.catalog.dto.restaurant.RestaurantDtos.*;
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
+import com.mravel.catalog.search.dto.RestaurantSearchResult;
 
 public class RestaurantMapper {
 
         // ================== SUMMARY ==================
 
-        public static RestaurantSummaryDTO toSummary(RestaurantDoc r) {
-                // Cover image
+        public static RestaurantSummaryDTO toSummary(RestaurantSearchResult r) {
                 String cover = null;
-                if (r.getImages() != null && !r.getImages().isEmpty()) {
-                        cover = r.getImages().stream()
+                if (r.images() != null && !r.images().isEmpty()) {
+                        cover = r.images().stream()
                                         .filter(Objects::nonNull)
                                         .sorted(Comparator
-                                                        .comparing(RestaurantDoc.Image::getCover,
+                                                        .comparing(RestaurantSearchResult.ImageRef::cover,
                                                                         Comparator.nullsLast(Boolean::compareTo))
                                                         .reversed()
-                                                        .thenComparing(RestaurantDoc.Image::getSortOrder,
+                                                        .thenComparing(RestaurantSearchResult.ImageRef::sortOrder,
                                                                         Comparator.nullsLast(Integer::compareTo)))
-                                        .map(RestaurantDoc.Image::getUrl)
+                                        .map(RestaurantSearchResult.ImageRef::url)
                                         .findFirst()
                                         .orElse(null);
                 }
 
-                // Location
                 Double lat = null, lon = null;
-                if (r.getLocation() != null && r.getLocation().length == 2) {
-                        lon = r.getLocation()[0];
-                        lat = r.getLocation()[1];
+                if (r.location() != null && r.location().length == 2) {
+                        lon = r.location()[0];
+                        lat = r.location()[1];
                 }
 
-                // Cuisines
-                List<String> cuisineNames = r.getCuisines() == null
-                                ? List.of()
-                                : r.getCuisines().stream()
+                List<String> cuisineNames = r.cuisines() == null ? List.of()
+                                : r.cuisines().stream()
                                                 .filter(Objects::nonNull)
-                                                .map(RestaurantDoc.CuisineTag::getName)
+                                                .map(RestaurantSearchResult.CuisineRef::name)
                                                 .filter(Objects::nonNull)
                                                 .distinct()
                                                 .toList();
 
-                // Ambience
-                List<String> ambienceLabels = r.getAmbience() == null
-                                ? List.of()
-                                : r.getAmbience().stream()
+                List<String> ambienceLabels = r.ambience() == null ? List.of()
+                                : r.ambience().stream()
                                                 .filter(Objects::nonNull)
-                                                .map(RestaurantDoc.AmbienceTag::getLabel)
+                                                .map(RestaurantSearchResult.AmbienceRef::label)
                                                 .filter(Objects::nonNull)
                                                 .distinct()
                                                 .toList();
 
-                // Capacity
-                Integer totalCapacity = r.getCapacity() == null ? null : r.getCapacity().getTotalCapacity();
-
-                // Highlight tags – tạm thời để rỗng, sau này tính thêm
-                List<String> highlightTags = List.of();
+                Integer totalCapacity = r.capacity() == null ? null : r.capacity().totalCapacity();
 
                 return new RestaurantSummaryDTO(
-                                r.getId(),
-                                r.getName(),
-                                r.getSlug(),
-                                r.getActive(),
-                                r.getRestaurantType() == null ? null : r.getRestaurantType().name(),
+                                r.id(),
+                                r.name(),
+                                r.slug(),
+                                r.active(),
+                                r.restaurantType(),
 
-                                r.getDestinationSlug(),
-                                r.getCityName(),
-                                r.getDistrictName(),
-                                r.getWardName(),
-                                r.getAddressLine(),
+                                r.destinationSlug(),
+                                r.cityName(),
+                                r.districtName(),
+                                r.wardName(),
+                                r.addressLine(),
                                 lat,
                                 lon,
 
@@ -85,18 +76,18 @@ public class RestaurantMapper {
                                 ambienceLabels,
                                 totalCapacity,
 
-                                r.getAvgRating(),
-                                r.getReviewsCount(),
-                                r.getRatingLabel(),
+                                r.avgRating(),
+                                r.reviewsCount(),
+                                r.ratingLabel(),
 
-                                r.getMinPricePerPerson(),
-                                r.getMaxPricePerPerson(),
-                                r.getCurrencyCode(),
-                                r.getPriceLevel() == null ? null : r.getPriceLevel().name(),
-                                r.getPriceBucket() == null ? null : r.getPriceBucket().name(),
+                                r.minPricePerPerson(),
+                                r.maxPricePerPerson(),
+                                r.currencyCode(),
+                                r.priceLevel(),
+                                r.priceBucket(),
 
                                 cover,
-                                highlightTags);
+                                List.of());
         }
 
         // ================== DETAIL ==================

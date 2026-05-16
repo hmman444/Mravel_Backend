@@ -5,6 +5,7 @@ import com.mravel.catalog.dto.partner.PartnerCatalogDtos;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.repository.RestaurantDocRepository;
+import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.catalog.service.AmenityCatalogService;
 
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class PartnerRestaurantService {
     private final RestaurantDocRepository repo;
     private final AmenityCatalogService amenityCatalogService;
     private final UserServiceClient userServiceClient;
+    private final IndexingService indexingService;
 
     public Page<RestaurantDoc> listMyRestaurants(Long partnerId, String status, Integer page, Integer size) {
         String pid = String.valueOf(partnerId);
@@ -139,7 +141,9 @@ public class PartnerRestaurantService {
                 .build();
         doc.setModeration(mod);
 
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     // =========================================================
@@ -229,7 +233,9 @@ public class PartnerRestaurantService {
         }
 
         touchPublisher(doc);
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc softDelete(String id, Long partnerId) {
@@ -241,7 +247,9 @@ public class PartnerRestaurantService {
         doc.setActive(false);
         touchPublisher(doc);
 
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.deleteRestaurant(saved.getId());
+        return saved;
     }
 
     public RestaurantDoc pause(String id, Long partnerId) {
@@ -256,7 +264,9 @@ public class PartnerRestaurantService {
         doc.setActive(false);
         touchPublisher(doc);
 
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc resume(String id, Long partnerId) {
@@ -271,7 +281,9 @@ public class PartnerRestaurantService {
         doc.setActive(true);
         touchPublisher(doc);
 
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc unlockRequest(String id, Long partnerId, String reason) {
@@ -287,7 +299,9 @@ public class PartnerRestaurantService {
         doc.getModeration().setUnlockRequestReason(reason);
         touchPublisher(doc);
 
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc getByIdForPartner(String id, Long partnerId) {

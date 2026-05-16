@@ -34,34 +34,51 @@ import lombok.*;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PlaceDoc {
 
+  // =====================================================================
+  // NESTED ENUMS
+  // =====================================================================
+
+  public enum CrowdLevel  { LOW, MEDIUM, HIGH }
+  public enum NoiseLevel  { QUIET, MODERATE, LOUD }
+  public enum BestVisitTime { MORNING, AFTERNOON, EVENING, NIGHT }
+  public enum BestSeason  { DRY_SEASON, WET_SEASON, YEAR_ROUND }
+  public enum VenueContext { INDOOR, OUTDOOR, MIXED }
+
+  // =====================================================================
+  // CORE IDENTITY
+  // =====================================================================
+
   @Id
   private String id;
+
+  @Builder.Default
+  private Integer favoriteCount = 0;
 
   @Field
   @Indexed
   @Builder.Default
   private Boolean active = true;
 
-  /** Phân cấp: DESTINATION / POI / VENUE */
   @Field
-  @Indexed(name = "kind_idx") // đặt tên để KHỚP index hiện có, tránh conflict
+  @Indexed(name = "kind_idx")
   private PlaceKind kind;
 
-  /** Loại dịch vụ khi kind = VENUE (HOTEL / RESTAURANT / OTHER) */
   @Field
   @Indexed
   private VenueType venueType;
 
-  /** Liên kết phân cấp */
-  @Indexed private String parentId;       // optional
+  @Indexed private String parentId;
 
   @Indexed(name = "parent_slug_idx")
-  private String parentSlug;              // destination cha theo slug
+  private String parentSlug;
 
-  private List<String> ancestors; // hỗ trợ nhiều cấp [slug-cha, ...]
+  private List<String> ancestors;
   @Builder.Default private Integer childrenCount = 0;
 
-  // ---- Basic info ----
+  // =====================================================================
+  // BASIC INFO
+  // =====================================================================
+
   @TextIndexed(weight = 10)
   private String name;
 
@@ -71,12 +88,14 @@ public class PlaceDoc {
   private String shortDescription;
   private String description;
 
-  // Contact
   private String phone;
   private String email;
   private String website;
 
-  // Address + codes + names
+  // =====================================================================
+  // ADDRESS
+  // =====================================================================
+
   private String addressLine;
 
   @Field
@@ -84,56 +103,97 @@ public class PlaceDoc {
   @Builder.Default
   private String countryCode = "VN";
 
-  @Field @Indexed
-  private String provinceCode;
+  @Field @Indexed private String provinceCode;
+  @Field @Indexed private String districtCode;
+  @Field @Indexed private String wardCode;
 
-  @Field @Indexed
-  private String districtCode;
+  @TextIndexed(weight = 5) private String provinceName;
+  @TextIndexed(weight = 5) private String districtName;
+  @TextIndexed(weight = 5) private String wardName;
 
-  @Field @Indexed
-  private String wardCode;
-
-  @TextIndexed(weight = 5)
-  private String provinceName;
-
-  @TextIndexed(weight = 5)
-  private String districtName;
-
-  @TextIndexed(weight = 5)
-  private String wardName;
-
-  // Geo: [lon, lat] để dùng 2dsphere
   @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE, name = "loc_2dsphere_idx")
-  private double[] location; // new double[]{longitude, latitude}
+  private double[] location;
 
-  // Price
+  // =====================================================================
+  // PRICE & RATING
+  // =====================================================================
+
   private PriceLevel priceLevel;
   private BigDecimal minPrice;
   private BigDecimal maxPrice;
 
-  // Rating
-  @Builder.Default
-  private Double avgRating = 0.0;
+  @Builder.Default private Double avgRating    = 0.0;
+  @Builder.Default private Integer reviewsCount = 0;
 
-  @Builder.Default
-  private Integer reviewsCount = 0;
+  private List<ReviewKeywordStat> reviewKeywords;
 
-  // Embedded arrays
-  private List<Image> images;
-  private List<OpenHour> openHours;
+  // =====================================================================
+  // EMBEDDED ARRAYS
+  // =====================================================================
+
+  private List<Image>        images;
+  private List<OpenHour>     openHours;
   private List<CategoryMini> categories;
-  private List<TagMini> tags;
-
-  /** Nội dung dạng bài báo (ảnh + đoạn văn đan xen) */
+  private List<TagMini>      tags;
   private List<ContentBlock> content;
 
-  // --- Subdocuments ---
+  // =====================================================================
+  // EXPERIENCE LAYER
+  // =====================================================================
+
+  private List<String> vibes;
+  private String       atmosphere;
+  private List<String> travelStyle;
+
+  // =====================================================================
+  // USER INTENT FILTERS
+  // =====================================================================
+
+  private List<String> suitableFor;
+  private List<String> visitPurpose;
+
+  // =====================================================================
+  // CONTEXT FILTERS
+  // =====================================================================
+
+  private CrowdLevel   crowdLevel;
+  private NoiseLevel   noiseLevel;
+  private VenueContext venueContext;
+  private Boolean      isFamilyFriendly;
+
+  // =====================================================================
+  // TIME-BASED DISCOVERY
+  // =====================================================================
+
+  private List<BestVisitTime> bestVisitTime;
+  private BestSeason          bestSeason;
+  private Integer             visitDurationMinutes;
+
+  // =====================================================================
+  // UX / RANKING SIGNALS
+  // =====================================================================
+
+  private Integer photographyScore;
+  private Integer romanticScore;
+  private Integer localExperienceScore;
+
+  // =====================================================================
+  // SUBDOCUMENTS
+  // =====================================================================
+
+  @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+  public static class ReviewKeywordStat {
+    private String  code;
+    private String  label;
+    private Integer count;
+  }
+
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
   public static class Image {
-    private String url;
-    private String caption;
-    @Builder.Default private Boolean cover = false;
-    @Builder.Default private Integer sortOrder = 0;
+    private String  url;
+    private String  caption;
+    @Builder.Default private Boolean cover      = false;
+    @Builder.Default private Integer sortOrder  = 0;
   }
 
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -142,31 +202,41 @@ public class PlaceDoc {
     private LocalTime openTime;
     private LocalTime closeTime;
     @Builder.Default private Boolean open24h = false;
-    @Builder.Default private Boolean closed = false;
+    @Builder.Default private Boolean closed  = false;
   }
 
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
   public static class CategoryMini {
-    private String id;   // optional
+    private String id;
     private String name;
     private String slug;
   }
 
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
   public static class TagMini {
-    private String name;
-    private String slug;
-    private TagType type; // AMENITY / FEATURE / CUISINE / SERVICE
+    private String  name;
+    private String  slug;
+    private TagType type;
   }
 
-  /** Khối nội dung để render trang chi tiết như bài viết */
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
   public static class ContentBlock {
     public enum BlockType { HEADING, PARAGRAPH, IMAGE, GALLERY, QUOTE, DIVIDER, INFOBOX, MAP }
-    private BlockType type;
-    private String text;           // cho HEADING/PARAGRAPH/QUOTE/INFOBOX
-    private Image image;           // cho IMAGE
-    private List<Image> gallery;   // cho GALLERY
-    private double[] mapLocation;  // cho MAP (nếu muốn chỉ điểm khác location chính)
+    private BlockType   type;
+    private String      text;
+    private Image       image;
+    private List<Image> gallery;
+    private double[]    mapLocation;
   }
 }
+
+/*
+CHANGELOG:
+- added: vibes, suitableFor, visitPurpose
+- converted: crowdLevel (String → CrowdLevel enum: LOW/MEDIUM/HIGH)
+- converted: noiseLevel (String → NoiseLevel enum: QUIET/MODERATE/LOUD)
+- converted: bestVisitTime (String → List<BestVisitTime> enum: MORNING/AFTERNOON/EVENING/NIGHT)
+- converted: bestSeason (String → BestSeason enum: DRY_SEASON/WET_SEASON/YEAR_ROUND)
+- merged: isIndoor + isOutdoor → venueContext (VenueContext enum: INDOOR/OUTDOOR/MIXED)
+- kept: atmosphere, travelStyle, isFamilyFriendly, visitDurationMinutes, photographyScore, romanticScore, localExperienceScore
+*/

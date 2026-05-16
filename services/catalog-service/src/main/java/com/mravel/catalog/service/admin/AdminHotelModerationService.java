@@ -2,6 +2,7 @@ package com.mravel.catalog.service.admin;
 
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.repository.HotelDocRepository;
+import com.mravel.catalog.search.es.IndexingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 public class AdminHotelModerationService {
 
     private final HotelDocRepository repo;
+    private final IndexingService indexingService;
 
     public HotelDoc approve(String id, Long adminId) {
         HotelDoc doc = repo.findByIdAndDeletedAtIsNull(id)
@@ -25,7 +27,9 @@ public class AdminHotelModerationService {
         doc.getModeration().setBlockedReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public HotelDoc getByIdForAdmin(String id) {
@@ -46,7 +50,9 @@ public class AdminHotelModerationService {
         doc.getModeration().setRejectionReason(reason);
         doc.getModeration().setBlockedReason(null);
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public HotelDoc block(String id, Long adminId, String reason) {
@@ -63,7 +69,9 @@ public class AdminHotelModerationService {
         doc.getModeration().setRejectionReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     public HotelDoc unblock(String id, Long adminId) {
@@ -83,7 +91,9 @@ public class AdminHotelModerationService {
         doc.getModeration().setUnlockRequestReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        HotelDoc saved = repo.save(doc);
+        indexingService.syncHotel(saved);
+        return saved;
     }
 
     private void ensureStatus(HotelDoc.ModerationInfo mod, HotelDoc.HotelStatus expected, String msg) {

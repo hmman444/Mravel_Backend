@@ -3,15 +3,29 @@ package com.mravel.catalog.controller;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import com.mravel.common.response.ApiResponse;
+import com.mravel.catalog.dto.SearchRequests.PlaceSearchRequest;
 import com.mravel.catalog.dto.place.PlaceAdminDtos.PlaceAdminResponse;
 import com.mravel.catalog.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
 import com.mravel.catalog.dto.place.PlaceDtos.PlaceDetailDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.PlaceSummaryDTO;
+import com.mravel.catalog.dto.search.FacetedPlaceSearchRequest;
+import com.mravel.catalog.dto.search.FacetedSearchResponse;
+import com.mravel.catalog.dto.search.PlaceFacets;
 import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.service.PlaceService;
+import com.mravel.common.response.ApiResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,14 +36,30 @@ public class PlaceController {
 
     private final PlaceService placeService;
 
-    // Search POI (q optional)
-    @GetMapping("/poi")
+    @PostMapping("/search")
     public ApiResponse<Page<PlaceSummaryDTO>> searchPlaces(
-            @RequestParam(required = false) String q,
-            @ParameterObject Pageable pageable) {
+            @RequestBody(required = false) PlaceSearchRequest request,
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
 
-        Page<PlaceSummaryDTO> page = placeService.searchPlaces(q, pageable);
-        return ApiResponse.success("OK", page);
+        String q = request != null ? request.q() : null;
+        return ApiResponse.success("OK", placeService.searchPlaces(q, pageable));
+    }
+
+    @PostMapping("/search/faceted")
+    public ApiResponse<FacetedSearchResponse<PlaceSummaryDTO, PlaceFacets>> searchPlacesFaceted(
+            @RequestBody(required = false) FacetedPlaceSearchRequest request,
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
+
+        return ApiResponse.success("OK", placeService.searchPlacesFaceted(request, pageable));
+    }
+
+    // kept for backward compatibility
+    @GetMapping("/poi")
+    public ApiResponse<Page<PlaceSummaryDTO>> searchPlacesLegacy(
+            @RequestParam(required = false) String q,
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
+
+        return ApiResponse.success("OK", placeService.searchPlaces(q, pageable));
     }
 
     // Public detail by slug
@@ -41,21 +71,19 @@ public class PlaceController {
     @GetMapping("/{slug}/children")
     public ApiResponse<Page<PlaceSummaryDTO>> children(
             @PathVariable String slug,
-            @ParameterObject Pageable pageable,
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable,
             @RequestParam(required = false, defaultValue = "POI") PlaceKind kind) {
 
-        Page<PlaceSummaryDTO> page = placeService.findChildrenByParentSlug(slug, kind, pageable);
-        return ApiResponse.success("OK", page);
+        return ApiResponse.success("OK", placeService.findChildrenByParentSlug(slug, kind, pageable));
     }
 
     @GetMapping("/{slug}/children/all")
     public ApiResponse<Page<PlaceSummaryDTO>> childrenAll(
             @PathVariable String slug,
-            @ParameterObject Pageable pageable,
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable,
             @RequestParam(required = false, defaultValue = "POI") PlaceKind kind) {
 
-        Page<PlaceSummaryDTO> page = placeService.findChildrenByParentSlugAll(slug, kind, pageable);
-        return ApiResponse.success("OK", page);
+        return ApiResponse.success("OK", placeService.findChildrenByParentSlugAll(slug, kind, pageable));
     }
 
     @PostMapping
