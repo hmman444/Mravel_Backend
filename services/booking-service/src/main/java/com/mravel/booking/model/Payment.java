@@ -10,7 +10,8 @@ import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "payments")
-@Getter @Setter
+@Getter
+@Setter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
@@ -34,26 +35,26 @@ public class Payment extends BaseEntity {
     @Column(length = 10)
     private String currencyCode; // "VND"
 
-    // ==== Thông tin từ cổng thanh toán (Momo, ...)
+    // Thông tin từ cổng thanh toán (Momo, ...)
 
     @Column(length = 50)
     private String provider; // "MOMO"
 
     @Column(length = 100)
-    private String providerRequestId;    // partnerRefId / orderId trong Momo
+    private String providerRequestId; // partnerRefId / orderId trong Momo
 
     @Column(length = 100)
     private String providerTransactionId; // transId / paymentId trả về từ Momo
 
     @Column(length = 500)
-    private String providerPayUrl;      // payUrl để redirect người dùng
+    private String providerPayUrl; // payUrl để redirect người dùng
 
     @Column(length = 1000)
     private String providerRawResponse; // lưu JSON/chuỗi response để debug
 
     private Instant paidAt;
 
-    // ==== Thông tin refund (đơn giản)
+    // Thông tin refund (đơn giản)
 
     @Column(precision = 18, scale = 2)
     private BigDecimal refundedAmount;

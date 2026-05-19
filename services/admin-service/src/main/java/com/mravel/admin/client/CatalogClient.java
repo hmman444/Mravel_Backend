@@ -271,7 +271,7 @@ public class CatalogClient {
         return (v == null || v.isBlank()) ? Optional.empty() : Optional.of(v);
     }
 
-    // ===== common exchange helpers =====
+    // common exchange helpers
     private ResponseEntity<ApiResponse<?>> exchange(String path, HttpMethod method, Object body, String bearerToken) {
         String url = requireBaseUrl() + Objects.requireNonNull(path, "path must not be null");
         return exchangeAbsolute(url, method, body, bearerToken);
@@ -311,15 +311,17 @@ public class CatalogClient {
         }
     }
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     private String requireBaseUrl() {
-        return Objects.requireNonNull(baseUrl, "mravel.services.catalog.base-url must not be null");
+        String base = Objects.requireNonNull(baseUrl, "mravel.services.catalog.base-url must not be null");
+        if (activeProfile != null && activeProfile.contains("docker") && base.contains("localhost")) {
+            base = base.replaceAll("localhost(:\\d+)?", "gateway:8080");
+        }
+        return base;
     }
 
-    /**
-     * Cho phép input là:
-     * - "Bearer abc.def" (header Authorization)
-     * - hoặc "abc.def" (raw token)
-     */
     private String normalizeBearerToken(String bearerOrToken) {
         String s = bearerOrToken.trim();
         if (s.regionMatches(true, 0, "Bearer ", 0, 7)) {

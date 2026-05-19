@@ -13,7 +13,7 @@ public final class HotelSeedHelpers {
     private HotelSeedHelpers() {
     }
 
-    // ====== Amenity helpers ======
+    // = Amenity helpers =
 
     // HÀM CŨ – cho seed đơn giản, không section / highlight
     public static AmenityCatalogDoc amenity(String code, String name, AmenityGroup group) {
@@ -45,7 +45,7 @@ public final class HotelSeedHelpers {
                 .build();
     }
 
-    // ====== Nearby / keyword / FAQ ======
+    // = Nearby / keyword / FAQ =
 
     public static NearbyPlace nearby(String slug, String name, String category, Double distanceMeters) {
         return NearbyPlace.builder()

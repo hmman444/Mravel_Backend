@@ -50,7 +50,7 @@ public class HotelDoc {
     // soft delete
     private Instant deletedAt;
 
-    // ---------- Liên kết & vị trí ----------
+    // Liên kết & vị trí
 
     /** Destination cha – slug trong collection places (PlaceKind.DESTINATION) */
     @Indexed
@@ -68,7 +68,7 @@ public class HotelDoc {
     @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE, name = "hotel_loc_2dsphere_idx")
     private double[] location;
 
-    // ---------- Thông tin cơ bản ----------
+    // Thông tin cơ bản
 
     @Indexed
     private String name;
@@ -99,7 +99,7 @@ public class HotelDoc {
     @Builder.Default
     private Boolean hasOnlineCheckin = false;
 
-    // ---------- Rating & review aggregate ----------
+    // Rating & review aggregate
 
     @Builder.Default
     private Double avgRating = 0.0; // ví dụ 9.1
@@ -107,7 +107,7 @@ public class HotelDoc {
     private Integer reviewsCount = 0; // 174 đánh giá
     private String ratingLabel; // "Xuất sắc", "Rất tốt"...
 
-    // ---------- Giá tổng quan của khách sạn (DENORMALIZED) ----------
+    // Giá tổng quan của khách sạn (DENORMALIZED)
 
     /**
      * Giá tối thiểu / đêm trong tất cả roomTypes.ratePlans.
@@ -152,7 +152,7 @@ public class HotelDoc {
      */
     private HotelFilterFacets filterFacets;
 
-    // ---------- Ảnh & nội dung ----------
+    // Ảnh & nội dung
 
     /** Gallery chính của khách sạn */
     private List<Image> images;
@@ -163,7 +163,7 @@ public class HotelDoc {
      */
     private List<ContentBlock> content;
 
-    // ---------- Tiện ích, phòng, lân cận ----------
+    // Tiện ích, phòng, lân cận
 
     /** Tiện ích ở cấp khách sạn: lễ tân 24h, thang máy, wifi... */
     private List<String> amenityCodes;
@@ -174,7 +174,7 @@ public class HotelDoc {
     /** Các điểm lân cận (có thể mapping từ PlaceDoc/POI) */
     private List<NearbyPlace> nearbyPlaces;
 
-    // ---------- Chính sách, thông tin chung, FAQ, review chi tiết ----------
+    // Chính sách, thông tin chung, FAQ, review chi tiết
 
     /** Chính sách & ghi chú liên quan */
     private HotelPolicy policy;
@@ -188,7 +188,7 @@ public class HotelDoc {
     /** Thống kê review chi tiết theo hạng mục & keyword */
     private ReviewStats reviewStats;
 
-    // ---------- Đăng tải & kiểm duyệt ----------
+    // Đăng tải & kiểm duyệt
 
     /** Thông tin đối tác / người đăng khách sạn */
     private PublisherInfo publisher;
@@ -196,9 +196,9 @@ public class HotelDoc {
     /** Trạng thái kiểm duyệt, khóa, báo cáo… */
     private ModerationInfo moderation;
 
-    // =====================================================================
+    //
     // SUBDOCUMENTS
-    // =====================================================================
+    //
 
     @Getter
     @Setter
@@ -537,7 +537,7 @@ public class HotelDoc {
         private Integer count; // ví dụ 39, 33...
     }
 
-    // ---------- Đối tác đăng tải ----------
+    // Đối tác đăng tải
 
     @Getter
     @Setter
@@ -563,7 +563,7 @@ public class HotelDoc {
         private Instant lastUpdatedAt;
     }
 
-    // ---------- Kiểm duyệt / báo cáo ----------
+    // Kiểm duyệt / báo cáo
 
     @Getter
     @Setter
@@ -593,7 +593,6 @@ public class HotelDoc {
 
         private String pendingReason;
 
-
         public String getLastActionByAdminId() {
             return lastActionByAdminId;
         }
@@ -611,9 +610,9 @@ public class HotelDoc {
         }
     }
 
-    // =====================================================================
+    //
     // ENUMS
-    // =====================================================================
+    //
 
     public enum HotelType {
         HOTEL,

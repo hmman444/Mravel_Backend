@@ -2,6 +2,7 @@ package com.mravel.plan.service;
 
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
+import com.mravel.plan.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,11 @@ public class PlanPermissionService {
 
     // quyền thao tác board
     public void checkPermission(Long planId, Long userId, PlanRole required) {
+        // Null user ID means not authenticated
+        if (userId == null) {
+            throw new ForbiddenException("You are not authenticated");
+        }
+
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
@@ -23,11 +29,11 @@ public class PlanPermissionService {
 
         // member
         PlanMember member = memberRepository.findByPlanIdAndUserId(planId, userId)
-                .orElseThrow(() -> new RuntimeException("You are not invited to this plan."));
+                .orElseThrow(() -> new ForbiddenException("You are not invited to this plan."));
 
         // yêu cầu edit nhưng chỉ là viewer
         if (required == PlanRole.EDITOR && member.getRole() == PlanRole.VIEWER)
-            throw new RuntimeException("You don't have permission to edit this plan.");
+            throw new ForbiddenException("You don't have permission to edit this plan.");
     }
 
     /**

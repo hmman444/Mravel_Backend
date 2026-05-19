@@ -41,8 +41,7 @@ public class BookingPublicController {
 
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<HotelBookingSummaryDTO>>> myBookings(
-            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid
-    ) {
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid) {
         if (sid == null || sid.isBlank()) {
             return ResponseEntity.ok(ApiResponse.success("OK", List.of()));
         }
@@ -59,8 +58,7 @@ public class BookingPublicController {
     @GetMapping("/my/{code}")
     public ResponseEntity<ApiResponse<HotelBookingDetailDTO>> myDetail(
             @PathVariable String code,
-            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid
-    ) {
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid) {
         if (sid == null || sid.isBlank()) {
             throw new IllegalStateException("Thiếu guest session");
         }
@@ -81,17 +79,16 @@ public class BookingPublicController {
 
     @PostMapping("/my/{code}/resume-payment")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumeMy(
-        @PathVariable String code,
-        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
-        @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body
-    ) {
+            @PathVariable String code,
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
+            @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body) {
         Payment.PaymentMethod method = PaymentMethodUtils.parseOrNull(body != null ? body.paymentMethod() : null);
 
         var dto = hotelBookingService.resumeHotelPaymentForOwner(code, null, sid, method);
         return ResponseEntity.ok(ApiResponse.success("OK", dto));
     }
 
-        @PostMapping("/lookup")
+    @PostMapping("/lookup")
     public ResponseEntity<ApiResponse<HotelBookingSummaryDTO>> lookup(@RequestBody BookingLookupRequest body) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
             throw new IllegalArgumentException("Thiếu bookingCode");
@@ -125,16 +122,17 @@ public class BookingPublicController {
     }
 
     private static String last4Digits(String phone) {
-        if (phone == null) return "";
+        if (phone == null)
+            return "";
         String digits = phone.replaceAll("\\D", "");
-        if (digits.length() <= 4) return digits;
+        if (digits.length() <= 4)
+            return digits;
         return digits.substring(digits.length() - 4);
     }
 
     @PostMapping("/lookup/detail")
     public ResponseEntity<ApiResponse<HotelBookingDetailDTO>> lookupDetail(
-        @RequestBody BookingLookupRequest body
-    ) {
+            @RequestBody BookingLookupRequest body) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
             throw new IllegalArgumentException("Thiếu bookingCode");
         }
@@ -143,7 +141,7 @@ public class BookingPublicController {
         }
 
         HotelBooking b = hotelBookingRepository.findWithRoomsByCode(body.bookingCode().trim())
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
         String last4 = last4Digits(b.getContactPhone());
         if (!body.phoneLast4().trim().equals(last4)) {
@@ -153,7 +151,7 @@ public class BookingPublicController {
         if (body.email() != null && !body.email().isBlank()) {
             String bEmail = b.getContactEmail();
             if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-            throw new IllegalStateException("Email không khớp");
+                throw new IllegalStateException("Email không khớp");
             }
         }
 
@@ -162,8 +160,7 @@ public class BookingPublicController {
 
     @PostMapping("/lookup/resume")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> lookupResume(
-        @RequestBody LookupResumeRequest body
-    ) {
+            @RequestBody LookupResumeRequest body) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
             throw new IllegalArgumentException("Thiếu bookingCode");
         }
@@ -172,7 +169,7 @@ public class BookingPublicController {
         }
 
         HotelBooking b = hotelBookingRepository.findByCode(body.bookingCode().trim())
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
         // lookup resume chỉ dành cho GUEST
         if (b.getUserId() != null) {
@@ -187,7 +184,7 @@ public class BookingPublicController {
         if (body.email() != null && !body.email().isBlank()) {
             String bEmail = b.getContactEmail();
             if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-            throw new IllegalStateException("Email không khớp");
+                throw new IllegalStateException("Email không khớp");
             }
         }
 
@@ -206,8 +203,9 @@ public class BookingPublicController {
 
         var requested = com.mravel.booking.payment.PaymentMethodUtils.parseOrNull(body.paymentMethod());
         var finalMethod = (requested != null)
-            ? requested
-            : (b.getActivePaymentMethod() != null ? b.getActivePaymentMethod() : com.mravel.booking.model.Payment.PaymentMethod.MOMO_WALLET);
+                ? requested
+                : (b.getActivePaymentMethod() != null ? b.getActivePaymentMethod()
+                        : com.mravel.booking.model.Payment.PaymentMethod.MOMO_WALLET);
 
         var attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
 
@@ -216,60 +214,64 @@ public class BookingPublicController {
         b.setActivePaymentMethod(attempt.getMethod());
         hotelBookingRepository.save(b);
 
-        return ResponseEntity.ok(ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn)));
+        return ResponseEntity.ok(
+                ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn)));
     }
 
     public record LookupResumeRequest(
-        String bookingCode,
-        String phoneLast4,
-        String email,
-        String paymentMethod // optional
-    ) {}
+            String bookingCode,
+            String phoneLast4,
+            String email,
+            String paymentMethod // optional
+    ) {
+    }
 
-    public record CancelReq(String reason) {}
+    public record CancelReq(String reason) {
+    }
 
     @PostMapping("/my/{code}/cancel")
     public ResponseEntity<ApiResponse<?>> cancelGuestHotel(
-        @PathVariable String code,
-        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
-        @RequestBody(required = false) CancelReq body
-    ) {
-    if (sid == null || sid.isBlank()) throw new IllegalStateException("Thiếu guest session");
-    String reason = body == null ? null : body.reason();
-    var b = hotelBookingService.cancelHotelBooking(code, null, sid, reason);
-    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
+            @PathVariable String code,
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
+            @RequestBody(required = false) CancelReq body) {
+        if (sid == null || sid.isBlank())
+            throw new IllegalStateException("Thiếu guest session");
+        String reason = body == null ? null : body.reason();
+        var b = hotelBookingService.cancelHotelBooking(code, null, sid, reason);
+        return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(b)));
     }
 
     public record LookupCancelRequest(
-        String bookingCode,
-        String phoneLast4,
-        String email,
-        String reason
-    ) {}
+            String bookingCode,
+            String phoneLast4,
+            String email,
+            String reason) {
+    }
 
     @PostMapping("/lookup/cancel")
     public ResponseEntity<ApiResponse<?>> lookupCancel(@RequestBody LookupCancelRequest body) {
-    if (body == null || body.bookingCode() == null || body.bookingCode().isBlank())
-        throw new IllegalArgumentException("Thiếu bookingCode");
-    if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4)
-        throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+        if (body == null || body.bookingCode() == null || body.bookingCode().isBlank())
+            throw new IllegalArgumentException("Thiếu bookingCode");
+        if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4)
+            throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
 
-    HotelBooking b = hotelBookingRepository.findByCode(body.bookingCode().trim())
-        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+        HotelBooking b = hotelBookingRepository.findByCode(body.bookingCode().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
-    // lookup cancel chỉ dành cho GUEST (đúng logic lookup hiện tại của bạn)
-    if (b.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
+        if (b.getUserId() != null)
+            throw new IllegalStateException("Booking này thuộc tài khoản");
 
-    String last4 = last4Digits(b.getContactPhone());
-    if (!body.phoneLast4().trim().equals(last4)) throw new IllegalStateException("Sai 4 số cuối SĐT");
+        String last4 = last4Digits(b.getContactPhone());
+        if (!body.phoneLast4().trim().equals(last4))
+            throw new IllegalStateException("Sai 4 số cuối SĐT");
 
-    if (body.email() != null && !body.email().isBlank()) {
-        String bEmail = b.getContactEmail();
-        if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim()))
-        throw new IllegalStateException("Email không khớp");
-    }
+        if (body.email() != null && !body.email().isBlank()) {
+            String bEmail = b.getContactEmail();
+            if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim()))
+                throw new IllegalStateException("Email không khớp");
+        }
 
-    var cancelled = hotelBookingService.cancelHotelBookingByLookup(b.getCode(), body.reason());
-    return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(cancelled)));
+        var cancelled = hotelBookingService.cancelHotelBookingByLookup(b.getCode(), body.reason());
+        return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetailDTO(cancelled)));
     }
 }

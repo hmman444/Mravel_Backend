@@ -1,0 +1,20 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD}}
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+mravel:
+  topics:
+    notification-events: notification-events
+  services:
+    user: http://gateway:8080

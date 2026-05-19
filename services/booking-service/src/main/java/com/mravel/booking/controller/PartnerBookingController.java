@@ -28,23 +28,26 @@ public class PartnerBookingController {
     private final HotelBookingRepository hotelRepo;
     private final RestaurantBookingRepository restaurantRepo;
 
-    private static long nn(Long v) { return v == null ? 0L : v; }
-    public record CancelReq(String reason) {}
+    private static long nn(Long v) {
+        return v == null ? 0L : v;
+    }
 
-    // ----------------- LIST / DETAIL -----------------
+    public record CancelReq(String reason) {
+    }
+
+    // LIST / DETAIL
     @GetMapping("/hotels")
     public ResponseEntity<ApiResponse<?>> listHotelBookings(
             @RequestHeader("Authorization") String bearer,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
-    ) {
+            @RequestParam(required = false) Integer size) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
         List<String> hotelIds = catalogPartnerIdsClient.listMyHotelIds(partnerId, bearer);
 
         List<HotelBooking> items = filterHotel(hotelIds, status);
 
-        // ✅ map -> summary DTO để khỏi đụng LAZY rooms
+        // map -> summary DTO để khỏi đụng LAZY rooms
         var dtoItems = items.stream()
                 .map(HotelBookingMapper::toSummary)
                 .toList();
@@ -55,32 +58,32 @@ public class PartnerBookingController {
     @GetMapping("/hotels/{code}")
     public ResponseEntity<ApiResponse<?>> hotelDetail(
             @RequestHeader("Authorization") String bearer,
-            @PathVariable String code
-    ) {
+            @PathVariable String code) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
         List<String> hotelIds = catalogPartnerIdsClient.listMyHotelIds(partnerId, bearer);
 
         HotelBooking b = hotelRepo.findWithRoomsByCode(code)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!hotelIds.contains(b.getHotelId())) throw new SecurityException("Not owner");
+        if (!hotelIds.contains(b.getHotelId()))
+            throw new SecurityException("Not owner");
 
         return ResponseEntity.ok(ApiResponse.success("OK", HotelBookingMapper.toDetail(b)));
     }
 
-    // ----------------- CANCEL (FIX #3 ở đây) -----------------
+    // CANCEL (FIX #3 ở đây)
 
     @PostMapping("/hotels/{code}/cancel")
     public ResponseEntity<ApiResponse<?>> cancelHotel(
             @RequestHeader("Authorization") String bearer,
             @PathVariable String code,
-            @RequestBody(required = false) CancelReq body
-    ) {
+            @RequestBody(required = false) CancelReq body) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
         List<String> hotelIds = catalogPartnerIdsClient.listMyHotelIds(partnerId, bearer);
 
         HotelBooking b = hotelRepo.findByCode(code)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!hotelIds.contains(b.getHotelId())) throw new SecurityException("Not owner");
+        if (!hotelIds.contains(b.getHotelId()))
+            throw new SecurityException("Not owner");
 
         if (b.getStatus() == BookingBase.BookingStatus.COMPLETED
                 || b.getStatus() == BookingBase.BookingStatus.CANCELLED
@@ -96,14 +99,16 @@ public class PartnerBookingController {
             b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
         }
 
-        // --- FIX #3: set reason + cancelledAt (nếu entity có field/setter) ---
+        // FIX #3: set reason + cancelledAt (nếu entity có field/setter)
         String reason = (body == null) ? null : body.reason();
         try {
             b.setCancelReason(reason);
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         try {
             b.setCancelledAt(Instant.now());
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
 
         b.setUpdatedAt(Instant.now());
         hotelRepo.save(b);
@@ -116,8 +121,7 @@ public class PartnerBookingController {
             @RequestHeader("Authorization") String bearer,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
-    ) {
+            @RequestParam(required = false) Integer size) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
         List<String> ids = catalogPartnerIdsClient.listMyRestaurantIds(partnerId, bearer);
 
@@ -133,14 +137,14 @@ public class PartnerBookingController {
     @GetMapping("/restaurants/{code}")
     public ResponseEntity<ApiResponse<?>> restaurantDetail(
             @RequestHeader("Authorization") String bearer,
-            @PathVariable String code
-    ) {
+            @PathVariable String code) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
         List<String> ids = catalogPartnerIdsClient.listMyRestaurantIds(partnerId, bearer);
 
         RestaurantBooking b = restaurantRepo.findWithTablesByCode(code)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!ids.contains(b.getRestaurantId())) throw new SecurityException("Not owner");
+        if (!ids.contains(b.getRestaurantId()))
+            throw new SecurityException("Not owner");
 
         return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toDetail(b)));
     }
@@ -149,14 +153,14 @@ public class PartnerBookingController {
     public ResponseEntity<ApiResponse<?>> cancelRestaurant(
             @RequestHeader("Authorization") String bearer,
             @PathVariable String code,
-            @RequestBody(required = false) CancelReq body
-    ) {
+            @RequestBody(required = false) CancelReq body) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
         List<String> ids = catalogPartnerIdsClient.listMyRestaurantIds(partnerId, bearer);
 
         RestaurantBooking b = restaurantRepo.findByCode(code)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!ids.contains(b.getRestaurantId())) throw new SecurityException("Not owner");
+        if (!ids.contains(b.getRestaurantId()))
+            throw new SecurityException("Not owner");
 
         if (b.getStatus() == BookingBase.BookingStatus.COMPLETED
                 || b.getStatus() == BookingBase.BookingStatus.CANCELLED
@@ -172,14 +176,16 @@ public class PartnerBookingController {
             b.setPaymentStatus(BookingBase.PaymentStatus.FAILED);
         }
 
-        // --- FIX #3: set reason + cancelledAt (nếu entity có field/setter) ---
+        // FIX #3: set reason + cancelledAt (nếu entity có field/setter)
         String reason = (body == null) ? null : body.reason();
         try {
             b.setCancelReason(reason);
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         try {
             b.setCancelledAt(Instant.now());
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
 
         b.setUpdatedAt(Instant.now());
         restaurantRepo.save(b);
@@ -187,14 +193,13 @@ public class PartnerBookingController {
         return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toSummary(b)));
     }
 
-    // ----------------- STATS (FIX #2 ở đây) -----------------
+    // STATS (FIX #2 ở đây)
 
     @GetMapping("/stats/status")
     public ResponseEntity<ApiResponse<?>> statsByStatus(
             @RequestHeader("Authorization") String bearer,
             @RequestParam(required = false) LocalDate from,
-            @RequestParam(required = false) LocalDate to
-    ) {
+            @RequestParam(required = false) LocalDate to) {
         Long partnerId = authValidateClient.requirePartnerId(bearer);
 
         List<String> hotelIds = catalogPartnerIdsClient.listMyHotelIds(partnerId, bearer);
@@ -214,7 +219,8 @@ public class PartnerBookingController {
         return ResponseEntity.ok(ApiResponse.success("OK", counts));
     }
 
-    public record RevenuePoint(String label, BigDecimal hotelRevenue, BigDecimal restaurantRevenue) {}
+    public record RevenuePoint(String label, BigDecimal hotelRevenue, BigDecimal restaurantRevenue) {
+    }
 
     @GetMapping("/stats/revenue")
     public ResponseEntity<ApiResponse<?>> statsRevenue(
@@ -230,7 +236,8 @@ public class PartnerBookingController {
 
         ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
 
-        // Backward compatible: nếu không truyền group -> trả như cũ (HOTEL/RESTAURANT/TOTAL)
+        // Backward compatible: nếu không truyền group -> trả như cũ
+        // (HOTEL/RESTAURANT/TOTAL)
         if (group == null || group.isBlank()) {
             BigDecimal hotelRevenue = sumPaidHotel(hotelIds, from, to, zone);
             BigDecimal restaurantRevenue = sumPaidRestaurant(restaurantIds, from, to, zone);
@@ -238,8 +245,7 @@ public class PartnerBookingController {
             Map<String, BigDecimal> res = Map.of(
                     "HOTEL", hotelRevenue,
                     "RESTAURANT", restaurantRevenue,
-                    "TOTAL", hotelRevenue.add(restaurantRevenue)
-            );
+                    "TOTAL", hotelRevenue.add(restaurantRevenue));
             return ResponseEntity.ok(ApiResponse.success("OK", res));
         }
 
@@ -255,8 +261,7 @@ public class PartnerBookingController {
             List<String> restaurantIds,
             LocalDate from,
             LocalDate to,
-            ZoneId zone
-    ) {
+            ZoneId zone) {
         // chuẩn hoá range (nếu null)
         LocalDate end = (to != null) ? to : LocalDate.now(zone);
         LocalDate start = (from != null) ? from : end;
@@ -267,21 +272,28 @@ public class PartnerBookingController {
 
         if ("weekly".equals(group)) {
             // luôn tạo đủ 7 ngày T2..CN cho đẹp
-            List<String> labels = List.of("T2","T3","T4","T5","T6","T7","CN");
-            labels.forEach(lb -> { hotel.put(lb, BigDecimal.ZERO); restaurant.put(lb, BigDecimal.ZERO); });
+            List<String> labels = List.of("T2", "T3", "T4", "T5", "T6", "T7", "CN");
+            labels.forEach(lb -> {
+                hotel.put(lb, BigDecimal.ZERO);
+                restaurant.put(lb, BigDecimal.ZERO);
+            });
 
             for (HotelBooking b : filterHotel(hotelIds, null)) {
-                if (!isPaidSuccess(b)) continue;
+                if (!isPaidSuccess(b))
+                    continue;
                 LocalDate d = toLocalDateSafe(b, zone);
-                if (d == null || d.isBefore(start) || d.isAfter(end)) continue;
+                if (d == null || d.isBefore(start) || d.isAfter(end))
+                    continue;
                 String lb = dowLabel(d);
                 hotel.put(lb, hotel.get(lb).add(nz(b.getAmountPaid())));
             }
 
             for (RestaurantBooking b : filterRestaurant(restaurantIds, null)) {
-                if (!isPaidSuccess(b)) continue;
+                if (!isPaidSuccess(b))
+                    continue;
                 LocalDate d = toLocalDateSafe(b, zone);
-                if (d == null || d.isBefore(start) || d.isAfter(end)) continue;
+                if (d == null || d.isBefore(start) || d.isAfter(end))
+                    continue;
                 String lb = dowLabel(d);
                 restaurant.put(lb, restaurant.get(lb).add(nz(b.getAmountPaid())));
             }
@@ -292,23 +304,30 @@ public class PartnerBookingController {
         }
 
         if ("monthly".equals(group)) {
-            List<String> labels = List.of("Tuần 1","Tuần 2","Tuần 3","Tuần 4");
-            labels.forEach(lb -> { hotel.put(lb, BigDecimal.ZERO); restaurant.put(lb, BigDecimal.ZERO); });
+            List<String> labels = List.of("Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4");
+            labels.forEach(lb -> {
+                hotel.put(lb, BigDecimal.ZERO);
+                restaurant.put(lb, BigDecimal.ZERO);
+            });
 
             for (HotelBooking b : filterHotel(hotelIds, null)) {
-                if (!isPaidSuccess(b)) continue;
+                if (!isPaidSuccess(b))
+                    continue;
                 LocalDate d = toLocalDateSafe(b, zone);
-                if (d == null || d.isBefore(start) || d.isAfter(end)) continue;
+                if (d == null || d.isBefore(start) || d.isAfter(end))
+                    continue;
                 int wk = ((d.getDayOfMonth() - 1) / 7) + 1; // 1..5
-                wk = Math.min(4, Math.max(1, wk));          // ép về 1..4
+                wk = Math.min(4, Math.max(1, wk)); // ép về 1..4
                 String lb = "Tuần " + wk;
                 hotel.put(lb, hotel.get(lb).add(nz(b.getAmountPaid())));
             }
 
             for (RestaurantBooking b : filterRestaurant(restaurantIds, null)) {
-                if (!isPaidSuccess(b)) continue;
+                if (!isPaidSuccess(b))
+                    continue;
                 LocalDate d = toLocalDateSafe(b, zone);
-                if (d == null || d.isBefore(start) || d.isAfter(end)) continue;
+                if (d == null || d.isBefore(start) || d.isAfter(end))
+                    continue;
                 int wk = ((d.getDayOfMonth() - 1) / 7) + 1;
                 wk = Math.min(4, Math.max(1, wk));
                 String lb = "Tuần " + wk;
@@ -322,21 +341,29 @@ public class PartnerBookingController {
 
         if ("yearly".equals(group)) {
             List<String> labels = new java.util.ArrayList<>();
-            for (int m = 1; m <= 12; m++) labels.add("Th" + m);
-            labels.forEach(lb -> { hotel.put(lb, BigDecimal.ZERO); restaurant.put(lb, BigDecimal.ZERO); });
+            for (int m = 1; m <= 12; m++)
+                labels.add("Th" + m);
+            labels.forEach(lb -> {
+                hotel.put(lb, BigDecimal.ZERO);
+                restaurant.put(lb, BigDecimal.ZERO);
+            });
 
             for (HotelBooking b : filterHotel(hotelIds, null)) {
-                if (!isPaidSuccess(b)) continue;
+                if (!isPaidSuccess(b))
+                    continue;
                 LocalDate d = toLocalDateSafe(b, zone);
-                if (d == null || d.isBefore(start) || d.isAfter(end)) continue;
+                if (d == null || d.isBefore(start) || d.isAfter(end))
+                    continue;
                 String lb = "Th" + d.getMonthValue();
                 hotel.put(lb, hotel.get(lb).add(nz(b.getAmountPaid())));
             }
 
             for (RestaurantBooking b : filterRestaurant(restaurantIds, null)) {
-                if (!isPaidSuccess(b)) continue;
+                if (!isPaidSuccess(b))
+                    continue;
                 LocalDate d = toLocalDateSafe(b, zone);
-                if (d == null || d.isBefore(start) || d.isAfter(end)) continue;
+                if (d == null || d.isBefore(start) || d.isAfter(end))
+                    continue;
                 String lb = "Th" + d.getMonthValue();
                 restaurant.put(lb, restaurant.get(lb).add(nz(b.getAmountPaid())));
             }
@@ -361,9 +388,11 @@ public class PartnerBookingController {
     }
 
     private LocalDate toLocalDateSafe(BookingBase b, ZoneId zone) {
-        if (b == null) return null;
+        if (b == null)
+            return null;
         Instant t = b.getCreatedAt(); // nếu có paidAt thì dùng paidAt sẽ hợp lý hơn
-        if (t == null) return null;
+        if (t == null)
+            return null;
         return t.atZone(zone).toLocalDate();
     }
 
@@ -380,18 +409,22 @@ public class PartnerBookingController {
         };
     }
 
-    // ----------------- helpers -----------------
+    // helpers
 
     private static boolean inRange(Instant createdAt, LocalDate from, LocalDate to, ZoneId zone) {
-        if (createdAt == null) return false;
+        if (createdAt == null)
+            return false;
         LocalDate d = createdAt.atZone(zone).toLocalDate();
-        if (from != null && d.isBefore(from)) return false;
-        if (to != null && d.isAfter(to)) return false;
+        if (from != null && d.isBefore(from))
+            return false;
+        if (to != null && d.isAfter(to))
+            return false;
         return true;
     }
 
     private List<HotelBooking> filterHotel(List<String> hotelIds, String status) {
-        if (hotelIds == null || hotelIds.isEmpty()) return List.of();
+        if (hotelIds == null || hotelIds.isEmpty())
+            return List.of();
         if (status == null || status.isBlank()) {
             return hotelRepo.findByHotelIdInOrderByCreatedAtDesc(hotelIds);
         }
@@ -400,7 +433,8 @@ public class PartnerBookingController {
     }
 
     private List<RestaurantBooking> filterRestaurant(List<String> ids, String status) {
-        if (ids == null || ids.isEmpty()) return List.of();
+        if (ids == null || ids.isEmpty())
+            return List.of();
         if (status == null || status.isBlank()) {
             return restaurantRepo.findByRestaurantIdInOrderByCreatedAtDesc(ids);
         }
@@ -436,7 +470,6 @@ public class PartnerBookingController {
                 "content", content,
                 "page", p,
                 "size", s,
-                "totalElements", items.size()
-        );
+                "totalElements", items.size());
     }
 }

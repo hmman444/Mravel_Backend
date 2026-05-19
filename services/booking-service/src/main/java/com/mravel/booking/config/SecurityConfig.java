@@ -39,7 +39,6 @@ public class SecurityConfig {
             .requestMatchers("/api/booking/my").authenticated()
             .requestMatchers("/api/booking/bookings/claim").authenticated()
 
-            // các API booking còn lại tuỳ bạn: demo thì permitAll, về sau siết dần
             .requestMatchers("/api/booking/**").permitAll()
 
             .anyRequest().permitAll())

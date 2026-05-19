@@ -22,6 +22,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
 
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/plans/_sync").permitAll()
                         .requestMatchers("/api/plans/user/**").permitAll()
                         .requestMatchers("/api/plans/me").authenticated()
 

@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import com.mravel.plan.client.NotificationClient;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlanNotificationService {
@@ -24,10 +26,12 @@ public class PlanNotificationService {
         if (recipientId == null || actorId == null)
             return;
         if (recipientId.equals(actorId))
-            return; // không tự notify
+            return; // do not self-notify
         try {
             notificationClient.createNotification(recipientId, actorId, type, title, message, data);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("[PlanNotificationService] Failed to send notification type={} recipient={}: {}",
+                    type, recipientId, e.getMessage());
         }
     }
 
@@ -81,6 +85,23 @@ public class PlanNotificationService {
                 "REPLY_COMMENT",
                 "Trả lời",
                 "đã trả lời bình luận của bạn",
+                data);
+    }
+
+    public void notifyCommentReact(Long actorId, Long recipientId, Long planId, Long commentId, String reactionKey) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("actorId", actorId);
+        data.put("planId", planId);
+        data.put("commentId", commentId);
+        data.put("reactionKey", reactionKey);
+        data.put("deepLink", "/plans/" + planId + "?commentId=" + commentId);
+
+        safeCreate(
+                recipientId,
+                actorId,
+                "COMMENT_REACT",
+                "Thích bình luận",
+                "đã thích bình luận của bạn",
                 data);
     }
 

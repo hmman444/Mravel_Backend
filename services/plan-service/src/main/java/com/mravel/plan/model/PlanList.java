@@ -43,4 +43,9 @@ public class PlanList {
     @Column(nullable = false)
     @Builder.Default
     private PlanListType type = PlanListType.DAY;
+
+    @Version
+    @Column(nullable = false)
+    @Builder.Default
+    private Long version = 0L;
 }

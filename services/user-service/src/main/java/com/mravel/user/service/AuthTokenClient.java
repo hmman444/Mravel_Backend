@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.Map;
 
-@FeignClient(name = "auth-service", url = "http://localhost:8081/api/auth")
+@FeignClient(name = "auth-service", url = "${mravel.auth.url:http://auth-service:8081/api/auth}")
 public interface AuthTokenClient {
 
     @GetMapping("/validate")

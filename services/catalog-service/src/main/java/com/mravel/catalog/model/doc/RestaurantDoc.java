@@ -48,7 +48,7 @@ public class RestaurantDoc {
 
     private Instant deletedAt;
 
-    // ---------- Liên kết & vị trí ----------
+    // Liên kết & vị trí
 
     /** Destination cha – slug trong collection places (PlaceKind.DESTINATION) */
     @Indexed
@@ -74,7 +74,7 @@ public class RestaurantDoc {
     @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE, name = "restaurant_loc_2dsphere_idx")
     private double[] location;
 
-    // ---------- Thông tin cơ bản ----------
+    // Thông tin cơ bản
 
     @Indexed
     private String name;
@@ -98,7 +98,7 @@ public class RestaurantDoc {
     private String facebookPage;
     private String bookingHotline;
 
-    // ---------- Giá / khoảng giá ----------
+    // Giá / khoảng giá
 
     /** Khoảng giá / người (đồng bộ với filter PasGo) */
     private BigDecimal minPricePerPerson;
@@ -113,7 +113,7 @@ public class RestaurantDoc {
     /** Bucket giá để filter nhanh: <150k, 150-250k,... */
     private PriceBucket priceBucket;
 
-    // ---------- Giờ hoạt động ----------
+    // Giờ hoạt động
 
     /**
      * Giờ mở cửa theo từng ngày trong tuần.
@@ -123,7 +123,7 @@ public class RestaurantDoc {
      */
     private List<OpeningHour> openingHours;
 
-    // ---------- Phù hợp / Không gian / Sức chứa ----------
+    // Phù hợp / Không gian / Sức chứa
 
     /** Các trường hợp sử dụng: Ăn gia đình, Sinh nhật, Liên hoan,... */
     private List<SuitableFor> suitableFor;
@@ -134,7 +134,7 @@ public class RestaurantDoc {
     /** Thông tin sức chứa & phòng riêng */
     private CapacityInfo capacity;
 
-    // ---------- Món đặc sắc & menu ----------
+    // Món đặc sắc & menu
 
     /** Danh sách món đặc sắc (highlight) */
     private List<SignatureDish> signatureDishes;
@@ -145,11 +145,11 @@ public class RestaurantDoc {
     /** Menu cấu trúc (optional, phục vụ tiểu luận & mở rộng sau này) */
     private List<MenuSection> menuSections;
 
-    // ---------- Đỗ xe ----------
+    // Đỗ xe
 
     private ParkingInfo parking;
 
-    // ---------- Tiện ích (amenities) ----------
+    // Tiện ích (amenities)
 
     /**
      * Danh sách code tiện ích mà nhà hàng CÓ.
@@ -159,7 +159,7 @@ public class RestaurantDoc {
      */
     private List<String> amenityCodes;
 
-    // ---------- Ảnh & content dài ----------
+    // Ảnh & content dài
 
     /** Gallery chính của nhà hàng */
     private List<Image> images;
@@ -170,11 +170,11 @@ public class RestaurantDoc {
      */
     private List<ContentBlock> content;
 
-    // ---------- Policy & quy định đặt chỗ ----------
+    // Policy & quy định đặt chỗ
 
     private RestaurantPolicy policy;
 
-    // ---------- Rating & review ----------
+    // Rating & review
 
     @Builder.Default
     private Double avgRating = 0.0;
@@ -186,7 +186,7 @@ public class RestaurantDoc {
 
     private ReviewStats reviewStats;
 
-    // ---------- Đối tác & kiểm duyệt ----------
+    // Đối tác & kiểm duyệt
 
     private PublisherInfo publisher;
     private ModerationInfo moderation;
@@ -199,9 +199,9 @@ public class RestaurantDoc {
      */
     private BookingConfig bookingConfig;
 
-    // =====================================================================
+    //
     // SUBDOCUMENTS
-    // =====================================================================
+    //
 
     @Getter
     @Setter
@@ -478,7 +478,7 @@ public class RestaurantDoc {
         private double[] mapLocation; // cho MAP (lon, lat) nếu khác location chính
     }
 
-    // ---------- Policy (quy định đặt chỗ, ưu đãi, hóa đơn, phí...) ----------
+    // Policy (quy định đặt chỗ, ưu đãi, hóa đơn, phí...)
 
     @Getter
     @Setter
@@ -487,7 +487,7 @@ public class RestaurantDoc {
     @Builder
     public static class RestaurantPolicy {
 
-        // --- Đặt cọc ---
+        // Đặt cọc
         @Builder.Default
         private Boolean depositRequired = false;
         private Integer depositMinGuests;
@@ -495,7 +495,7 @@ public class RestaurantDoc {
         private String depositCurrencyCode;
         private String depositNotes;
 
-        // --- Ưu đãi & ngày ngoại lệ ---
+        // Ưu đãi & ngày ngoại lệ
         @Builder.Default
         private Boolean hasPromotion = false;
         private String promotionSummary;
@@ -504,12 +504,12 @@ public class RestaurantDoc {
 
         private List<BlackoutDateRule> blackoutRules;
 
-        // --- Thời gian đặt / giữ chỗ ---
+        // Thời gian đặt / giữ chỗ
         private Integer minBookingLeadTimeMinutes; // đặt trước tối thiểu, vd: 60'
         private Integer maxHoldTimeMinutes; // giữ chỗ tối đa, vd: 20'
         private Integer minGuestsPerBooking; // "Không quy định" -> null
 
-        // --- Hóa đơn ---
+        // Hóa đơn
         @Builder.Default
         private Boolean vatInvoiceAvailable = false;
         private BigDecimal vatPercent;
@@ -518,11 +518,11 @@ public class RestaurantDoc {
         private Boolean directInvoiceAvailable = false;
         private String invoiceNotes;
 
-        // --- Phí phục vụ ---
+        // Phí phục vụ
         private BigDecimal serviceChargePercent;
         private String serviceChargeNotes;
 
-        // --- Mang đồ từ ngoài vào ---
+        // Mang đồ từ ngoài vào
         @Builder.Default
         private Boolean allowOutsideFood = false;
         @Builder.Default
@@ -568,7 +568,7 @@ public class RestaurantDoc {
         private String note;
     }
 
-    // ---------- Review stats ----------
+    // Review stats
 
     @Getter
     @Setter
@@ -598,7 +598,7 @@ public class RestaurantDoc {
         private Integer count; // số lần được nhắc
     }
 
-    // ---------- Đối tác / publisher ----------
+    // Đối tác / publisher
 
     @Getter
     @Setter
@@ -624,7 +624,7 @@ public class RestaurantDoc {
         private Instant lastUpdatedAt;
     }
 
-    // ---------- Kiểm duyệt / báo cáo ----------
+    // Kiểm duyệt / báo cáo
 
     @Getter
     @Setter
@@ -671,9 +671,9 @@ public class RestaurantDoc {
         }
     }
 
-    // =====================================================================
+    //
     // ENUMS
-    // =====================================================================
+    //
 
     /** Loại hình nhà hàng chính */
     public enum RestaurantType {

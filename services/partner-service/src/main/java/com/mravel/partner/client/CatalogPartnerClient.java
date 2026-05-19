@@ -23,13 +23,15 @@ public class CatalogPartnerClient {
     @Value("${mravel.services.catalog.base-url}")
     private String baseUrl;
 
-    // ----------------- HOTEL -----------------
+    // HOTEL
 
-    public ResponseEntity<ApiResponse<?>> listMyHotels(Long partnerId, String status, Integer page, Integer size, String bearer) {
+    public ResponseEntity<ApiResponse<?>> listMyHotels(Long partnerId, String status, Integer page, Integer size,
+            String bearer) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(baseUrl + "/api/catalog/partners/hotels")
                 .queryParam("partnerId", partnerId)
-                .queryParamIfPresent("status", (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
+                .queryParamIfPresent("status",
+                        (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
                 .queryParamIfPresent("page", Optional.ofNullable(page))
                 .queryParamIfPresent("size", Optional.ofNullable(size))
                 .toUriString();
@@ -42,7 +44,8 @@ public class CatalogPartnerClient {
         return exchange("/api/catalog/partners/hotels", HttpMethod.POST, body, bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> updateHotel(String id, Long partnerId, PartnerDtos.UpsertHotelReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> updateHotel(String id, Long partnerId, PartnerDtos.UpsertHotelReq req,
+            String bearer) {
         var body = new CatalogUpsertWrapper<>(partnerId, PartnerDtos.PendingReason.UPDATE, req);
         return exchange("/api/catalog/partners/hotels/" + id, HttpMethod.PUT, body, bearer);
     }
@@ -56,37 +59,44 @@ public class CatalogPartnerClient {
     }
 
     public ResponseEntity<ApiResponse<?>> pauseHotel(String id, Long partnerId, String bearer) {
-        return exchange("/api/catalog/partners/hotels/" + id + "/pause?partnerId=" + partnerId, HttpMethod.POST, null, bearer);
+        return exchange("/api/catalog/partners/hotels/" + id + "/pause?partnerId=" + partnerId, HttpMethod.POST, null,
+                bearer);
     }
 
     public ResponseEntity<ApiResponse<?>> resumeHotel(String id, Long partnerId, String bearer) {
-        return exchange("/api/catalog/partners/hotels/" + id + "/resume?partnerId=" + partnerId, HttpMethod.POST, null, bearer);
+        return exchange("/api/catalog/partners/hotels/" + id + "/resume?partnerId=" + partnerId, HttpMethod.POST, null,
+                bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> requestUnlockHotel(String id, Long partnerId, PartnerDtos.UnlockRequestReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> requestUnlockHotel(String id, Long partnerId,
+            PartnerDtos.UnlockRequestReq req, String bearer) {
         var body = new UnlockWrapper(partnerId, req.reason());
         return exchange("/api/catalog/partners/hotels/" + id + "/unlock-request", HttpMethod.POST, body, bearer);
     }
 
-    // ----------------- RESTAURANT -----------------
+    // RESTAURANT
 
-    public ResponseEntity<ApiResponse<?>> listMyRestaurants(Long partnerId, String status, Integer page, Integer size, String bearer) {
+    public ResponseEntity<ApiResponse<?>> listMyRestaurants(Long partnerId, String status, Integer page, Integer size,
+            String bearer) {
         String url = UriComponentsBuilder
                 .fromHttpUrl(baseUrl + "/api/catalog/partners/restaurants")
                 .queryParam("partnerId", partnerId)
-                .queryParamIfPresent("status", (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
+                .queryParamIfPresent("status",
+                        (status == null || status.isBlank()) ? Optional.empty() : Optional.of(status))
                 .queryParamIfPresent("page", Optional.ofNullable(page))
                 .queryParamIfPresent("size", Optional.ofNullable(size))
                 .toUriString();
         return exchangeAbsolute(url, HttpMethod.GET, null, bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> createRestaurant(Long partnerId, PartnerDtos.UpsertRestaurantReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> createRestaurant(Long partnerId, PartnerDtos.UpsertRestaurantReq req,
+            String bearer) {
         var body = new CatalogUpsertWrapper<>(partnerId, PartnerDtos.PendingReason.CREATE, req);
         return exchange("/api/catalog/partners/restaurants", HttpMethod.POST, body, bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> updateRestaurant(String id, Long partnerId, PartnerDtos.UpsertRestaurantReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> updateRestaurant(String id, Long partnerId,
+            PartnerDtos.UpsertRestaurantReq req, String bearer) {
         var body = new CatalogUpsertWrapper<>(partnerId, PartnerDtos.PendingReason.UPDATE, req);
         return exchange("/api/catalog/partners/restaurants/" + id, HttpMethod.PUT, body, bearer);
     }
@@ -100,25 +110,29 @@ public class CatalogPartnerClient {
     }
 
     public ResponseEntity<ApiResponse<?>> pauseRestaurant(String id, Long partnerId, String bearer) {
-        return exchange("/api/catalog/partners/restaurants/" + id + "/pause?partnerId=" + partnerId, HttpMethod.POST, null, bearer);
+        return exchange("/api/catalog/partners/restaurants/" + id + "/pause?partnerId=" + partnerId, HttpMethod.POST,
+                null, bearer);
     }
 
     public ResponseEntity<ApiResponse<?>> resumeRestaurant(String id, Long partnerId, String bearer) {
-        return exchange("/api/catalog/partners/restaurants/" + id + "/resume?partnerId=" + partnerId, HttpMethod.POST, null, bearer);
+        return exchange("/api/catalog/partners/restaurants/" + id + "/resume?partnerId=" + partnerId, HttpMethod.POST,
+                null, bearer);
     }
 
-    public ResponseEntity<ApiResponse<?>> requestUnlockRestaurant(String id, Long partnerId, PartnerDtos.UnlockRequestReq req, String bearer) {
+    public ResponseEntity<ApiResponse<?>> requestUnlockRestaurant(String id, Long partnerId,
+            PartnerDtos.UnlockRequestReq req, String bearer) {
         var body = new UnlockWrapper(partnerId, req.reason());
         return exchange("/api/catalog/partners/restaurants/" + id + "/unlock-request", HttpMethod.POST, body, bearer);
     }
 
-    // ----------------- shared helpers -----------------
+    // shared helpers
 
     private ResponseEntity<ApiResponse<?>> exchange(String path, HttpMethod method, Object body, String bearerToken) {
         return exchangeAbsolute(baseUrl + path, method, body, bearerToken);
     }
 
-    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body, String bearerToken) {
+    private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body,
+            String bearerToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(extractBearer(bearerToken));
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -141,9 +155,11 @@ public class CatalogPartnerClient {
     }
 
     private String extractBearer(String authorizationHeader) {
-        if (authorizationHeader == null) return "";
+        if (authorizationHeader == null)
+            return "";
         String s = authorizationHeader.trim();
-        if (s.toLowerCase().startsWith("bearer ")) return s.substring(7).trim();
+        if (s.toLowerCase().startsWith("bearer "))
+            return s.substring(7).trim();
         return s;
     }
 
@@ -156,6 +172,9 @@ public class CatalogPartnerClient {
     }
 
     // Wrapper giúp catalog-service phân biệt pending do tạo mới hay update
-    public record CatalogUpsertWrapper<T>(Long partnerId, PartnerDtos.PendingReason pendingReason, T payload) {}
-    public record UnlockWrapper(Long partnerId, String reason) {}
+    public record CatalogUpsertWrapper<T>(Long partnerId, PartnerDtos.PendingReason pendingReason, T payload) {
+    }
+
+    public record UnlockWrapper(Long partnerId, String reason) {
+    }
 }

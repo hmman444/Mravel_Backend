@@ -137,7 +137,7 @@ public class PlaceService {
     return toAdminResponse(saved);
   }
 
-  // ===================== UPDATE =====================
+  // === UPDATE ===
   @Transactional
   public PlaceAdminResponse update(String id, UpsertPlaceRequest req) {
     PlaceDoc existing = repo.findById(id)
@@ -357,7 +357,7 @@ public class PlaceService {
         p.getChildrenCount());
   }
 
-  // --- mapping lists to embedded docs ---
+  // mapping lists to embedded docs
   private List<PlaceDoc.Image> mapImages(List<com.mravel.catalog.dto.place.PlaceAdminDtos.ImageReq> imgs) {
     if (imgs == null)
       return List.of();

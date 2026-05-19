@@ -26,6 +26,7 @@ public class NotificationRealtimeEvent {
         private Long actorId;
         private ActorSummary actor;
         private String type;
+        private String category; // SOCIAL, BOOKING, ACCOUNT, PARTNER, ADMIN
         private String title;
         private String message;
         private String deepLink;

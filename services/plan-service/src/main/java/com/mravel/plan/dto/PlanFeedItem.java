@@ -20,7 +20,12 @@ public class PlanFeedItem {
     private long views;
     private Instant createdAt;
     private Author author;
+    private Long budgetTotal;
+    private Long budgetPerPerson;
+    private String budgetCurrency;
+    private String thumbnail;
     private List<String> images;
+    private List<String> videos;
     private List<Destination> destinations;
     private Map<String, Long> reactions;
     private List<ReactionUser> reactionUsers;
@@ -80,6 +85,9 @@ public class PlanFeedItem {
         private Instant createdAt;
         private Long parentId;
         private List<Comment> replies;
+        private Map<String, Long> reactions;      // reaction counts by type
+        private String myReaction;               // current viewer's reaction type (null if none)
+        private List<ReactionUser> reactionUsers; // who reacted (reuse top-level inner class)
 
         @Data
         @Builder

@@ -108,4 +108,8 @@ public class PlanCard {
     @Column(name = "actual_manual")
     private Boolean actualManual; // true = user nhập, false = auto
 
+    @Version
+    @Column(nullable = false)
+    @Builder.Default
+    private Long version = 0L;
 }

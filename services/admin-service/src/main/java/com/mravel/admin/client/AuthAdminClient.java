@@ -75,7 +75,14 @@ public class AuthAdminClient {
         }
     }
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     private String requireBaseUrl() {
-        return Objects.requireNonNull(baseUrl, "mravel.services.auth.base-url must not be null");
+        String base = Objects.requireNonNull(baseUrl, "mravel.services.auth.base-url must not be null");
+        if (activeProfile != null && activeProfile.contains("docker") && base.contains("localhost")) {
+            base = base.replaceAll("localhost(:\\d+)?", "gateway:8080");
+        }
+        return base;
     }
 }

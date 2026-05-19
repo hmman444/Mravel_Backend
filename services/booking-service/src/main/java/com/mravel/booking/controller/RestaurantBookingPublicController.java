@@ -26,92 +26,55 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RestaurantBookingPublicController {
 
-  private final RestaurantBookingRepository repo;
-  private final RestaurantBookingService service;
-  private final PaymentAttemptService paymentAttemptService;
+    private final RestaurantBookingRepository repo;
+    private final RestaurantBookingService service;
+    private final PaymentAttemptService paymentAttemptService;
 
-  @GetMapping("/my")
-  public ResponseEntity<ApiResponse<List<RestaurantBookingSummaryDTO>>> my(
-      @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid
-  ) {
-    if (sid == null || sid.isBlank()) {
-      return ResponseEntity.ok(ApiResponse.success("OK", List.of()));
-    }
-
-    var items = repo.findByGuestSessionIdOrderByCreatedAtDesc(sid)
-        .stream()
-        .map(RestaurantBookingMapper::toSummary)
-        .toList();
-
-    return ResponseEntity.ok(ApiResponse.success("OK", items));
-  }
-
-  @GetMapping("/my/{code}")
-    public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> myDetail(
-        @PathVariable String code,
-        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid
-    ) {
-    if (sid == null || sid.isBlank()) throw new IllegalStateException("Thiếu guest session");
-
-    var b = repo.findWithTablesByCode(code.trim())
-        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
-
-    if (b.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
-    if (b.getGuestSessionId() == null || !sid.equals(b.getGuestSessionId()))
-        throw new IllegalStateException("Không có quyền xem booking này");
-
-    return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toDetailDTO(b)));
-    }
-
-  @PostMapping("/lookup")
-    public ResponseEntity<ApiResponse<RestaurantBookingSummaryDTO>> lookup(
-        @RequestBody com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest body
-    ) {
-    if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
-        throw new IllegalArgumentException("Thiếu bookingCode");
-    }
-    if (body.phoneLast4() == null || body.phoneLast4().isBlank() || body.phoneLast4().trim().length() != 4) {
-        throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
-    }
-
-    var b = repo.findByCode(body.bookingCode().trim())
-        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
-
-    String last4 = last4Digits(b.getContactPhone());
-    if (!body.phoneLast4().trim().equals(last4)) {
-        throw new IllegalStateException("Sai 4 số cuối SĐT");
-    }
-
-    if (body.email() != null && !body.email().isBlank()) {
-        String bEmail = b.getContactEmail();
-        if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-        throw new IllegalStateException("Email không khớp");
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<RestaurantBookingSummaryDTO>>> my(
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid) {
+        if (sid == null || sid.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.success("OK", List.of()));
         }
+
+        var items = repo.findByGuestSessionIdOrderByCreatedAtDesc(sid)
+                .stream()
+                .map(RestaurantBookingMapper::toSummary)
+                .toList();
+
+        return ResponseEntity.ok(ApiResponse.success("OK", items));
     }
 
-    return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toSummary(b)));
+    @GetMapping("/my/{code}")
+    public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> myDetail(
+            @PathVariable String code,
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid) {
+        if (sid == null || sid.isBlank())
+            throw new IllegalStateException("Thiếu guest session");
+
+        var b = repo.findWithTablesByCode(code.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        if (b.getUserId() != null)
+            throw new IllegalStateException("Booking này thuộc tài khoản");
+        if (b.getGuestSessionId() == null || !sid.equals(b.getGuestSessionId()))
+            throw new IllegalStateException("Không có quyền xem booking này");
+
+        return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toDetailDTO(b)));
     }
 
-    private static String last4Digits(String phone) {
-    if (phone == null) return "";
-    String digits = phone.replaceAll("\\D", "");
-    if (digits.length() <= 4) return digits;
-    return digits.substring(digits.length() - 4);
-    }
-
-    @PostMapping("/lookup/detail")
-    public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> lookupDetail(
-        @RequestBody com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest body
-    ) {
+    @PostMapping("/lookup")
+    public ResponseEntity<ApiResponse<RestaurantBookingSummaryDTO>> lookup(
+            @RequestBody com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest body) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
             throw new IllegalArgumentException("Thiếu bookingCode");
         }
-        if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
+        if (body.phoneLast4() == null || body.phoneLast4().isBlank() || body.phoneLast4().trim().length() != 4) {
             throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
         }
 
-        var b = repo.findWithTablesByCode(body.bookingCode().trim())
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+        var b = repo.findByCode(body.bookingCode().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
         String last4 = last4Digits(b.getContactPhone());
         if (!body.phoneLast4().trim().equals(last4)) {
@@ -121,20 +84,55 @@ public class RestaurantBookingPublicController {
         if (body.email() != null && !body.email().isBlank()) {
             String bEmail = b.getContactEmail();
             if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-            throw new IllegalStateException("Email không khớp");
+                throw new IllegalStateException("Email không khớp");
+            }
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toSummary(b)));
+    }
+
+    private static String last4Digits(String phone) {
+        if (phone == null)
+            return "";
+        String digits = phone.replaceAll("\\D", "");
+        if (digits.length() <= 4)
+            return digits;
+        return digits.substring(digits.length() - 4);
+    }
+
+    @PostMapping("/lookup/detail")
+    public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> lookupDetail(
+            @RequestBody com.mravel.booking.dto.BookingPublicDtos.BookingLookupRequest body) {
+        if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
+            throw new IllegalArgumentException("Thiếu bookingCode");
+        }
+        if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
+            throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+        }
+
+        var b = repo.findWithTablesByCode(body.bookingCode().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+
+        String last4 = last4Digits(b.getContactPhone());
+        if (!body.phoneLast4().trim().equals(last4)) {
+            throw new IllegalStateException("Sai 4 số cuối SĐT");
+        }
+
+        if (body.email() != null && !body.email().isBlank()) {
+            String bEmail = b.getContactEmail();
+            if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
+                throw new IllegalStateException("Email không khớp");
             }
         }
 
         return ResponseEntity.ok(ApiResponse.success("OK", RestaurantBookingMapper.toDetailDTO(b)));
     }
 
-    
     @PostMapping("/my/{code}/resume-payment")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> resumeMy(
-        @PathVariable String code,
-        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
-        @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body
-    ) {
+            @PathVariable String code,
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
+            @RequestBody(required = false) com.mravel.booking.dto.ResumePaymentRequest body) {
         Payment.PaymentMethod method = PaymentMethodUtils.parseOrNull(body != null ? body.paymentMethod() : null);
 
         var dto = service.resumeRestaurantPaymentForOwner(code, null, sid, method);
@@ -143,78 +141,82 @@ public class RestaurantBookingPublicController {
 
     @PostMapping("/lookup/resume")
     public ResponseEntity<ApiResponse<ResumePaymentDTO>> lookupResume(
-        @RequestBody LookupResumeRequest body
-    ) {
-    if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
-        throw new IllegalArgumentException("Thiếu bookingCode");
-    }
-    if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
-        throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
-    }
-
-    var b = repo.findByCode(body.bookingCode().trim())
-        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
-
-    // lookup resume chỉ cho GUEST
-    if (b.getUserId() != null) {
-        throw new IllegalStateException("Booking này thuộc tài khoản");
-    }
-
-    String last4 = last4Digits(b.getContactPhone());
-    if (!body.phoneLast4().trim().equals(last4)) {
-        throw new IllegalStateException("Sai 4 số cuối SĐT");
-    }
-
-    if (body.email() != null && !body.email().isBlank()) {
-        String bEmail = b.getContactEmail();
-        if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
-        throw new IllegalStateException("Email không khớp");
+            @RequestBody LookupResumeRequest body) {
+        if (body == null || body.bookingCode() == null || body.bookingCode().isBlank()) {
+            throw new IllegalArgumentException("Thiếu bookingCode");
         }
-    }
+        if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4) {
+            throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
+        }
 
-    // pending
-    if (b.getStatus() != BookingBase.BookingStatus.PENDING_PAYMENT
-        || b.getPaymentStatus() != BookingBase.PaymentStatus.PENDING) {
-        throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
-    }
+        var b = repo.findByCode(body.bookingCode().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
-    if (b.getCreatedAt() == null) throw new IllegalStateException("Booking thiếu createdAt");
-    Instant deadline = b.getCreatedAt().plus(30, ChronoUnit.MINUTES);
-    Instant now = Instant.now();
-    if (now.isAfter(deadline)) throw new IllegalStateException("Đơn đã quá hạn thanh toán");
-    long expiresIn = Duration.between(now, deadline).getSeconds();
+        // lookup resume chỉ cho GUEST
+        if (b.getUserId() != null) {
+            throw new IllegalStateException("Booking này thuộc tài khoản");
+        }
 
-    var requested = com.mravel.booking.payment.PaymentMethodUtils.parseOrNull(body.paymentMethod());
-    var finalMethod = (requested != null)
-        ? requested
-        : (b.getActivePaymentMethod() != null ? b.getActivePaymentMethod() : Payment.PaymentMethod.MOMO_WALLET);
+        String last4 = last4Digits(b.getContactPhone());
+        if (!body.phoneLast4().trim().equals(last4)) {
+            throw new IllegalStateException("Sai 4 số cuối SĐT");
+        }
 
-    var attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
+        if (body.email() != null && !body.email().isBlank()) {
+            String bEmail = b.getContactEmail();
+            if (bEmail == null || !bEmail.equalsIgnoreCase(body.email().trim())) {
+                throw new IllegalStateException("Email không khớp");
+            }
+        }
 
-    b.setPendingPaymentUrl(attempt.getProviderPayUrl());
-    b.setPendingPaymentOrderId(attempt.getProviderRequestId());
-    b.setActivePaymentMethod(attempt.getMethod());
-    repo.save(b);
+        // pending
+        if (b.getStatus() != BookingBase.BookingStatus.PENDING_PAYMENT
+                || b.getPaymentStatus() != BookingBase.PaymentStatus.PENDING) {
+            throw new IllegalStateException("Đơn này không ở trạng thái chờ thanh toán");
+        }
 
-    return ResponseEntity.ok(ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn)));
+        if (b.getCreatedAt() == null)
+            throw new IllegalStateException("Booking thiếu createdAt");
+        Instant deadline = b.getCreatedAt().plus(30, ChronoUnit.MINUTES);
+        Instant now = Instant.now();
+        if (now.isAfter(deadline))
+            throw new IllegalStateException("Đơn đã quá hạn thanh toán");
+        long expiresIn = Duration.between(now, deadline).getSeconds();
+
+        var requested = com.mravel.booking.payment.PaymentMethodUtils.parseOrNull(body.paymentMethod());
+        var finalMethod = (requested != null)
+                ? requested
+                : (b.getActivePaymentMethod() != null ? b.getActivePaymentMethod() : Payment.PaymentMethod.MOMO_WALLET);
+
+        var attempt = paymentAttemptService.createOrReusePendingAttempt(b, finalMethod, deadline);
+
+        b.setPendingPaymentUrl(attempt.getProviderPayUrl());
+        b.setPendingPaymentOrderId(attempt.getProviderRequestId());
+        b.setActivePaymentMethod(attempt.getMethod());
+        repo.save(b);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("OK", new ResumePaymentDTO(b.getCode(), attempt.getProviderPayUrl(), expiresIn)));
     }
 
     public record LookupResumeRequest(
-        String bookingCode,
-        String phoneLast4,
-        String email,
-        String paymentMethod // optional
-    ) {}
+            String bookingCode,
+            String phoneLast4,
+            String email,
+            String paymentMethod // optional
+    ) {
+    }
 
-    public record CancelReq(String reason) {}
+    public record CancelReq(String reason) {
+    }
 
     @PostMapping("/my/{code}/cancel")
     public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> cancelGuestRestaurant(
-        @PathVariable String code,
-        @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
-        @RequestBody(required = false) CancelReq body
-    ) {
-        if (sid == null || sid.isBlank()) throw new IllegalStateException("Thiếu guest session");
+            @PathVariable String code,
+            @CookieValue(name = GuestSessionCookie.COOKIE_NAME, required = false) String sid,
+            @RequestBody(required = false) CancelReq body) {
+        if (sid == null || sid.isBlank())
+            throw new IllegalStateException("Thiếu guest session");
 
         String reason = (body == null) ? null : body.reason();
 
@@ -224,30 +226,30 @@ public class RestaurantBookingPublicController {
     }
 
     public record LookupCancelRequest(
-        String bookingCode,
-        String phoneLast4,
-        String email,
-        String reason
-    ) {}
+            String bookingCode,
+            String phoneLast4,
+            String email,
+            String reason) {
+    }
 
     @PostMapping("/lookup/cancel")
     public ResponseEntity<ApiResponse<RestaurantBookingDetailDTO>> lookupCancel(
-        @RequestBody LookupCancelRequest body
-    ) {
+            @RequestBody LookupCancelRequest body) {
         if (body == null || body.bookingCode() == null || body.bookingCode().isBlank())
             throw new IllegalArgumentException("Thiếu bookingCode");
         if (body.phoneLast4() == null || body.phoneLast4().trim().length() != 4)
             throw new IllegalArgumentException("Thiếu phoneLast4 (4 số cuối)");
 
-        // verify lookup y hệt lookup/detail hiện tại của bạn
         var b = repo.findByCode(body.bookingCode().trim())
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking"));
 
         // lookup cancel chỉ cho GUEST
-        if (b.getUserId() != null) throw new IllegalStateException("Booking này thuộc tài khoản");
+        if (b.getUserId() != null)
+            throw new IllegalStateException("Booking này thuộc tài khoản");
 
         String last4 = last4Digits(b.getContactPhone());
-        if (!body.phoneLast4().trim().equals(last4)) throw new IllegalStateException("Sai 4 số cuối SĐT");
+        if (!body.phoneLast4().trim().equals(last4))
+            throw new IllegalStateException("Sai 4 số cuối SĐT");
 
         if (body.email() != null && !body.email().isBlank()) {
             String bEmail = b.getContactEmail();

@@ -4,8 +4,13 @@ import com.mravel.common.response.UserProfileResponse;
 import com.mravel.plan.client.FriendClient;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.dto.board.*;
+import com.mravel.plan.exception.BadRequestException;
+import com.mravel.plan.exception.ErrorCodes;
+import com.mravel.plan.exception.ForbiddenException;
+import com.mravel.plan.exception.NotFoundException;
 import com.mravel.plan.kafka.KafkaProducer;
 import com.mravel.plan.kafka.PlanBoardEvent;
+import com.mravel.plan.kafka.PlanBoardEventV2;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.*;
 import jakarta.transaction.Transactional;
@@ -23,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -60,16 +66,16 @@ public class PlanBoardService {
         Set<Long> memberIds = memberRepository.findUserIdsByPlanId(planId); // custom query
         for (Long uid : ids) {
             if (!memberIds.contains(uid)) {
-                throw new RuntimeException("User " + uid + " is not a member of this plan");
+                throw new ForbiddenException("User " + uid + " is not a member of this plan");
             }
         }
     }
 
     private PlanList mustLoadList(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
-                .orElseThrow(() -> new RuntimeException("List not found"));
+                .orElseThrow(() -> new NotFoundException("List not found"));
         if (!list.getPlan().getId().equals(planId)) {
-            throw new RuntimeException("List not part of this plan");
+            throw new BadRequestException("List not part of this plan");
         }
         return list;
     }
@@ -77,9 +83,9 @@ public class PlanBoardService {
     private PlanCard mustLoadCard(Long planId, Long listId, Long cardId) {
         PlanList list = mustLoadList(planId, listId);
         PlanCard card = cardRepository.findById(cardId)
-                .orElseThrow(() -> new RuntimeException("Card not found"));
+                .orElseThrow(() -> new NotFoundException("Card not found"));
         if (!card.getList().getId().equals(list.getId())) {
-            throw new RuntimeException("Card not in this list");
+            throw new BadRequestException("Card not in this list");
         }
         return card;
     }
@@ -89,7 +95,7 @@ public class PlanBoardService {
                 .stream()
                 .filter(l -> l.getType() == PlanListType.TRASH)
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Trash missing"));
+                .orElseThrow(() -> new NotFoundException("Trash missing"));
     }
 
     public List<PlanList> findDayLists(Long planId) {
@@ -119,13 +125,24 @@ public class PlanBoardService {
         trash.setPosition(dayLists.size());
     }
 
+    public long incrementBoardRevision(Long planId) {
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan not found: " + planId));
+        long newRevision = (plan.getBoardRevision() == null ? 0L : plan.getBoardRevision()) + 1;
+        plan.setBoardRevision(newRevision);
+        planRepository.save(plan);
+        return newRevision;
+    }
+
+    /**
+     * Publishes a v1 full-snapshot event for legacy consumers.
+     * v2 patch-only events are now emitted directly by each mutation method via
+     * emitV2Patch() / emitV2Sync().
+     */
     public void publishBoard(Long planId, Long actorId, String eventType) {
         try {
             BoardResponse board = getBoard(planId, actorId, false);
-            // log.info("[PlanService] publishBoard eventType={}, planId={}, actorId={},
-            // lists={}",
-            // eventType, planId, actorId,
-            // board.getLists() != null ? board.getLists().size() : null);
+
             PlanBoardEvent evt = PlanBoardEvent.builder()
                     .eventType(eventType)
                     .planId(planId)
@@ -133,11 +150,57 @@ public class PlanBoardService {
                     .timestamp(System.currentTimeMillis())
                     .board(board)
                     .build();
-
             kafkaProducer.publishBoardEvent(evt);
 
         } catch (Exception ex) {
             log.error("Failed to publish board event for planId={}", planId, ex);
+        }
+    }
+
+    /**
+     * Emits a targeted v2 patch-only event. Called by each mutation method so
+     * realtime consumers can apply incremental updates without a full reload.
+     */
+    public void emitV2Patch(Long planId, Long actorId, String entityType,
+            Long entityId, String operationType, Map<String, Object> patch, long revision) {
+        try {
+            PlanBoardEventV2 evt = PlanBoardEventV2.builder()
+                    .envelopeVersion("2")
+                    .planId(planId)
+                    .entityType(entityType)
+                    .entityId(entityId)
+                    .operationType(operationType)
+                    .patch(patch)
+                    .actorId(actorId)
+                    .operationId(UUID.randomUUID().toString())
+                    .revision(revision)
+                    .occurredAt(Instant.now().toString())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            kafkaProducer.publishBoardEventV2(evt);
+        } catch (Exception ex) {
+            log.error("Failed to emit v2 patch planId={} entity={} op={}", planId, entityType, operationType, ex);
+        }
+    }
+
+    /**
+     * Emits a v2 BOARD/SYNC event for complex operations (duplicateList,
+     * updateDates)
+     * that cannot be expressed as a simple patch.
+     */
+    public void emitV2Sync(Long planId, Long actorId, long revision) {
+        emitV2Patch(planId, actorId, "BOARD", planId, "SYNC", Collections.emptyMap(), revision);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> cardDtoToMap(CardDto dto) {
+        try {
+            return objectMapper.convertValue(dto, Map.class);
+        } catch (Exception e) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", dto.getId());
+            m.put("text", dto.getText());
+            return m;
         }
     }
 
@@ -226,8 +289,9 @@ public class PlanBoardService {
                 .status(plan.getStatus().name())
                 .thumbnail(plan.getThumbnail())
                 .images(plan.getImages())
-                // myRole = null
+                .videos(plan.getVideos())
                 .myRole(null)
+                .boardRevision(plan.getBoardRevision())
                 .costSummary(costSummary)
                 .memberCostSummary(memberCostSummary)
                 .lists(
@@ -254,7 +318,7 @@ public class PlanBoardService {
     public BoardResponse getBoard(Long planId, Long userId, boolean isFriend) {
 
         if (!permissionService.canView(planId, userId, isFriend)) {
-            throw new RuntimeException("You don't have permission to view this board.");
+            throw new ForbiddenException("You don't have permission to view this board.");
         }
 
         PlanRole myRole = permissionService.getUserRole(planId, userId);
@@ -275,11 +339,10 @@ public class PlanBoardService {
     public BoardResponse getBoard(Long planId, Long userId, String authorizationHeader) {
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         boolean isFriend = false;
 
-        // owner luôn coi như có quyền xem (tùy rule của bạn)
         if (!Objects.equals(plan.getAuthorId(), userId)) {
             // Nếu userId là member thì khỏi cần check friend
             boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
@@ -294,7 +357,7 @@ public class PlanBoardService {
         }
 
         if (!permissionService.canView(planId, userId, isFriend)) {
-            throw new RuntimeException("You don't have permission to view this board.");
+            throw new ForbiddenException("You don't have permission to view this board.");
         }
 
         PlanRole myRole = permissionService.getUserRole(planId, userId);
@@ -604,12 +667,15 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         List<PlanList> dayLists = findDayLists(planId);
         PlanList trash = findTrash(planId);
 
         int index = dayLists.size();
+        if (plan.getEndDate() == null) {
+            throw new BadRequestException("Plan endDate is null — cannot add a new day.");
+        }
         LocalDate newDate = plan.getEndDate().plusDays(1);
 
         String title = (req.getTitle() != null && !req.getTitle().isBlank())
@@ -635,8 +701,17 @@ public class PlanBoardService {
         // cập nhật endDate của Plan
         plan.setEndDate(newDate);
         planRepository.save(plan);
+        long revision = incrementBoardRevision(planId);
         log.info("[PlanService] createList -> before publishBoard, planId={}, userId={}", planId, userId);
         publishBoard(planId, userId, "CREATE_LIST");
+
+        Map<String, Object> listPatch = new HashMap<>();
+        listPatch.put("listId", list.getId());
+        listPatch.put("title", list.getTitle());
+        listPatch.put("position", list.getPosition());
+        listPatch.put("type", "DAY");
+        listPatch.put("dayDate", list.getDayDate() != null ? list.getDayDate().toString() : null);
+        emitV2Patch(planId, userId, "LIST", list.getId(), "CREATE", listPatch, revision);
 
         return ListDto.builder()
                 .id(list.getId())
@@ -656,11 +731,13 @@ public class PlanBoardService {
         PlanList list = mustLoadList(planId, listId);
 
         if (list.getType() == PlanListType.TRASH) {
-            throw new RuntimeException("Cannot rename trash");
+            throw new BadRequestException("Cannot rename trash");
         }
 
         list.setTitle(req.getTitle());
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "RENAME_LIST");
+        emitV2Patch(planId, userId, "LIST", listId, "UPDATE", Map.of("title", req.getTitle()), revision);
     }
 
     @Transactional
@@ -669,11 +746,11 @@ public class PlanBoardService {
 
         PlanList target = mustLoadList(planId, listId);
         if (target.getType() == PlanListType.TRASH)
-            throw new RuntimeException("Cannot delete trash list");
+            throw new BadRequestException("Cannot delete trash list");
 
         List<PlanList> dayLists = findDayLists(planId);
         if (dayLists.size() == 1)
-            throw new RuntimeException("Cannot delete the last day");
+            throw new BadRequestException("Cannot delete the last day");
 
         PlanList trash = findTrash(planId);
 
@@ -682,7 +759,9 @@ public class PlanBoardService {
         listRepository.delete(target);
 
         syncDayLists(target.getPlan());
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "DELETE_LIST");
+        emitV2Patch(planId, userId, "LIST", listId, "DELETE", Map.of("listId", listId), revision);
     }
 
     public void moveCardsToTrash(PlanList from, PlanList trash) {
@@ -713,12 +792,12 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanList list = mustLoadList(planId, listId);
 
         if (list.getType() == PlanListType.TRASH) {
-            throw new RuntimeException("Cannot create card in trash");
+            throw new BadRequestException("Cannot create card in trash");
         }
 
         int nextPos = (int) cardRepository.countByListId(listId);
@@ -746,9 +825,15 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
+        CardDto cardDto = toCardDto(card);
         publishBoard(planId, userId, "CREATE_CARD");
 
-        return toCardDto(card);
+        Map<String, Object> cardPatch = cardDtoToMap(cardDto);
+        cardPatch.put("listId", listId);
+        emitV2Patch(planId, userId, "CARD", card.getId(), "CREATE", cardPatch, revision);
+
+        return cardDto;
     }
 
     @Transactional
@@ -757,7 +842,7 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanCard card = mustLoadCardInList(planId, listId, cardId);
 
@@ -790,8 +875,11 @@ public class PlanBoardService {
         recalculateSplitDetails(card);
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
+        CardDto cardDto = toCardDto(card);
         publishBoard(planId, userId, "UPDATE_CARD");
-        return toCardDto(card);
+        emitV2Patch(planId, userId, "CARD", card.getId(), "UPDATE", cardDtoToMap(cardDto), revision);
+        return cardDto;
     }
 
     @Transactional
@@ -800,7 +888,7 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanCard card = mustLoadCard(planId, listId, cardId);
 
@@ -813,7 +901,9 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "DELETE_CARD");
+        emitV2Patch(planId, userId, "CARD", cardId, "DELETE", Map.of("cardId", cardId, "listId", listId), revision);
     }
 
     @Transactional
@@ -823,7 +913,7 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanList trash = findTrash(planId);
 
@@ -836,8 +926,9 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "CLEAR_TRASH");
+        emitV2Patch(planId, userId, "BOARD", planId, "CLEAR_TRASH", Collections.emptyMap(), revision);
     }
 
     @Transactional
@@ -920,9 +1011,15 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
+        CardDto copyDto = toCardDto(copy);
         publishBoard(planId, userId, "DUPLICATE_CARD");
 
-        return toCardDto(copy);
+        Map<String, Object> copyPatch = cardDtoToMap(copyDto);
+        copyPatch.put("listId", listId);
+        emitV2Patch(planId, userId, "CARD", copy.getId(), "CREATE", copyPatch, revision);
+
+        return copyDto;
     }
 
     // drag drop
@@ -937,7 +1034,7 @@ public class PlanBoardService {
         } else if ("card".equalsIgnoreCase(req.getType())) {
             return reorderCards(planId, userId, isFriend, req);
         }
-        throw new RuntimeException("Unknown reorder type");
+        throw new BadRequestException("Unknown reorder type");
     }
 
     @Transactional
@@ -946,11 +1043,11 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanList source = mustLoadList(planId, listId);
         if (source.getType() == PlanListType.TRASH) {
-            throw new RuntimeException("Cannot duplicate trash list");
+            throw new BadRequestException("Cannot duplicate trash list");
         }
 
         List<PlanList> dayLists = findDayLists(planId);
@@ -1030,17 +1127,19 @@ public class PlanBoardService {
                             .note(p.getNote())
                             .build()));
 
-            cloneList.getCards().add(copy);
-
             recalculateCardCosts(copy);
             recalculateSplitDetails(copy);
 
             cardRepository.save(copy);
         }
 
+        List<PlanCard> duplicatedCards = cardRepository.findByListIdOrderByPositionAsc(cloneList.getId());
+
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "DUPLICATE_LIST");
+        emitV2Sync(planId, userId, revision);
 
         return ListDto.builder()
                 .id(cloneList.getId())
@@ -1049,7 +1148,7 @@ public class PlanBoardService {
                 .type("DAY")
                 .dayDate(cloneList.getDayDate())
                 .cards(
-                        cloneList.getCards().stream()
+                        duplicatedCards.stream()
                                 .sorted(Comparator.comparingInt(PlanCard::getPosition))
                                 .map(this::toCardDto)
                                 .toList())
@@ -1069,7 +1168,7 @@ public class PlanBoardService {
         }
 
         if (req.getSourceIndex() == trashIndex || req.getDestIndex() == trashIndex) {
-            throw new RuntimeException("Cannot move trash");
+            throw new BadRequestException("Cannot move trash");
         }
 
         PlanList moved = lists.remove(req.getSourceIndex().intValue());
@@ -1079,9 +1178,21 @@ public class PlanBoardService {
             lists.get(i).setPosition(i);
         }
 
-        Plan plan = planRepository.findById(planId).orElseThrow();
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
         syncDayLists(plan);
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "REORDER_LIST");
+
+        List<Map<String, Object>> positions = lists.stream()
+                .map(l -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("listId", l.getId());
+                    m.put("position", l.getPosition());
+                    return m;
+                })
+                .toList();
+        emitV2Patch(planId, userId, "LIST", null, "REORDER", Map.of("positions", positions), revision);
 
         // getBoard sẽ dùng snapshot mới (đã bị evict ở @CacheEvict trên reorder)
         return getBoard(planId, userId, isFriend);
@@ -1094,7 +1205,7 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.EDITOR);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanList source = mustLoadList(planId, req.getSourceListId());
         PlanList dest = mustLoadList(planId, req.getDestListId());
@@ -1122,8 +1233,28 @@ public class PlanBoardService {
 
         recalculatePlanTotals(plan);
         recalculateDestinations(plan);
-
+        long revision = incrementBoardRevision(planId);
         publishBoard(planId, userId, "REORDER_CARD");
+
+        if (source.getId().equals(dest.getId())) {
+            List<Map<String, Object>> positions = destCards.stream()
+                    .map(c -> {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("cardId", c.getId());
+                        m.put("position", c.getPosition());
+                        return m;
+                    })
+                    .toList();
+            emitV2Patch(planId, userId, "CARD", source.getId(), "REORDER",
+                    Map.of("listId", source.getId(), "positions", positions), revision);
+        } else {
+            Map<String, Object> movePatch = new HashMap<>();
+            movePatch.put("cardId", moved.getId());
+            movePatch.put("sourceListId", source.getId());
+            movePatch.put("targetListId", dest.getId());
+            movePatch.put("targetPosition", req.getDestIndex());
+            emitV2Patch(planId, userId, "CARD", moved.getId(), "MOVE", movePatch, revision);
+        }
 
         return getBoard(planId, userId, isFriend);
     }
@@ -1135,7 +1266,7 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, userId, PlanRole.OWNER);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         PlanRole role = Optional.ofNullable(req.getRole())
                 .orElse(PlanRole.VIEWER);
@@ -1159,10 +1290,15 @@ public class PlanBoardService {
 
             inviteTokenRepo.save(tokenEntity);
 
+            // mailService.sendInviteEmail(
+            // email,
+            // plan.getTitle(),
+            // "http://localhost:5173/plans/join?token=" + token);
+
             mailService.sendInviteEmail(
                     email,
                     plan.getTitle(),
-                    "http://localhost:5173/plans/join?token=" + token);
+                    "http://localhost:3000/plans/join?token=" + token);
 
             result.add(InviteDto.builder()
                     .id(tokenEntity.getId())
@@ -1179,14 +1315,14 @@ public class PlanBoardService {
     public Long joinPlan(String token, Long userId) {
 
         PlanInviteToken inv = inviteTokenRepo.findByToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid token"));
+                .orElseThrow(() -> new NotFoundException("Invalid token"));
 
         Long planId = inv.getPlan().getId();
 
         if (inv.isUsed())
             return planId;
         if (inv.getExpiredAt().isBefore(Instant.now())) {
-            throw new RuntimeException("Invite expired");
+            throw new BadRequestException("Invite expired");
         }
 
         boolean exists = memberRepository.existsByPlanIdAndUserId(planId, userId);
@@ -1212,11 +1348,11 @@ public class PlanBoardService {
     @Transactional
     public ShareResponse getShareInfo(Long planId, Long userId) {
         if (!permissionService.canView(planId, userId, false)) {
-            throw new RuntimeException("You don't have permission to view share info.");
+            throw new ForbiddenException("You don't have permission to view share info.");
         }
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
         List<MemberDto> members = memberRepository.findByPlanId(planId).stream()
                 .map(m -> {
@@ -1255,17 +1391,17 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
 
         PlanMember member = memberRepository.findByPlanIdAndUserId(planId, req.getUserId())
-                .orElseThrow(() -> new RuntimeException("Member not found"));
+                .orElseThrow(() -> new NotFoundException("Member not found"));
 
         if (member.getRole() == PlanRole.OWNER) {
-            throw new RuntimeException("Cannot change role of the owner.");
+            throw new BadRequestException("Cannot change role of the owner.");
         }
 
         PlanRole newRole;
         try {
             newRole = PlanRole.valueOf(req.getRole().toUpperCase());
         } catch (Exception e) {
-            throw new RuntimeException("Invalid role: " + req.getRole());
+            throw new BadRequestException("Invalid role: " + req.getRole());
         }
 
         member.setRole(newRole);
@@ -1278,14 +1414,14 @@ public class PlanBoardService {
         permissionService.checkPermission(planId, ownerId, PlanRole.OWNER);
 
         if (Objects.equals(ownerId, targetUserId)) {
-            throw new RuntimeException("Owner cannot remove themselves.");
+            throw new BadRequestException("Owner cannot remove themselves.");
         }
 
         PlanMember member = memberRepository.findByPlanIdAndUserId(planId, targetUserId)
-                .orElseThrow(() -> new RuntimeException("Member not found"));
+                .orElseThrow(() -> new NotFoundException("Member not found"));
 
         if (member.getRole() == PlanRole.OWNER) {
-            throw new RuntimeException("Cannot remove the owner.");
+            throw new BadRequestException("Cannot remove the owner.");
         }
 
         memberRepository.delete(member);
@@ -1305,19 +1441,19 @@ public class PlanBoardService {
 
         if (member != null) {
             if (member.getRole() == PlanRole.OWNER || member.getRole() == PlanRole.EDITOR) {
-                throw new RuntimeException("Bạn đã có quyền truy cập.");
+                throw new ForbiddenException(ErrorCodes.ACCESS_ALREADY_GRANTED, "Bạn đã có quyền truy cập.");
             }
 
             if (member.getRole() == PlanRole.VIEWER) {
                 if (req.getType() != PlanRequestType.EDIT) {
-                    throw new RuntimeException("Bạn đã có quyền xem.");
+                    throw new ForbiddenException(ErrorCodes.ACCESS_VIEW_ALREADY_GRANTED, "Bạn đã có quyền xem.");
                 }
             }
         }
 
         if (requestRepo.existsByPlanIdAndUserIdAndStatus(
                 planId, userId, PlanRequestStatus.PENDING)) {
-            throw new IllegalArgumentException("Bạn đã gửi yêu cầu trước đó.");
+            throw new BadRequestException(ErrorCodes.ACCESS_REQUEST_ALREADY_SUBMITTED, "Bạn đã gửi yêu cầu trước đó.");
         }
 
         PlanRequest entity = PlanRequest.builder()
@@ -1378,10 +1514,10 @@ public class PlanBoardService {
     public void handleRequest(Long planId, Long reqId, PlanRequestAction action) {
 
         PlanRequest req = requestRepo.findById(reqId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new NotFoundException("Request not found"));
 
         if (!req.getPlanId().equals(planId)) {
-            throw new RuntimeException("Invalid plan");
+            throw new BadRequestException("Invalid plan");
         }
 
         Plan plan = planRepository.getReferenceById(planId);
@@ -1420,10 +1556,10 @@ public class PlanBoardService {
                                 .build());
             } else {
                 PlanMember member = memberRepository.findByPlanIdAndUserId(planId, req.getUserId())
-                        .orElseThrow(() -> new RuntimeException("Member not found"));
+                        .orElseThrow(() -> new NotFoundException("Member not found"));
 
                 if (member.getRole() == PlanRole.OWNER) {
-                    throw new RuntimeException("Cannot change role of the owner.");
+                    throw new BadRequestException("Cannot change role of the owner.");
                 }
 
                 member.setRole(assignedRole);
@@ -1440,16 +1576,16 @@ public class PlanBoardService {
             return;
         }
 
-        throw new RuntimeException("Invalid action: " + action.getAction());
+        throw new BadRequestException("Invalid action: " + action.getAction());
     }
 
     // helpers
 
     private PlanList mustLoadListInPlan(Long planId, Long listId) {
         PlanList list = listRepository.findById(listId)
-                .orElseThrow(() -> new RuntimeException("List not found"));
+                .orElseThrow(() -> new NotFoundException("List not found"));
         if (!list.getPlan().getId().equals(planId)) {
-            throw new RuntimeException("List not in plan");
+            throw new BadRequestException("List not in plan");
         }
         return list;
     }
@@ -1457,9 +1593,9 @@ public class PlanBoardService {
     private PlanCard mustLoadCardInList(Long planId, Long listId, Long cardId) {
         PlanList list = mustLoadListInPlan(planId, listId);
         PlanCard card = cardRepository.findById(cardId)
-                .orElseThrow(() -> new RuntimeException("Card not found"));
+                .orElseThrow(() -> new NotFoundException("Card not found"));
         if (!card.getList().getId().equals(list.getId())) {
-            throw new RuntimeException("Card not in list");
+            throw new BadRequestException("Card not in list");
         }
         return card;
     }

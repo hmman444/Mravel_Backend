@@ -8,7 +8,6 @@ public class PartnerRegisterRequest {
     private String email;
     private String password;
 
-    // optional, bạn muốn có thì thêm
     private String businessName;
     private String phone;
 }

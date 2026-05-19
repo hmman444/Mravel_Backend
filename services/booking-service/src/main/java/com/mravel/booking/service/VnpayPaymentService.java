@@ -31,11 +31,14 @@ public class VnpayPaymentService {
 
   @Transactional
   public void handleIpn(Map<String, String> params) {
-    if (params == null || params.isEmpty()) throw new IllegalArgumentException("empty params");
-    if (!vnpayGatewayClient.verifySignature(params)) throw new IllegalArgumentException("bad signature");
+    if (params == null || params.isEmpty())
+      throw new IllegalArgumentException("empty params");
+    if (!vnpayGatewayClient.verifySignature(params))
+      throw new IllegalArgumentException("bad signature");
 
     String txnRef = trim(params.get("vnp_TxnRef"));
-    if (txnRef == null) throw new IllegalArgumentException("missing vnp_TxnRef");
+    if (txnRef == null)
+      throw new IllegalArgumentException("missing vnp_TxnRef");
 
     String responseCode = trim(params.get("vnp_ResponseCode")); // "00" = success :contentReference[oaicite:6]{index=6}
     String transNo = trim(params.get("vnp_TransactionNo"));
@@ -55,33 +58,37 @@ public class VnpayPaymentService {
     }
   }
 
-    @Transactional
-    public void handleReturn(Map<String, String> params) {
-        if (params == null || params.isEmpty()) return;
-        if (!vnpayGatewayClient.verifySignature(params)) return;
+  @Transactional
+  public void handleReturn(Map<String, String> params) {
+    if (params == null || params.isEmpty())
+      return;
+    if (!vnpayGatewayClient.verifySignature(params))
+      return;
 
-        String txnRef = trim(params.get("vnp_TxnRef"));
-        if (txnRef == null) return;
+    String txnRef = trim(params.get("vnp_TxnRef"));
+    if (txnRef == null)
+      return;
 
-        String responseCode = trim(params.get("vnp_ResponseCode"));
-        String txnStatus    = trim(params.get("vnp_TransactionStatus"));
-        String transNo      = trim(params.get("vnp_TransactionNo"));
-        BigDecimal paidAmount = parseAmountVnd(params.get("vnp_Amount")); // vnp_Amount * 100 :contentReference[oaicite:2]{index=2}
+    String responseCode = trim(params.get("vnp_ResponseCode"));
+    String txnStatus = trim(params.get("vnp_TransactionStatus"));
+    String transNo = trim(params.get("vnp_TransactionNo"));
+    BigDecimal paidAmount = parseAmountVnd(params.get("vnp_Amount")); // vnp_Amount * 100
+                                                                      // :contentReference[oaicite:2]{index=2}
 
-        if ("00".equals(responseCode) && "00".equals(txnStatus)) { // :contentReference[oaicite:3]{index=3}
-            resolveAndMarkPaid(txnRef, paidAmount, transNo);
-        } else {
-            // nếu muốn: mark PaymentAttempt FAILED/CANCELLED
-            var p = paymentRepository.findByProviderRequestId(txnRef).orElse(null);
-            if (p != null) {
-                p.setStatus(Payment.PaymentStatus.FAILED);
-                p.setProviderTransactionId(transNo);
-                paymentRepository.save(p);
-            }
-        }
+    if ("00".equals(responseCode) && "00".equals(txnStatus)) { // :contentReference[oaicite:3]{index=3}
+      resolveAndMarkPaid(txnRef, paidAmount, transNo);
+    } else {
+      // nếu muốn: mark PaymentAttempt FAILED/CANCELLED
+      var p = paymentRepository.findByProviderRequestId(txnRef).orElse(null);
+      if (p != null) {
+        p.setStatus(Payment.PaymentStatus.FAILED);
+        p.setProviderTransactionId(transNo);
+        paymentRepository.save(p);
+      }
     }
+  }
 
-  // ================= core =================
+  // == core ==
 
   private void resolveAndMarkPaid(String providerRequestId, BigDecimal paidAmount, String providerTxnId) {
     // 0) ưu tiên PaymentAttempt (Payment) trước (chuẩn theo code bạn)
@@ -126,7 +133,8 @@ public class VnpayPaymentService {
   private static BigDecimal parseAmountVnd(String vnpAmount) {
     // VNPay gửi amount * 100 :contentReference[oaicite:7]{index=7}
     String s = trim(vnpAmount);
-    if (s == null) return null;
+    if (s == null)
+      return null;
     try {
       long raw = Long.parseLong(s);
       return BigDecimal.valueOf(raw).divide(BigDecimal.valueOf(100));
@@ -136,7 +144,8 @@ public class VnpayPaymentService {
   }
 
   private static String trim(String s) {
-    if (s == null) return null;
+    if (s == null)
+      return null;
     String t = s.trim();
     return t.isBlank() ? null : t;
   }

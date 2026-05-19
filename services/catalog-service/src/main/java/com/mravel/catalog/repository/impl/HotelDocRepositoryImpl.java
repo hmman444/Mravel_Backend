@@ -28,13 +28,14 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
             String location,
             Integer minGuestsPerRoom,
             Integer requiredRooms,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         Query q = new Query();
 
         if (pageable != null) {
-            if (pageable.isPaged()) q.with(pageable);
-            else q.with(pageable.getSort());
+            if (pageable.isPaged())
+                q.with(pageable);
+            else
+                q.with(pageable.getSort());
         }
 
         List<Criteria> cs = new ArrayList<>();
@@ -42,7 +43,7 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
         // chỉ show hotel đã duyệt
         cs.add(where("moderation.status").is(HotelStatus.APPROVED));
 
-        // ----- location -----
+        // location
         // inline check để JDT hiểu chắc chắn non-null (thay vì has())
         if (location != null && !location.isBlank()) {
             final String loc = location.trim();
@@ -52,11 +53,10 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
                     where("cityName").regex(loc, "i"),
                     where("districtName").regex(loc, "i"),
                     where("wardName").regex(loc, "i"),
-                    where("addressLine").regex(loc, "i")
-            ));
+                    where("addressLine").regex(loc, "i")));
         }
 
-        // ----- capacity theo roomTypes -----
+        // capacity theo roomTypes
         if (minGuestsPerRoom != null || requiredRooms != null) {
             List<Criteria> roomConditions = new ArrayList<>();
 
@@ -90,7 +90,7 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
         return new PageImpl<>(data, pb, total);
     }
 
-    // ===== helpers =====
+    // helpers
 
     private static Criteria and(List<Criteria> cs) {
         final Criteria[] arr = cs.toArray(Criteria[]::new);

@@ -9,158 +9,155 @@ import java.util.List;
 public class RestaurantBookingDtos {
 
     public record SelectedTable(
-        String tableTypeId,
-        String tableTypeName,
-        Integer seats,
-        Integer quantity,
-        BigDecimal depositPrice
-    ) {}
+            String tableTypeId,
+            String tableTypeName,
+            Integer seats,
+            Integer quantity,
+            BigDecimal depositPrice) {
+    }
 
     public record CreateRestaurantBookingRequest(
-        Long userId,
-        String contactName,
-        String contactPhone,
-        String contactEmail,
-        String note,
+            Long userId,
+            String contactName,
+            String contactPhone,
+            String contactEmail,
+            String note,
 
-        String restaurantId,
-        String restaurantSlug,
-        String restaurantName,
+            String restaurantId,
+            String restaurantSlug,
+            String restaurantName,
 
-        LocalDate reservationDate,
-        LocalTime reservationTime,
-        Integer durationMinutes,
-        Integer people,
+            LocalDate reservationDate,
+            LocalTime reservationTime,
+            Integer durationMinutes,
+            Integer people,
 
-        String paymentMethod,
+            String paymentMethod,
 
-        List<SelectedTable> tables
-    ) {}
+            List<SelectedTable> tables) {
+    }
 
     /**
      * SUMMARY cho list booking restaurant (dùng cho Partner/User list).
-     * ✅ Canonical constructor (đầy đủ) khớp mapper mới.
-     * ✅ Có thêm constructor "cũ" để tương thích code cũ.
+     * Canonical constructor (đầy đủ) khớp mapper mới.
+     * Có thêm constructor "cũ" để tương thích code cũ.
      */
     public record RestaurantBookingSummaryDTO(
-        String code,
-
-        String restaurantId,
-        String restaurantName,
-        String restaurantSlug,
-
-        LocalDate reservationDate,
-        LocalTime reservationTime,
-        Integer durationMinutes,
-        Integer people,
-        Integer tablesCount,
-
-        String contactName,
-        String contactPhone,
-        String contactEmail,
-
-        BigDecimal totalAmount,
-        BigDecimal depositAmount,
-        BigDecimal amountPayable,
-        BigDecimal amountPaid,
-        String currencyCode,
-
-        String status,
-        String paymentStatus,
-
-        Instant createdAt,
-        Instant paidAt,
-        Instant cancelledAt,
-        String cancelReason
-    ) {
-        // ✅ Constructor cũ (giữ cho những chỗ đang dùng signature 11 params)
-        public RestaurantBookingSummaryDTO(
             String code,
+
+            String restaurantId,
             String restaurantName,
             String restaurantSlug,
+
             LocalDate reservationDate,
             LocalTime reservationTime,
+            Integer durationMinutes,
             Integer people,
             Integer tablesCount,
+
+            String contactName,
+            String contactPhone,
+            String contactEmail,
+
+            BigDecimal totalAmount,
+            BigDecimal depositAmount,
+            BigDecimal amountPayable,
+            BigDecimal amountPaid,
+            String currencyCode,
+
             String status,
             String paymentStatus,
+
             Instant createdAt,
-            Instant paidAt
-        ) {
+            Instant paidAt,
+            Instant cancelledAt,
+            String cancelReason) {
+        // Constructor cũ (giữ cho những chỗ đang dùng signature 11 params)
+        public RestaurantBookingSummaryDTO(
+                String code,
+                String restaurantName,
+                String restaurantSlug,
+                LocalDate reservationDate,
+                LocalTime reservationTime,
+                Integer people,
+                Integer tablesCount,
+                String status,
+                String paymentStatus,
+                Instant createdAt,
+                Instant paidAt) {
             this(
-                code,
-                null, restaurantName, restaurantSlug,
-                reservationDate, reservationTime, null, people, tablesCount,
-                null, null, null,
-                null, null, null, null, null,
-                status, paymentStatus,
-                createdAt, paidAt,
-                null, null
-            );
+                    code,
+                    null, restaurantName, restaurantSlug,
+                    reservationDate, reservationTime, null, people, tablesCount,
+                    null, null, null,
+                    null, null, null, null, null,
+                    status, paymentStatus,
+                    createdAt, paidAt,
+                    null, null);
         }
     }
 
     public record RestaurantBookingCreatedDTO(
-        String bookingCode,
-        String restaurantName,
-        String restaurantSlug,
-        LocalDate reservationDate,
-        LocalTime reservationTime,
-        Integer durationMinutes,
-        Integer people,
-        Integer tablesCount,
+            String bookingCode,
+            String restaurantName,
+            String restaurantSlug,
+            LocalDate reservationDate,
+            LocalTime reservationTime,
+            Integer durationMinutes,
+            Integer people,
+            Integer tablesCount,
 
-        String payOption,       // DEPOSIT
-        BigDecimal depositAmount,
-        BigDecimal amountPayable,
-        String currencyCode,
+            String payOption, // DEPOSIT
+            BigDecimal depositAmount,
+            BigDecimal amountPayable,
+            String currencyCode,
 
-        String paymentMethod,
-        String paymentUrl
-    ) {}
+            String paymentMethod,
+            String paymentUrl) {
+    }
 
     public record BookingTableLine(
-        Long id,
-        String tableTypeId,
-        String tableTypeName,
-        Integer seats,
-        Integer quantity,
-        BigDecimal depositPrice,
-        BigDecimal totalDeposit
-    ) {}
+            Long id,
+            String tableTypeId,
+            String tableTypeName,
+            Integer seats,
+            Integer quantity,
+            BigDecimal depositPrice,
+            BigDecimal totalDeposit) {
+    }
 
     public record RestaurantBookingDetailDTO(
-        Long id,
-        Instant createdAt,
-        String code,
-        Long userId,
-        String guestSessionId,
+            Long id,
+            Instant createdAt,
+            String code,
+            Long userId,
+            String guestSessionId,
 
-        String contactName,
-        String contactPhone,
-        String contactEmail,
-        String note,
+            String contactName,
+            String contactPhone,
+            String contactEmail,
+            String note,
 
-        String restaurantId,
-        String restaurantSlug,
-        String restaurantName,
+            String restaurantId,
+            String restaurantSlug,
+            String restaurantName,
 
-        LocalDate reservationDate,
-        LocalTime reservationTime,
-        Integer durationMinutes,
-        Integer people,
-        Integer tablesCount,
+            LocalDate reservationDate,
+            LocalTime reservationTime,
+            Integer durationMinutes,
+            Integer people,
+            Integer tablesCount,
 
-        String status,
-        String paymentStatus,
-        BigDecimal depositAmount,
-        BigDecimal amountPayable,
-        BigDecimal amountPaid,
-        Instant paidAt,
-        Instant cancelledAt,
-        String cancelReason,
+            String status,
+            String paymentStatus,
+            BigDecimal depositAmount,
+            BigDecimal amountPayable,
+            BigDecimal amountPaid,
+            Instant paidAt,
+            Instant cancelledAt,
+            String cancelReason,
 
-        Boolean inventoryDeducted,
-        List<BookingTableLine> tables
-    ) {}
+            Boolean inventoryDeducted,
+            List<BookingTableLine> tables) {
+    }
 }

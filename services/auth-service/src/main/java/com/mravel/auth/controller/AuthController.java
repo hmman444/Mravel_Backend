@@ -33,6 +33,8 @@ import com.mravel.common.response.UserProfileResponse;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -166,5 +168,26 @@ public class AuthController {
     public ResponseEntity<ApiResponse<JwtResponse>> partnerSocialLogin(@RequestBody SocialLoginRequest request) {
         JwtResponse jwt = authService.partnerSocialLogin(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập đối tác mạng xã hội thành công", jwt));
+    }
+
+    /**
+     * Debug endpoint: test SMTP connection and optionally send a test OTP to the provided email.
+     * Usage: GET /api/auth/internal/test-smtp or /api/auth/internal/test-smtp?email=you@domain
+     */
+    @GetMapping("/internal/test-smtp")
+    public ResponseEntity<ApiResponse<?>> testSmtp(@RequestParam(required = false) String email) {
+        boolean ok = authService.testSmtpConnection();
+        if (!ok) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("SMTP connection failed. Check MAIL_USERNAME and MAIL_PASSWORD (use Gmail App Password WITHOUT spaces)."));
+        }
+
+        if (email != null && !email.isBlank()) {
+            authService.sendTestOtp(email);
+            return ResponseEntity.ok(ApiResponse.success("SMTP OK. Test OTP sent (check inbox/spam).", null));
+        } else {
+            return ResponseEntity.ok(ApiResponse.success("SMTP OK. Provide ?email=you@domain to send a test OTP.", null));
+        }
     }
 }

@@ -15,15 +15,14 @@ public class PartnerBookingController {
 
     private final BookingPartnerClient bookingClient;
 
-    // ---------------- HOTEL BOOKINGS ----------------
+    // HOTEL BOOKINGS
 
     @GetMapping("/hotels")
     public ResponseEntity<ApiResponse<?>> listHotelBookings(
             @RequestHeader("Authorization") String bearer,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
-    ) {
+            @RequestParam(required = false) Integer size) {
         ResponseEntity<ApiResponse<?>> resp = bookingClient.listHotelBookings(status, page, size, bearer);
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
@@ -31,8 +30,7 @@ public class PartnerBookingController {
     @GetMapping("/hotels/{bookingCode}")
     public ResponseEntity<ApiResponse<?>> getHotelBookingDetail(
             @RequestHeader("Authorization") String bearer,
-            @PathVariable String bookingCode
-    ) {
+            @PathVariable String bookingCode) {
         ResponseEntity<ApiResponse<?>> resp = bookingClient.getHotelBookingDetail(bookingCode, bearer);
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
@@ -41,21 +39,19 @@ public class PartnerBookingController {
     public ResponseEntity<ApiResponse<?>> cancelHotelBooking(
             @RequestHeader("Authorization") String bearer,
             @PathVariable String bookingCode,
-            @Valid @RequestBody PartnerDtos.CancelBookingReq req
-    ) {
+            @Valid @RequestBody PartnerDtos.CancelBookingReq req) {
         ResponseEntity<ApiResponse<?>> resp = bookingClient.cancelHotelBooking(bookingCode, req, bearer);
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
 
-    // ---------------- RESTAURANT BOOKINGS ----------------
+    // RESTAURANT BOOKINGS
 
     @GetMapping("/restaurants")
     public ResponseEntity<ApiResponse<?>> listRestaurantBookings(
             @RequestHeader("Authorization") String bearer,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
-    ) {
+            @RequestParam(required = false) Integer size) {
         ResponseEntity<ApiResponse<?>> resp = bookingClient.listRestaurantBookings(status, page, size, bearer);
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
@@ -63,8 +59,7 @@ public class PartnerBookingController {
     @GetMapping("/restaurants/{bookingCode}")
     public ResponseEntity<ApiResponse<?>> getRestaurantBookingDetail(
             @RequestHeader("Authorization") String bearer,
-            @PathVariable String bookingCode
-    ) {
+            @PathVariable String bookingCode) {
         ResponseEntity<ApiResponse<?>> resp = bookingClient.getRestaurantBookingDetail(bookingCode, bearer);
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
@@ -73,8 +68,7 @@ public class PartnerBookingController {
     public ResponseEntity<ApiResponse<?>> cancelRestaurantBooking(
             @RequestHeader("Authorization") String bearer,
             @PathVariable String bookingCode,
-            @Valid @RequestBody PartnerDtos.CancelBookingReq req
-    ) {
+            @Valid @RequestBody PartnerDtos.CancelBookingReq req) {
         ResponseEntity<ApiResponse<?>> resp = bookingClient.cancelRestaurantBooking(bookingCode, req, bearer);
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }

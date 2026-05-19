@@ -17,6 +17,7 @@ public class BoardResponse {
     private List<ListDto> lists;
     private String thumbnail;
     private List<String> images;
+    private List<String> videos;
     private String description;
 
     private LocalDate startDate;
@@ -34,4 +35,6 @@ public class BoardResponse {
     private PlanCostSummaryDto costSummary;
 
     private PlanMemberCostSummaryDto memberCostSummary;
+
+    private Long boardRevision;
 }

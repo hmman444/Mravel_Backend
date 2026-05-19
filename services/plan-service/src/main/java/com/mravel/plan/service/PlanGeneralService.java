@@ -1,6 +1,9 @@
 package com.mravel.plan.service;
 
 import com.mravel.plan.dto.board.UpdateBudgetRequest;
+import com.mravel.plan.exception.BadRequestException;
+import com.mravel.plan.exception.NotFoundException;
+import com.mravel.plan.kafka.PlanIndexPublisher;
 import com.mravel.plan.model.*;
 import com.mravel.plan.repository.PlanListRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -12,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,18 +27,19 @@ public class PlanGeneralService {
     private final PlanPermissionService permission;
     private final PlanListRepository listRepo;
     private final PlanBoardService planBoardService;
+    private final PlanIndexPublisher planIndexPublisher;
 
     // helper
     private Plan loadPlan(Long planId) {
         return planRepo.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
     }
 
     private PlanList loadTrash(Long planId) {
         return listRepo.findByPlanIdOrderByPositionAsc(planId)
                 .stream().filter(l -> l.getType() == PlanListType.TRASH)
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Trash list missing"));
+                .orElseThrow(() -> new NotFoundException("Trash list missing"));
     }
 
     private List<PlanList> loadDayLists(Long planId) {
@@ -49,8 +55,10 @@ public class PlanGeneralService {
     public void updateTitle(Long planId, Long userId, String title) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setTitle(title);
-
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_TITLE_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("planTitle", title), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -59,8 +67,10 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setDescription(desc);
 
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_DESCRIPTION_UPDATED");
-
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("description", desc), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
@@ -69,7 +79,10 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setStatus(status);
 
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_STATUS_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("status", status.name()),
+                revision);
 
     }
 
@@ -79,24 +92,60 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
         loadPlan(planId).setThumbnail(url);
 
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_THUMBNAIL_UPDATED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("thumbnail", url), revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
     @Transactional
     @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void addImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
-        loadPlan(planId).getImages().add(url);
+        Plan plan = loadPlan(planId);
+        plan.getImages().add(url);
 
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_ADDED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()),
+                revision);
     }
 
     @Transactional
     @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
     public void removeImage(Long planId, Long userId, String url) {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
-        loadPlan(planId).getImages().remove(url);
+        Plan plan = loadPlan(planId);
+        plan.getImages().remove(url);
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_IMAGE_REMOVED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("images", plan.getImages()),
+                revision);
+    }
+
+    @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
+    public void addVideo(Long planId, Long userId, String url) {
+        permission.checkPermission(planId, userId, PlanRole.EDITOR);
+        Plan plan = loadPlan(planId);
+        plan.getVideos().add(url);
+
+        long revision = planBoardService.incrementBoardRevision(planId);
+        planBoardService.publishBoard(planId, userId, "PLAN_VIDEO_ADDED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("videos", plan.getVideos()),
+                revision);
+    }
+
+    @Transactional
+    @CacheEvict(value = "boardSnapshot", key = "#planId", beforeInvocation = true)
+    public void removeVideo(Long planId, Long userId, String url) {
+        permission.checkPermission(planId, userId, PlanRole.EDITOR);
+        Plan plan = loadPlan(planId);
+        plan.getVideos().remove(url);
+        long revision = planBoardService.incrementBoardRevision(planId);
+        planBoardService.publishBoard(planId, userId, "PLAN_VIDEO_REMOVED");
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", Map.of("videos", plan.getVideos()),
+                revision);
     }
 
     // logic update date
@@ -106,7 +155,7 @@ public class PlanGeneralService {
         permission.checkPermission(planId, userId, PlanRole.EDITOR);
 
         if (endNew.isBefore(startNew)) {
-            throw new RuntimeException("endDate must be >= startDate");
+            throw new BadRequestException("endDate must be >= startDate");
         }
 
         Plan plan = loadPlan(planId);
@@ -121,9 +170,9 @@ public class PlanGeneralService {
         boolean startChanged = !startNew.equals(startOld);
         boolean durationUnchanged = newCount == oldCount;
 
-        // -------------------------------------------------------------
+        //
         // CASE A — USER CHỈ ĐỔI startDate → GIỮ NGUYÊN duration
-        // -------------------------------------------------------------
+        //
         if (startChanged && durationUnchanged) {
 
             int shift = (int) (startNew.toEpochDay() - startOld.toEpochDay());
@@ -138,14 +187,17 @@ public class PlanGeneralService {
 
             trash.setPosition(oldCount);
 
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
-        // -------------------------------------------------------------
+        //
         // CASE B — LOGIC THAY ĐỔI endDate (tăng/giảm/tối ưu ngày)
         // (Toàn bộ các logic cũ giữ nguyên)
-        // -------------------------------------------------------------
+        //
 
         // CASE 1 — ÉP VỀ 1 NGÀY
         if (newCount == 1 && oldCount > 1) {
@@ -165,7 +217,10 @@ public class PlanGeneralService {
             plan.setEndDate(startNew);
             trash.setPosition(1);
 
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -182,7 +237,10 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
             return;
         }
 
@@ -212,7 +270,9 @@ public class PlanGeneralService {
             if (startChanged)
                 planBoardService.syncDayLists(plan);
 
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
             return;
         }
 
@@ -235,7 +295,10 @@ public class PlanGeneralService {
             plan.setEndDate(endNew);
             trash.setPosition(newCount);
 
+            long revision = planBoardService.incrementBoardRevision(planId);
             planBoardService.publishBoard(planId, userId, "PLAN_DATES_UPDATED");
+            planBoardService.emitV2Sync(planId, userId, revision);
+            planIndexPublisher.publishUpsert(planId);
         }
     }
 
@@ -250,10 +313,10 @@ public class PlanGeneralService {
         Long perPerson = req.getBudgetPerPerson();
 
         if (total != null && total < 0) {
-            throw new RuntimeException("budgetTotal must be >= 0");
+            throw new BadRequestException("budgetTotal must be >= 0");
         }
         if (perPerson != null && perPerson < 0) {
-            throw new RuntimeException("budgetPerPerson must be >= 0");
+            throw new BadRequestException("budgetPerPerson must be >= 0");
         }
 
         if (req.getBudgetCurrency() != null && !req.getBudgetCurrency().isBlank()) {
@@ -265,8 +328,15 @@ public class PlanGeneralService {
         if (perPerson != null) {
             plan.setBudgetPerPerson(perPerson);
         }
+        long revision = planBoardService.incrementBoardRevision(planId);
         planBoardService.publishBoard(planId, userId, "PLAN_BUDGET_UPDATED");
 
+        Map<String, Object> budgetPatch = new HashMap<>();
+        budgetPatch.put("budgetCurrency", plan.getBudgetCurrency());
+        budgetPatch.put("budgetTotal", plan.getBudgetTotal());
+        budgetPatch.put("budgetPerPerson", plan.getBudgetPerPerson());
+        planBoardService.emitV2Patch(planId, userId, "PLAN", planId, "UPDATE", budgetPatch, revision);
+        planIndexPublisher.publishUpsert(planId);
     }
 
 }

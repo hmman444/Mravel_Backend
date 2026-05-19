@@ -31,32 +31,32 @@ public class PartnerHotelService {
     private final UserServiceClient userServiceClient;
     private final IndexingService indexingService;
 
-    // ================= LIST giữ nguyên như bạn đang làm =================
+    // == LIST giữ nguyên như bạn đang làm ==
 
-    // ================= CREATE (FULL) =================
+    // == CREATE (FULL) ==
     public HotelDoc create(Long partnerId,
-                           PartnerCatalogDtos.PendingReason pendingReason,
-                           PartnerCatalogDtos.UpsertHotelReq req,
-                           String bearer) {
+            PartnerCatalogDtos.PendingReason pendingReason,
+            PartnerCatalogDtos.UpsertHotelReq req,
+            String bearer) {
 
         HotelDoc doc = new HotelDoc();
         doc.setActive(true);
         doc.setDeletedAt(null);
         doc.setCurrencyCode("VND");
 
-        // --- location ---
+        // location
         doc.setDestinationSlug(req.destinationSlug());
         doc.setCityName(req.cityName());
         doc.setDistrictName(req.districtName());
         doc.setWardName(req.wardName());
         doc.setAddressLine(req.addressLine());
         if (req.longitude() != null && req.latitude() != null) {
-            doc.setLocation(new double[]{req.longitude(), req.latitude()});
+            doc.setLocation(new double[] { req.longitude(), req.latitude() });
         } else {
             doc.setLocation(null);
         }
 
-        // --- basic ---
+        // basic
         doc.setName(req.name());
         String slugBase = (req.slug() != null && !req.slug().isBlank()) ? req.slug() : req.name();
         doc.setSlug(genUniqueSlugForCreate(slugBase));
@@ -69,16 +69,16 @@ public class PartnerHotelService {
         doc.setEmail(req.email());
         doc.setWebsite(req.website());
 
-        // --- check-in/out ---
+        // check-in/out
         doc.setDefaultCheckInTime(parseTimeOrNull(req.defaultCheckInTime()));
         doc.setDefaultCheckOutTime(parseTimeOrNull(req.defaultCheckOutTime()));
         doc.setHasOnlineCheckin(req.hasOnlineCheckin() != null && req.hasOnlineCheckin());
 
-        // --- media/content ---
+        // media/content
         doc.setImages(req.images() == null ? List.of() : mapImages(req.images()));
         doc.setContent(req.content() == null ? List.of() : mapContentBlocks(req.content()));
 
-        // --- amenities (hotel) ---
+        // amenities (hotel)
         if (req.amenityCodes() != null) {
             amenityCatalogService.validateCodes(AmenityScope.HOTEL, req.amenityCodes());
             doc.setAmenityCodes(normalizeCodes(req.amenityCodes()));
@@ -86,31 +86,31 @@ public class PartnerHotelService {
             doc.setAmenityCodes(List.of());
         }
 
-        // --- nearby/policy/info/faq ---
+        // nearby/policy/info/faq
         doc.setNearbyPlaces(req.nearbyPlaces() == null ? List.of() : mapNearbyPlaces(req.nearbyPlaces()));
         doc.setPolicy(mapPolicy(req.policy()));
         doc.setGeneralInfo(mapGeneralInfo(req.generalInfo()));
         doc.setFaqs(req.faqs() == null ? List.of() : mapFaqs(req.faqs()));
 
-        // --- taxConfig ---
+        // taxConfig
         doc.setTaxConfig(req.taxConfig() != null
-        ? mapTaxConfig(req.taxConfig())
-        : HotelDoc.TaxAndFeeConfig.builder()
-            .defaultVatPercent(new BigDecimal("8"))
-            .defaultServiceFeePercent(new BigDecimal("7"))
-            .showPricePreTax(true)
-            .build());
+                ? mapTaxConfig(req.taxConfig())
+                : HotelDoc.TaxAndFeeConfig.builder()
+                        .defaultVatPercent(new BigDecimal("8"))
+                        .defaultServiceFeePercent(new BigDecimal("7"))
+                        .showPricePreTax(true)
+                        .build());
 
         doc.setBookingConfig(req.bookingConfig() != null
                 ? mapBookingConfig(req.bookingConfig())
                 : HotelDoc.BookingConfig.builder()
-                    .allowFullPayment(true)
-                    .allowDeposit(true)
-                    .depositPercent(null)
-                    .freeCancelMinutes(null)
-                    .build());
+                        .allowFullPayment(true)
+                        .allowDeposit(true)
+                        .depositPercent(null)
+                        .freeCancelMinutes(null)
+                        .build());
 
-        // --- roomTypes ---
+        // roomTypes
         if (req.roomTypes() != null) {
             // validate ROOM codes
             List<String> roomCodes = req.roomTypes().stream()
@@ -127,7 +127,7 @@ public class PartnerHotelService {
         // recompute denormalized fields
         recomputeHotelAggregates(doc);
 
-        // --- publisher: enrich from user-service ---
+        // publisher: enrich from user-service
         var user = userServiceClient.getUserById(partnerId, bearer);
         HotelDoc.PublisherInfo pub = HotelDoc.PublisherInfo.builder()
                 .partnerId(String.valueOf(partnerId))
@@ -148,7 +148,8 @@ public class PartnerHotelService {
         doc.setModeration(mod);
 
         // currency default nếu null
-        if (doc.getCurrencyCode() == null) doc.setCurrencyCode("VND");
+        if (doc.getCurrencyCode() == null)
+            doc.setCurrencyCode("VND");
 
         HotelDoc saved = repo.save(doc);
         indexingService.syncHotel(saved);
@@ -161,8 +162,7 @@ public class PartnerHotelService {
         Pageable pageable = PageRequest.of(
                 page == null ? 0 : page,
                 size == null ? 20 : size,
-                Sort.by(Sort.Direction.DESC, "publisher.lastUpdatedAt")
-        );
+                Sort.by(Sort.Direction.DESC, "publisher.lastUpdatedAt"));
 
         if (status == null || status.isBlank()) {
             return repo.findByPublisher_PartnerIdAndDeletedAtIsNull(pid, pageable);
@@ -172,30 +172,30 @@ public class PartnerHotelService {
 
         return switch (st) {
             case "PENDING" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-                            pid, HotelDoc.HotelStatus.PENDING_REVIEW, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
+                        pid, HotelDoc.HotelStatus.PENDING_REVIEW, pageable);
 
             case "REJECTED" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-                            pid, HotelDoc.HotelStatus.REJECTED, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
+                        pid, HotelDoc.HotelStatus.REJECTED, pageable);
 
             case "ADMIN_BLOCKED" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
-                            pid, HotelDoc.HotelStatus.BLOCKED, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_Status(
+                        pid, HotelDoc.HotelStatus.BLOCKED, pageable);
 
             case "ACTIVE" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
-                            pid, HotelDoc.HotelStatus.APPROVED, true, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
+                        pid, HotelDoc.HotelStatus.APPROVED, true, pageable);
 
             case "PARTNER_PAUSED" ->
-                    repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
-                            pid, HotelDoc.HotelStatus.APPROVED, false, pageable);
+                repo.findByPublisher_PartnerIdAndDeletedAtIsNullAndModeration_StatusAndActive(
+                        pid, HotelDoc.HotelStatus.APPROVED, false, pageable);
 
             default -> throw new IllegalArgumentException("Invalid status: " + status);
         };
     }
 
-     public HotelDoc softDelete(String id, Long partnerId) {
+    public HotelDoc softDelete(String id, Long partnerId) {
         HotelDoc doc = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
         assertOwner(doc, partnerId);
@@ -266,19 +266,20 @@ public class PartnerHotelService {
         return doc;
     }
 
-    // ================= UPDATE (FULL) =================
+    // == UPDATE (FULL) ==
     public HotelDoc update(String id,
-                           Long partnerId,
-                           PartnerCatalogDtos.PendingReason pendingReason,
-                           PartnerCatalogDtos.UpsertHotelReq req,
-                           String bearer) {
+            Long partnerId,
+            PartnerCatalogDtos.PendingReason pendingReason,
+            PartnerCatalogDtos.UpsertHotelReq req,
+            String bearer) {
 
         HotelDoc doc = repo.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new IllegalArgumentException("Hotel not found"));
         assertOwner(doc, partnerId);
 
-        // --- basic ---
-        if (req.name() != null) doc.setName(req.name());
+        // basic
+        if (req.name() != null)
+            doc.setName(req.name());
 
         // slug: chỉ đổi nếu user gửi slug khác slug hiện tại
         if (req.slug() != null && !req.slug().isBlank()) {
@@ -291,57 +292,79 @@ public class PartnerHotelService {
         if (req.hotelType() != null && !req.hotelType().isBlank()) {
             doc.setHotelType(parseEnum(req.hotelType(), HotelDoc.HotelType.class, "hotelType"));
         }
-        if (req.starRating() != null) doc.setStarRating(req.starRating());
+        if (req.starRating() != null)
+            doc.setStarRating(req.starRating());
 
-        if (req.shortDescription() != null) doc.setShortDescription(req.shortDescription());
-        if (req.description() != null) doc.setDescription(req.description());
-        if (req.phone() != null) doc.setPhone(req.phone());
-        if (req.email() != null) doc.setEmail(req.email());
-        if (req.website() != null) doc.setWebsite(req.website());
+        if (req.shortDescription() != null)
+            doc.setShortDescription(req.shortDescription());
+        if (req.description() != null)
+            doc.setDescription(req.description());
+        if (req.phone() != null)
+            doc.setPhone(req.phone());
+        if (req.email() != null)
+            doc.setEmail(req.email());
+        if (req.website() != null)
+            doc.setWebsite(req.website());
 
-        // --- location ---
-        if (req.destinationSlug() != null) doc.setDestinationSlug(req.destinationSlug());
-        if (req.cityName() != null) doc.setCityName(req.cityName());
-        if (req.districtName() != null) doc.setDistrictName(req.districtName());
-        if (req.wardName() != null) doc.setWardName(req.wardName());
-        if (req.addressLine() != null) doc.setAddressLine(req.addressLine());
+        // location
+        if (req.destinationSlug() != null)
+            doc.setDestinationSlug(req.destinationSlug());
+        if (req.cityName() != null)
+            doc.setCityName(req.cityName());
+        if (req.districtName() != null)
+            doc.setDistrictName(req.districtName());
+        if (req.wardName() != null)
+            doc.setWardName(req.wardName());
+        if (req.addressLine() != null)
+            doc.setAddressLine(req.addressLine());
 
         if (req.longitude() != null && req.latitude() != null) {
-            doc.setLocation(new double[]{req.longitude(), req.latitude()});
+            doc.setLocation(new double[] { req.longitude(), req.latitude() });
         } else if (req.longitude() == null && req.latitude() == null) {
-            // giữ nguyên nếu FE không gửi (tuỳ rule); nếu muốn clear thì FE gửi explicit flag
+            // giữ nguyên nếu FE không gửi (tuỳ rule); nếu muốn clear thì FE gửi explicit
+            // flag
         }
 
-        // --- check-in/out ---
-        if (req.defaultCheckInTime() != null) doc.setDefaultCheckInTime(parseTimeOrNull(req.defaultCheckInTime()));
-        if (req.defaultCheckOutTime() != null) doc.setDefaultCheckOutTime(parseTimeOrNull(req.defaultCheckOutTime()));
-        if (req.hasOnlineCheckin() != null) doc.setHasOnlineCheckin(req.hasOnlineCheckin());
+        // check-in/out
+        if (req.defaultCheckInTime() != null)
+            doc.setDefaultCheckInTime(parseTimeOrNull(req.defaultCheckInTime()));
+        if (req.defaultCheckOutTime() != null)
+            doc.setDefaultCheckOutTime(parseTimeOrNull(req.defaultCheckOutTime()));
+        if (req.hasOnlineCheckin() != null)
+            doc.setHasOnlineCheckin(req.hasOnlineCheckin());
 
-        // --- media/content ---
-        if (req.images() != null) doc.setImages(mapImages(req.images()));
-        if (req.content() != null) doc.setContent(mapContentBlocks(req.content()));
+        // media/content
+        if (req.images() != null)
+            doc.setImages(mapImages(req.images()));
+        if (req.content() != null)
+            doc.setContent(mapContentBlocks(req.content()));
 
-        // --- amenities ---
+        // amenities
         if (req.amenityCodes() != null) {
             amenityCatalogService.validateCodes(AmenityScope.HOTEL, req.amenityCodes());
             doc.setAmenityCodes(req.amenityCodes() == null ? List.of() : normalizeCodes(req.amenityCodes()));
         }
 
-        // --- nearby/policy/info/faq ---
-        if (req.nearbyPlaces() != null) doc.setNearbyPlaces(mapNearbyPlaces(req.nearbyPlaces()));
-        if (req.policy() != null) doc.setPolicy(mapPolicy(req.policy()));
-        if (req.generalInfo() != null) doc.setGeneralInfo(mapGeneralInfo(req.generalInfo()));
-        if (req.faqs() != null) doc.setFaqs(mapFaqs(req.faqs()));
+        // nearby/policy/info/faq
+        if (req.nearbyPlaces() != null)
+            doc.setNearbyPlaces(mapNearbyPlaces(req.nearbyPlaces()));
+        if (req.policy() != null)
+            doc.setPolicy(mapPolicy(req.policy()));
+        if (req.generalInfo() != null)
+            doc.setGeneralInfo(mapGeneralInfo(req.generalInfo()));
+        if (req.faqs() != null)
+            doc.setFaqs(mapFaqs(req.faqs()));
 
-        // --- taxConfig ---
-        if (req.taxConfig() != null) doc.setTaxConfig(mapTaxConfig(req.taxConfig()));
+        // taxConfig
+        if (req.taxConfig() != null)
+            doc.setTaxConfig(mapTaxConfig(req.taxConfig()));
 
-        // --- bookingConfig ---
+        // bookingConfig
         if (req.bookingConfig() != null) {
             doc.setBookingConfig(mapBookingConfig(req.bookingConfig()));
         }
 
-        // --- roomTypes ---
+        // roomTypes
         if (req.roomTypes() != null) {
             List<String> roomCodes = req.roomTypes().stream()
                     .filter(Objects::nonNull)
@@ -358,7 +381,8 @@ public class PartnerHotelService {
         String pr = PartnerCatalogDtos.PendingReason.UPDATE.name();
 
         // update moderation
-        if (doc.getModeration() == null) doc.setModeration(new HotelDoc.ModerationInfo());
+        if (doc.getModeration() == null)
+            doc.setModeration(new HotelDoc.ModerationInfo());
         doc.getModeration().setStatus(HotelDoc.HotelStatus.PENDING_REVIEW);
         doc.getModeration().setPendingReason(pr);
         doc.getModeration().setRejectionReason(null);
@@ -376,15 +400,17 @@ public class PartnerHotelService {
         return saved;
     }
 
-    // ================= MAPPERS =================
+    // == MAPPERS ==
 
     private static LocalTime parseTimeOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
+        if (s == null || s.isBlank())
+            return null;
         return LocalTime.parse(s.trim());
     }
 
     private List<HotelDoc.Image> mapImages(List<PartnerCatalogDtos.ImageReq> images) {
-        if (images == null) return null;
+        if (images == null)
+            return null;
         List<HotelDoc.Image> list = images.stream()
                 .filter(Objects::nonNull)
                 .map((i) -> HotelDoc.Image.builder()
@@ -403,7 +429,8 @@ public class PartnerHotelService {
     }
 
     private List<HotelDoc.ContentBlock> mapContentBlocks(List<PartnerCatalogDtos.UpsertContentBlockReq> blocks) {
-        if (blocks == null) return null;
+        if (blocks == null)
+            return null;
 
         return blocks.stream()
                 .filter(Objects::nonNull)
@@ -430,7 +457,7 @@ public class PartnerHotelService {
 
                     // map
                     if (b.mapLon() != null && b.mapLat() != null) {
-                        cb.mapLocation(new double[]{b.mapLon(), b.mapLat()});
+                        cb.mapLocation(new double[] { b.mapLon(), b.mapLat() });
                     }
 
                     return cb.build();
@@ -439,7 +466,8 @@ public class PartnerHotelService {
     }
 
     private List<HotelDoc.NearbyPlace> mapNearbyPlaces(List<PartnerCatalogDtos.UpsertNearbyPlaceReq> nearby) {
-        if (nearby == null) return null;
+        if (nearby == null)
+            return null;
         return nearby.stream()
                 .filter(Objects::nonNull)
                 .map(n -> HotelDoc.NearbyPlace.builder()
@@ -452,7 +480,8 @@ public class PartnerHotelService {
     }
 
     private HotelDoc.HotelPolicy mapPolicy(PartnerCatalogDtos.UpsertHotelPolicyReq p) {
-        if (p == null) return null;
+        if (p == null)
+            return null;
 
         List<HotelDoc.PolicyItem> items = null;
         if (p.items() != null) {
@@ -474,7 +503,8 @@ public class PartnerHotelService {
     }
 
     private HotelDoc.GeneralInfo mapGeneralInfo(PartnerCatalogDtos.UpsertGeneralInfoReq gi) {
-        if (gi == null) return null;
+        if (gi == null)
+            return null;
         return HotelDoc.GeneralInfo.builder()
                 .mainFacilitiesSummary(gi.mainFacilitiesSummary())
                 .distanceToCityCenterKm(gi.distanceToCityCenterKm())
@@ -487,7 +517,8 @@ public class PartnerHotelService {
     }
 
     private List<HotelDoc.FaqItem> mapFaqs(List<PartnerCatalogDtos.UpsertFaqReq> faqs) {
-        if (faqs == null) return null;
+        if (faqs == null)
+            return null;
         return faqs.stream()
                 .filter(Objects::nonNull)
                 .map(f -> HotelDoc.FaqItem.builder()
@@ -498,7 +529,8 @@ public class PartnerHotelService {
     }
 
     private HotelDoc.TaxAndFeeConfig mapTaxConfig(PartnerCatalogDtos.UpsertTaxConfigReq tc) {
-        if (tc == null) return null;
+        if (tc == null)
+            return null;
         return HotelDoc.TaxAndFeeConfig.builder()
                 .defaultVatPercent(tc.defaultVatPercent())
                 .defaultServiceFeePercent(tc.defaultServiceFeePercent())
@@ -507,7 +539,8 @@ public class PartnerHotelService {
     }
 
     private HotelDoc.BookingConfig mapBookingConfig(PartnerCatalogDtos.UpsertBookingConfigReq bc) {
-        if (bc == null) return null;
+        if (bc == null)
+            return null;
         return HotelDoc.BookingConfig.builder()
                 .allowFullPayment(bc.allowFullPayment() == null ? true : bc.allowFullPayment())
                 .allowDeposit(bc.allowDeposit() == null ? true : bc.allowDeposit())
@@ -537,9 +570,9 @@ public class PartnerHotelService {
 
                     List<HotelDoc.RatePlan> rps = (rt.ratePlans() == null) ? List.of()
                             : rt.ratePlans().stream()
-                            .filter(Objects::nonNull)
-                            .map(this::mapRatePlan)
-                            .toList();
+                                    .filter(Objects::nonNull)
+                                    .map(this::mapRatePlan)
+                                    .toList();
 
                     return HotelDoc.RoomType.builder()
                             .id(rtId)
@@ -607,7 +640,8 @@ public class PartnerHotelService {
                 .build();
     }
 
-    // ===== recompute denormalized (minNightlyPrice/referenceNightlyPrice/filterFacets) =====
+    // recompute denormalized
+    // (minNightlyPrice/referenceNightlyPrice/filterFacets)
     private void recomputeHotelAggregates(HotelDoc doc) {
         BigDecimal min = null;
         BigDecimal refMin = null;
@@ -618,25 +652,34 @@ public class PartnerHotelService {
 
         if (doc.getRoomTypes() != null) {
             for (var rt : doc.getRoomTypes()) {
-                if (rt == null || rt.getRatePlans() == null) continue;
+                if (rt == null || rt.getRatePlans() == null)
+                    continue;
                 for (var rp : rt.getRatePlans()) {
-                    if (rp == null) continue;
+                    if (rp == null)
+                        continue;
 
                     BigDecimal p = rp.getPricePerNight();
-                    if (p != null) min = (min == null) ? p : min.min(p);
+                    if (p != null)
+                        min = (min == null) ? p : min.min(p);
 
                     BigDecimal r = rp.getReferencePricePerNight();
-                    if (r != null) refMin = (refMin == null) ? r : refMin.min(r);
+                    if (r != null)
+                        refMin = (refMin == null) ? r : refMin.min(r);
 
-                    if (Boolean.TRUE.equals(rp.getRefundable())) hasFreeCancel = true;
-                    if (rp.getPaymentType() == HotelDoc.PaymentType.PAY_AT_HOTEL) hasPayAtHotel = true;
-                    if (rp.getBoardType() != null && rp.getBoardType() != HotelDoc.BoardType.ROOM_ONLY) hasBreakfast = true;
+                    if (Boolean.TRUE.equals(rp.getRefundable()))
+                        hasFreeCancel = true;
+                    if (rp.getPaymentType() == HotelDoc.PaymentType.PAY_AT_HOTEL)
+                        hasPayAtHotel = true;
+                    if (rp.getBoardType() != null && rp.getBoardType() != HotelDoc.BoardType.ROOM_ONLY)
+                        hasBreakfast = true;
                 }
             }
         }
 
-        if (min != null) doc.setMinNightlyPrice(min);
-        if (refMin != null) doc.setReferenceNightlyPrice(refMin);
+        if (min != null)
+            doc.setMinNightlyPrice(min);
+        if (refMin != null)
+            doc.setReferenceNightlyPrice(refMin);
 
         doc.setFilterFacets(HotelDoc.HotelFilterFacets.builder()
                 .hasFreeCancellation(hasFreeCancel)
@@ -645,9 +688,10 @@ public class PartnerHotelService {
                 .build());
     }
 
-    // ================= UTIL =================
+    // == UTIL ==
     private static List<String> normalizeCodes(List<String> codes) {
-        if (codes == null) return null;
+        if (codes == null)
+            return null;
         return codes.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
@@ -662,7 +706,8 @@ public class PartnerHotelService {
     }
 
     private static <E extends Enum<E>> E parseEnum(String s, Class<E> cls, String fieldName) {
-        if (s == null || s.isBlank()) return null;
+        if (s == null || s.isBlank())
+            return null;
         try {
             return Enum.valueOf(cls, s.trim().toUpperCase(Locale.ROOT));
         } catch (Exception e) {
@@ -691,7 +736,7 @@ public class PartnerHotelService {
         }
     }
 
-    // ===== slug utils =====
+    // slug utils
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
@@ -724,10 +769,13 @@ public class PartnerHotelService {
     }
 
     private static void requireNotBlank(String v, String field) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException(field + " is required");
+        if (v == null || v.isBlank())
+            throw new IllegalArgumentException(field + " is required");
     }
+
     private static void rejectBlankIfPresent(String v, String field) {
-        if (v != null && v.isBlank()) throw new IllegalArgumentException(field + " must not be blank");
+        if (v != null && v.isBlank())
+            throw new IllegalArgumentException(field + " must not be blank");
     }
 
     private void validateForCreate(PartnerCatalogDtos.UpsertHotelReq req) {

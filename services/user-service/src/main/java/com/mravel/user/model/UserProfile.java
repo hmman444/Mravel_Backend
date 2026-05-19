@@ -25,7 +25,7 @@ public class UserProfile {
     private String avatar;
     private String provider; // local, google, facebook
 
-    // -------- Thông tin cá nhân --------
+    // Thông tin cá nhân
     @Enumerated(EnumType.STRING)
     private Gender gender; // MALE, FEMALE, OTHER, UNKNOWN
 
@@ -35,16 +35,16 @@ public class UserProfile {
     private String country;
     private String addressLine;
 
-    // -------- Email liên hệ phụ --------
+    // Email liên hệ phụ
     private String secondaryEmail;
     private String tertiaryEmail;
 
-    // -------- Số điện thoại --------
+    // Số điện thoại
     private String phone1;
     private String phone2;
     private String phone3;
 
-    // -------- Membership & cài đặt --------
+    // Membership & cài đặt
     @Enumerated(EnumType.STRING)
     private MembershipTier membershipTier; // BRONZE, SILVER, GOLD, PLATINUM
 
@@ -60,5 +60,5 @@ public class UserProfile {
     private String hometown;
     private String occupation;
 
-    private String role; 
+    private String role;
 }

@@ -9,13 +9,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(
-    name = "bookings",
-    indexes = {
+@Table(name = "bookings", indexes = {
         @Index(name = "idx_booking_guest_sid", columnList = "guest_session_id"),
         @Index(name = "idx_booking_user_id", columnList = "user_id")
-    }
-)
+})
 @Inheritance(strategy = InheritanceType.JOINED)
 @Getter
 @Setter
@@ -30,7 +27,7 @@ public abstract class BookingBase extends BaseEntity {
     @Column(name = "user_id")
     private Long userId;
 
-    // ✅ NEW: guest session id (cookie)
+    // NEW: guest session id (cookie)
     @Column(name = "guest_session_id", length = 64)
     private String guestSessionId;
 
@@ -93,7 +90,15 @@ public abstract class BookingBase extends BaseEntity {
     @Column(name = "active_payment_method", length = 30)
     private Payment.PaymentMethod activePaymentMethod;
 
-    public enum PayOption { FULL, DEPOSIT }
-    public enum BookingStatus {PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, CANCELLED_BY_PARTNER, CANCELLED_BY_GUEST, COMPLETED, REFUNDED}
-    public enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED, PARTIAL_REFUNDED }
+    public enum PayOption {
+        FULL, DEPOSIT
+    }
+
+    public enum BookingStatus {
+        PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, CANCELLED_BY_PARTNER, CANCELLED_BY_GUEST, COMPLETED, REFUNDED
+    }
+
+    public enum PaymentStatus {
+        PENDING, SUCCESS, FAILED, REFUNDED, PARTIAL_REFUNDED
+    }
 }

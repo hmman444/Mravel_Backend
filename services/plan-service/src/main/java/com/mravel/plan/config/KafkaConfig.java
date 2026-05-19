@@ -17,4 +17,9 @@ public class KafkaConfig {
     public NewTopic planBoardEventsTopic() {
         return new NewTopic(KafkaTopics.PLAN_BOARD_EVENTS, 1, (short) 1);
     }
+
+    @Bean
+    public NewTopic planBoardEventsV2Topic() {
+        return new NewTopic(KafkaTopics.PLAN_BOARD_EVENTS_V2, 1, (short) 1);
+    }
 }

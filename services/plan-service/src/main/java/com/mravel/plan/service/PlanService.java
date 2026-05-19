@@ -4,20 +4,30 @@ import com.mravel.common.response.RelationshipType;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.plan.client.FriendClient;
 import com.mravel.plan.client.UserProfileClient;
+import com.mravel.plan.document.PlanDocument;
 import com.mravel.plan.dto.CreatePlanRequest;
 import com.mravel.plan.dto.PlanFeedItem;
+import com.mravel.plan.kafka.PlanIndexPublisher;
 import com.mravel.plan.dto.board.PlanRecentView;
+import com.mravel.plan.exception.BadRequestException;
+import com.mravel.plan.exception.ForbiddenException;
+import com.mravel.plan.exception.NotFoundException;
+import com.mravel.plan.model.Destination;
 import com.mravel.plan.model.ExtraCost;
 import com.mravel.plan.model.Plan;
 import com.mravel.plan.model.PlanCard;
 import com.mravel.plan.model.PlanComment;
 import com.mravel.plan.model.PlanList;
 import com.mravel.plan.model.PlanListType;
+import com.mravel.plan.dto.CommentReactionResponse;
+import com.mravel.plan.model.PlanCommentReaction;
 import com.mravel.plan.model.PlanReaction;
 import com.mravel.plan.model.SplitType;
 import com.mravel.plan.model.Visibility;
 import com.mravel.plan.repository.PlanCardRepository;
+import com.mravel.plan.repository.PlanCommentReactionRepository;
 import com.mravel.plan.repository.PlanInviteTokenRepository;
+import com.mravel.plan.repository.PlanEsRepository;
 import com.mravel.plan.repository.PlanReactionRepository;
 import com.mravel.plan.repository.PlanRecentViewRepository;
 import com.mravel.plan.repository.PlanRepository;
@@ -42,6 +52,7 @@ public class PlanService {
 
         private final PlanRepository planRepository;
         private final PlanReactionRepository reactionRepository;
+        private final PlanCommentReactionRepository commentReactionRepository;
         private final PlanMapper planMapper;
         private final PlanPermissionService permissionService;
         private final UserProfileClient userProfileClient;
@@ -53,6 +64,8 @@ public class PlanService {
         private final CurrentUserService currentUser;
         private final FriendClient friendClient;
         private final PlanNotificationService planNotificationService;
+        private final PlanIndexPublisher planIndexPublisher;
+        private final PlanEsRepository planEsRepository;
 
         // EntityManager để truy vấn trực tiếp cho comment
         @PersistenceContext
@@ -81,7 +94,7 @@ public class PlanService {
                                 pageable);
 
                 List<PlanFeedItem> content = pageResult.getContent().stream()
-                                .map(planMapper::toFeedItem)
+                                .map(p -> planMapper.toFeedItem(p, viewerId))
                                 .toList();
 
                 return new PageImpl<>(content, pageable, pageResult.getTotalElements());
@@ -127,7 +140,7 @@ public class PlanService {
                 Page<Plan> pageResult = planRepository.findFeedForUser(viewerId, memberPlanIds, friendIds, pageable);
 
                 List<PlanFeedItem> content = pageResult.getContent().stream()
-                                .map(planMapper::toFeedItem)
+                                .map(p -> planMapper.toFeedItem(p, viewerId))
                                 .toList();
 
                 return new PageImpl<>(content, pageable, pageResult.getTotalElements());
@@ -138,7 +151,7 @@ public class PlanService {
                 Long viewerId = currentUser.getId();
 
                 Plan plan = planRepository.findById(id)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 RelationshipType relationship = friendClient.getRelationship(
                                 authorizationHeader,
@@ -147,20 +160,20 @@ public class PlanService {
                 boolean isFriend = relationship == RelationshipType.FRIEND;
 
                 if (!permissionService.canView(id, viewerId, isFriend)) {
-                        throw new RuntimeException("You don't have permission to view this plan.");
+                        throw new ForbiddenException("You don't have permission to view this plan.");
                 }
 
-                return planMapper.toFeedItem(plan);
+                return planMapper.toFeedItem(plan, viewerId);
         }
 
         @Transactional
         public PlanFeedItem createPlan(CreatePlanRequest req, Long userId) {
 
                 if (req.getStartDate() == null || req.getEndDate() == null)
-                        throw new RuntimeException("Start and end date are required");
+                        throw new BadRequestException("Start and end date are required");
 
                 if (req.getEndDate().isBefore(req.getStartDate()))
-                        throw new RuntimeException("endDate must be >= startDate");
+                        throw new BadRequestException("endDate must be >= startDate");
 
                 int days = (int) (req.getEndDate().toEpochDay() - req.getStartDate().toEpochDay() + 1);
 
@@ -213,6 +226,7 @@ public class PlanService {
                                                 .build());
 
                 permissionService.ensureOwner(plan.getId(), userId);
+                planIndexPublisher.publishUpsert(plan.getId());
 
                 return planMapper.toFeedItem(plan);
         }
@@ -220,51 +234,75 @@ public class PlanService {
         @Transactional
         public PlanFeedItem updateVisibility(Long planId, Long userId, Visibility visibility) {
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 if (!userId.equals(plan.getAuthorId()))
-                        throw new RuntimeException("Only the owner can change visibility.");
+                        throw new ForbiddenException("Only the owner can change visibility.");
 
                 plan.setVisibility(visibility);
                 planRepository.save(plan);
+                planIndexPublisher.publishUpsert(planId);
                 return planMapper.toFeedItem(plan);
         }
 
         @Transactional
-        public PlanFeedItem copyPlan(Long planId, Long userId) {
+        public PlanFeedItem copyPlan(Long planId, Long userId, String authorizationHeader) {
 
                 Plan source = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 boolean isMember = memberRepository.existsByPlanIdAndUserId(planId, userId);
 
-                if (source.getVisibility() != Visibility.PUBLIC && !isMember) {
-                        throw new RuntimeException("You don't have permission to copy this plan.");
+                boolean isFriend = false;
+                if (authorizationHeader != null) {
+                        try {
+                                RelationshipType relationship = friendClient.getRelationship(
+                                                authorizationHeader,
+                                                source.getAuthorId());
+                                isFriend = (relationship == RelationshipType.FRIEND);
+                        } catch (Exception ignored) {
+                        }
                 }
-                // Tạo plan mới
+
+                // CÁCH B: Ai xem được thì copy được
+                // - PUBLIC: ai cũng xem/copy
+                // - FRIENDS: bạn bè xem/copy
+                // - PRIVATE: chỉ member/owner xem/copy
+                if (!permissionService.canView(planId, userId, isFriend) && !isMember) {
+                        throw new ForbiddenException("You don't have permission to copy this plan.");
+                }
+
+                // TẠO PLAN MỚI
                 Plan copy = Plan.builder()
                                 .title(source.getTitle() + " (Copy)")
                                 .description(source.getDescription())
-                                .visibility(Visibility.PRIVATE)
+                                .visibility(Visibility.PRIVATE) // copy về PRIVATE
                                 .authorId(userId)
                                 .startDate(source.getStartDate())
                                 .endDate(source.getEndDate())
                                 .days(source.getDays())
+
                                 .budgetCurrency(source.getBudgetCurrency())
                                 .budgetTotal(source.getBudgetTotal())
                                 .budgetPerPerson(source.getBudgetPerPerson())
+
                                 .createdAt(Instant.now())
                                 .views(0L)
-                                // Tổng chi phí sẽ tính lại sau hoặc để 0
+
                                 .totalEstimatedCost(0L)
                                 .totalActualCost(0L)
-                                .images(new ArrayList<>(source.getImages()))
-                                .destinations(new ArrayList<>(source.getDestinations()))
+
+                                .images(source.getImages() != null ? new ArrayList<>(source.getImages())
+                                                : new ArrayList<>())
+                                .destinations(source.getDestinations() != null
+                                                ? new ArrayList<>(source.getDestinations())
+                                                : new ArrayList<>())
                                 .build();
 
                 planRepository.save(copy);
                 permissionService.ensureOwner(copy.getId(), userId);
 
+                // COPY LISTS (DAY) + CARDS
                 List<PlanList> sourceLists = listRepository.findByPlanIdOrderByPositionAsc(source.getId());
 
                 List<PlanList> sourceDays = sourceLists.stream()
@@ -272,30 +310,29 @@ public class PlanService {
                                 .sorted(Comparator.comparingInt(PlanList::getPosition))
                                 .toList();
 
-                Map<Long, PlanList> oldToNewList = new HashMap<>();
-
                 for (int i = 0; i < sourceDays.size(); i++) {
-                        PlanList src = sourceDays.get(i);
+                        PlanList srcList = sourceDays.get(i);
 
-                        PlanList dst = PlanList.builder()
+                        PlanList dstList = PlanList.builder()
                                         .plan(copy)
                                         .type(PlanListType.DAY)
                                         .position(i)
-                                        .title(src.getTitle())
+                                        .title(srcList.getTitle())
                                         .dayDate(copy.getStartDate().plusDays(i))
                                         .build();
 
-                        listRepository.save(dst);
-                        oldToNewList.put(src.getId(), dst);
+                        // save(...) can return a managed instance different from the transient input
+                        // (especially when Spring Data routes to merge). Always use returned entity.
+                        PlanList savedDstList = listRepository.save(dstList);
 
                         // copy cards
-                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(src.getId());
+                        List<PlanCard> srcCards = cardRepository.findByListIdOrderByPositionAsc(srcList.getId());
                         for (int c = 0; c < srcCards.size(); c++) {
 
                                 PlanCard oc = srcCards.get(c);
 
                                 PlanCard nc = PlanCard.builder()
-                                                .list(dst)
+                                                .list(savedDstList)
                                                 .text(oc.getText())
                                                 .description(oc.getDescription())
                                                 .startTime(oc.getStartTime())
@@ -309,9 +346,11 @@ public class PlanService {
 
                                                 .currencyCode(oc.getCurrencyCode())
                                                 .estimatedCost(oc.getEstimatedCost())
-                                                // Reset actual về null, để tính lại sau
+
+                                                // reset actual để người copy tự nhập lại
                                                 .actualCost(null)
                                                 .actualManual(false)
+
                                                 .budgetAmount(oc.getBudgetAmount())
                                                 .participantCount(null)
 
@@ -321,26 +360,32 @@ public class PlanService {
                                                 .payerId(null)
                                                 .build();
 
-                                oc.getExtraCosts().forEach(e -> nc.getExtraCosts().add(
-                                                ExtraCost.builder()
-                                                                .reason(e.getReason())
-                                                                .type(e.getType())
-                                                                .estimatedAmount(e.getEstimatedAmount())
-                                                                .actualAmount(e.getActualAmount())
-                                                                .build()));
+                                // copy extraCosts (giữ nguyên như bạn đang làm)
+                                if (oc.getExtraCosts() != null) {
+                                        oc.getExtraCosts().forEach(e -> nc.getExtraCosts().add(
+                                                        ExtraCost.builder()
+                                                                        .reason(e.getReason())
+                                                                        .type(e.getType())
+                                                                        .estimatedAmount(e.getEstimatedAmount())
+                                                                        .actualAmount(e.getActualAmount())
+                                                                        .build()));
+                                }
 
                                 cardRepository.save(nc);
                         }
                 }
 
-                // trash mới
+                // TRASH LIST
                 listRepository.save(
                                 PlanList.builder()
                                                 .plan(copy)
                                                 .type(PlanListType.TRASH)
                                                 .position(sourceDays.size())
                                                 .title("Trash")
+                                                .dayDate(null)
                                                 .build());
+
+                planIndexPublisher.publishUpsert(copy.getId());
 
                 return planMapper.toFeedItem(copy);
         }
@@ -353,13 +398,13 @@ public class PlanService {
                         Long parentId) {
 
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 PlanComment parent = null;
                 if (parentId != null) {
                         parent = entityManager.find(PlanComment.class, parentId);
                         if (parent == null)
-                                throw new RuntimeException("Parent comment not found");
+                                throw new NotFoundException("Parent comment not found");
                 }
 
                 PlanComment comment = PlanComment.builder()
@@ -413,12 +458,12 @@ public class PlanService {
         @Transactional
         public PlanFeedItem react(Long planId, String key, Long userId) {
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 // Gọi sang user-service lấy thông tin user
                 UserProfileResponse user = userProfileClient.getUserById(userId);
                 if (user == null)
-                        throw new RuntimeException("User not found: " + userId);
+                        throw new NotFoundException("User not found: " + userId);
 
                 Optional<PlanReaction> existingOpt = reactionRepository.findByPlanIdAndUserId(planId, userId);
                 boolean created = false;
@@ -448,9 +493,83 @@ public class PlanService {
                 return planMapper.toFeedItem(plan);
         }
 
+        @Transactional
+        public CommentReactionResponse reactComment(Long commentId, String type, Long userId) {
+                PlanComment comment = entityManager.find(PlanComment.class, commentId);
+                if (comment == null)
+                        throw new NotFoundException("Comment not found");
+
+                Optional<PlanCommentReaction> existingOpt =
+                        commentReactionRepository.findByComment_IdAndUserId(commentId, userId);
+
+                boolean created = false;
+                if (existingOpt.isPresent()) {
+                        PlanCommentReaction existing = existingOpt.get();
+                        if (existing.getType().equals(type)) {
+                                // Same type → toggle off
+                                commentReactionRepository.delete(existing);
+                        } else {
+                                // Different type → change reaction
+                                existing.setType(type);
+                                commentReactionRepository.save(existing);
+                                created = true;
+                        }
+                } else {
+                        PlanCommentReaction newReaction = PlanCommentReaction.builder()
+                                        .comment(comment)
+                                        .userId(userId)
+                                        .type(type)
+                                        .createdAt(Instant.now())
+                                        .build();
+                        commentReactionRepository.save(newReaction);
+                        created = true;
+                }
+
+                if (created) {
+                        planNotificationService.notifyCommentReact(
+                                        userId,
+                                        comment.getUserId(),
+                                        comment.getPlan().getId(),
+                                        commentId,
+                                        type);
+                }
+
+                // Build fresh summary
+                List<PlanCommentReaction> all = commentReactionRepository.findByComment_Id(commentId);
+                Map<String, Long> summary = all.stream()
+                                .collect(Collectors.groupingBy(PlanCommentReaction::getType, Collectors.counting()));
+                String myReaction = all.stream()
+                                .filter(r -> userId.equals(r.getUserId()))
+                                .findFirst()
+                                .map(PlanCommentReaction::getType)
+                                .orElse(null);
+
+                List<PlanFeedItem.ReactionUser> reactionUsers = all.stream()
+                                .map(r -> {
+                                        UserProfileResponse profile = null;
+                                        try {
+                                                profile = userProfileClient.getUserById(r.getUserId());
+                                        } catch (Exception ignored) {}
+                                        return PlanFeedItem.ReactionUser.builder()
+                                                        .userId(r.getUserId())
+                                                        .userName(profile != null ? profile.getFullname() : null)
+                                                        .userAvatar(profile != null ? profile.getAvatar() : null)
+                                                        .type(r.getType())
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                return CommentReactionResponse.builder()
+                                .commentId(commentId)
+                                .reactions(summary)
+                                .myReaction(myReaction)
+                                .reactionUsers(reactionUsers)
+                                .build();
+        }
+
         public void increaseView(Long planId) {
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 plan.setViews(Optional.ofNullable(plan.getViews()).orElse(0L) + 1);
                 planRepository.save(plan);
@@ -482,7 +601,7 @@ public class PlanService {
                 }
 
                 List<PlanFeedItem> items = plans.getContent().stream()
-                                .map(planMapper::toFeedItem)
+                                .map(p -> planMapper.toFeedItem(p, viewerId))
                                 .toList();
 
                 return new PageImpl<>(items, pageable, plans.getTotalElements());
@@ -531,7 +650,7 @@ public class PlanService {
                         if (!permissionService.canView(p.getId(), viewerId, isFriend))
                                 continue;
 
-                        result.add(planMapper.toFeedItem(p));
+                        result.add(planMapper.toFeedItem(p, viewerId));
                 }
 
                 return result;
@@ -548,17 +667,128 @@ public class PlanService {
         public void deletePlan(Long planId, Long userId) {
                 inviteTokenRepository.deleteByPlanId(planId);
                 Plan plan = planRepository.findById(planId)
-                                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
 
                 if (!Objects.equals(plan.getAuthorId(), userId)) {
-                        throw new RuntimeException("Only the owner can delete this plan.");
+                        throw new ForbiddenException("Only the owner can delete this plan.");
                 }
 
                 recentViewRepository.deleteByPlanId(planId);
 
                 planRepository.delete(plan);
-
                 planRepository.flush();
+
+                // Remove from Elasticsearch index
+                planIndexPublisher.publishDelete(planId);
         }
 
+        // ─ helpers exposed to PlanController ─
+
+        /** Returns plan IDs where viewerId is a non-owner member (empty-safe). */
+        public List<Long> getMemberPlanIds(Long viewerId) {
+                if (viewerId == null)
+                        return List.of(-1L);
+                List<Long> ids = memberRepository.findPlanIdsByUserId(viewerId);
+                return ids.isEmpty() ? List.of(-1L) : ids;
+        }
+
+        /** Fetches friend IDs from friend-service; returns empty list on failure. */
+        public List<Long> getFriendIds(String authorizationHeader) {
+                if (authorizationHeader == null)
+                        return List.of();
+                try {
+                        List<Long> ids = friendClient.getFriendIds(authorizationHeader);
+                        return ids == null || ids.isEmpty() ? List.of() : ids;
+                } catch (Exception ignored) {
+                        return List.of();
+                }
+        }
+
+        /**
+         * Converts a PlanDocument (from ES) back into a PlanFeedItem by loading the
+         * full Plan from MySQL. Falls back to a lightweight DTO if the plan is missing.
+         */
+        public PlanFeedItem toFeedItemFromDocument(PlanDocument doc) {
+                try {
+                        Long planId = Long.parseLong(doc.getId());
+                        return planRepository.findById(planId)
+                                        .map(planMapper::toFeedItem)
+                                        .orElse(documentToLightweightFeedItem(doc));
+                } catch (NumberFormatException e) {
+                        return documentToLightweightFeedItem(doc);
+                }
+        }
+
+        /**
+         * Lightweight mapping from PlanDocument when the MySQL record is unavailable.
+         */
+        private PlanFeedItem documentToLightweightFeedItem(PlanDocument doc) {
+                return PlanFeedItem.builder()
+                                .id(Long.parseLong(doc.getId()))
+                                .title(doc.getTitle())
+                                .description(doc.getDescription())
+                                .visibility(doc.getVisibility())
+                                .views(doc.getViews() != null ? doc.getViews() : 0L)
+                                .startDate(doc.getStartDate() != null ? doc.getStartDate().toString() : null)
+                                .endDate(doc.getEndDate() != null ? doc.getEndDate().toString() : null)
+                                .days(doc.getDays() != null ? doc.getDays() : 0)
+                                .createdAt(doc.getCreatedAt())
+                                .budgetTotal(doc.getBudgetTotal())
+                                .budgetCurrency(doc.getBudgetCurrency() != null ? doc.getBudgetCurrency() : "VND")
+                                .thumbnail(doc.getThumbnail())
+                                .images(List.of())
+                                .destinations(doc.getDestinationNames() == null ? List.of()
+                                                : doc.getDestinationNames().stream()
+                                                                .map(n -> PlanFeedItem.Destination.builder().name(n)
+                                                                                .build())
+                                                                .toList())
+                                .reactions(Map.of())
+                                .reactionUsers(List.of())
+                                .comments(List.of())
+                                .build();
+        }
+
+        /**
+         * Đồng bộ thủ công 100% dữ liệu từ MySQL sang Elasticsearch
+         */
+        @Transactional
+        public void syncAllToElasticsearch() {
+                List<Plan> allPlans = planRepository.findAll();
+                List<PlanDocument> docs = new ArrayList<>();
+
+                for (Plan plan : allPlans) {
+                        List<String> destNames = plan.getDestinations() == null
+                                        ? Collections.emptyList()
+                                        : plan.getDestinations().stream()
+                                                        .map(Destination::getName)
+                                                        .filter(n -> n != null && !n.isBlank())
+                                                        .toList();
+
+                        PlanDocument doc = PlanDocument.builder()
+                                        .id(String.valueOf(plan.getId()))
+                                        .title(plan.getTitle())
+                                        .titleRaw(plan.getTitle())
+                                        .description(plan.getDescription())
+                                        .descriptionRaw(plan.getDescription())
+                                        .visibility(plan.getVisibility() != null ? plan.getVisibility().name()
+                                                        : "PRIVATE")
+                                        .authorId(plan.getAuthorId())
+                                        .views(plan.getViews() != null ? plan.getViews() : 0L)
+                                        .startDate(plan.getStartDate())
+                                        .endDate(plan.getEndDate())
+                                        .days(plan.getDays())
+                                        .budgetTotal(plan.getBudgetTotal())
+                                        .budgetCurrency(plan.getBudgetCurrency())
+                                        .createdAt(plan.getCreatedAt())
+                                        .destinationNames(destNames)
+                                        .thumbnail(plan.getThumbnail())
+                                        .build();
+
+                        docs.add(doc);
+                }
+
+                if (!docs.isEmpty()) {
+                        planEsRepository.saveAll(docs);
+                }
+        }
 }

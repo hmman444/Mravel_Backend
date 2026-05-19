@@ -9,7 +9,7 @@ import com.mravel.catalog.dto.hotel.HotelDtos.AmenityDTO;
 
 public class RestaurantDtos {
 
-        // ================== SUMMARY (LIST / SEARCH RESULT) ==================
+        // SUMMARY (LIST / SEARCH RESULT)
 
         /**
          * Dùng cho trang list / search nhà hàng.
@@ -55,7 +55,7 @@ public class RestaurantDtos {
         ) {
         }
 
-        // ================== DETAIL (TRANG CHI TIẾT) ==================
+        // DETAIL (TRANG CHI TIẾT)
 
         /**
          * Dùng cho trang chi tiết nhà hàng.
@@ -164,7 +164,7 @@ public class RestaurantDtos {
                         Integer maxTablesPerBooking) {
         }
 
-        // ================== SUB-DTOS ==================
+        // SUB-DTOS
 
         // Ảnh dùng chung
         public record ImageDTO(

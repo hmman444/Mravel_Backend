@@ -18,7 +18,10 @@ public class VnpayPaymentController {
 
   private final VnpayPaymentService vnpayPaymentService;
 
-  /** VNPay server-call-server (IPN). Trả JSON RspCode/Message. :contentReference[oaicite:5]{index=5} */
+  /**
+   * VNPay server-call-server (IPN). Trả JSON RspCode/Message.
+   * :contentReference[oaicite:5]{index=5}
+   */
   @GetMapping("/ipn")
   public ResponseEntity<Map<String, String>> ipn(@RequestParam Map<String, String> params) {
     try {
@@ -35,11 +38,13 @@ public class VnpayPaymentController {
   public ResponseEntity<Void> vnpReturn(@RequestParam Map<String, String> params) {
     try {
       vnpayPaymentService.handleReturn(params);
-    } catch (Exception ignore) {}
+    } catch (Exception ignore) {
+    }
 
     return ResponseEntity.status(HttpStatus.FOUND)
-      .location(Objects.requireNonNull(URI.create("http://localhost:5173/my-bookings")))
-      .build();
+        // .location(Objects.requireNonNull(URI.create("http://localhost:5173/my-bookings")))
+        .location(Objects.requireNonNull(URI.create("http://localhost:3000/my-bookings")))
+        .build();
   }
 
   private static Map<String, String> rsp(String code, String message) {

@@ -15,7 +15,7 @@ import com.mravel.catalog.search.dto.RestaurantSearchResult;
 
 public class RestaurantMapper {
 
-        // ================== SUMMARY ==================
+        // SUMMARY
 
         public static RestaurantSummaryDTO toSummary(RestaurantSearchResult r) {
                 String cover = null;
@@ -90,7 +90,7 @@ public class RestaurantMapper {
                                 List.of());
         }
 
-        // ================== DETAIL ==================
+        // DETAIL
 
         public static RestaurantDetailDTO toDetail(RestaurantDoc r, Map<String, AmenityCatalogDoc> catalogMap) {
                 // Location
@@ -269,7 +269,7 @@ public class RestaurantMapper {
                                 bookingConfig);
         }
 
-        // ================== SUB MAPPERS ==================
+        // SUB MAPPERS
 
         // Image
         public static ImageDTO toImage(RestaurantDoc.Image img) {

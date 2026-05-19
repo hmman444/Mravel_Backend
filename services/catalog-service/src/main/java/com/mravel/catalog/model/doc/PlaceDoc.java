@@ -24,14 +24,18 @@ import lombok.*;
 
 @Document(collection = "places")
 @CompoundIndexes({
-  @CompoundIndex(name = "active_kind_province_idx",  def = "{'active':1,'kind':1,'provinceCode':1}"),
-  @CompoundIndex(name = "active_kind_district_idx",  def = "{'active':1,'kind':1,'districtCode':1}"),
-  @CompoundIndex(name = "tag_cuisine_idx",           def = "{'tags.type':1,'tags.slug':1}"),
-  @CompoundIndex(name = "venue_kind_idx",            def = "{'kind':1,'venueType':1}"),
-  @CompoundIndex(name = "venue_kind_parent_idx",     def = "{'kind':1,'venueType':1,'parentSlug':1}"),
-  @CompoundIndex(name = "ancestors_idx",             def = "{'ancestors':1}")
+    @CompoundIndex(name = "active_kind_province_idx", def = "{'active':1,'kind':1,'provinceCode':1}"),
+    @CompoundIndex(name = "active_kind_district_idx", def = "{'active':1,'kind':1,'districtCode':1}"),
+    @CompoundIndex(name = "tag_cuisine_idx", def = "{'tags.type':1,'tags.slug':1}"),
+    @CompoundIndex(name = "venue_kind_idx", def = "{'kind':1,'venueType':1}"),
+    @CompoundIndex(name = "venue_kind_parent_idx", def = "{'kind':1,'venueType':1,'parentSlug':1}"),
+    @CompoundIndex(name = "ancestors_idx", def = "{'ancestors':1}")
 })
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class PlaceDoc {
 
   // =====================================================================
@@ -73,7 +77,8 @@ public class PlaceDoc {
   private String parentSlug;
 
   private List<String> ancestors;
-  @Builder.Default private Integer childrenCount = 0;
+  @Builder.Default
+  private Integer childrenCount = 0;
 
   // =====================================================================
   // BASIC INFO
@@ -196,7 +201,11 @@ public class PlaceDoc {
     @Builder.Default private Integer sortOrder  = 0;
   }
 
-  @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
   public static class OpenHour {
     private DayOfWeek dayOfWeek;
     private LocalTime openTime;
@@ -205,23 +214,38 @@ public class PlaceDoc {
     @Builder.Default private Boolean closed  = false;
   }
 
-  @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
   public static class CategoryMini {
     private String id;
     private String name;
     private String slug;
   }
 
-  @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
   public static class TagMini {
     private String  name;
     private String  slug;
     private TagType type;
   }
 
-  @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
   public static class ContentBlock {
-    public enum BlockType { HEADING, PARAGRAPH, IMAGE, GALLERY, QUOTE, DIVIDER, INFOBOX, MAP }
+    public enum BlockType {
+      HEADING, PARAGRAPH, IMAGE, GALLERY, QUOTE, DIVIDER, INFOBOX, MAP
+    }
+
     private BlockType   type;
     private String      text;
     private Image       image;
