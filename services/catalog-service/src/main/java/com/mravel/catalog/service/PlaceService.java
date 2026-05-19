@@ -38,8 +38,8 @@ public class PlaceService {
   private final PlaceSearchService placeSearchService;
   private final IndexingService indexingService;
 
-  public Page<PlaceSummaryDTO> searchPlaces(String q, Pageable pageable) {
-    return placeSearchService.search(q, pageable).map(PlaceMapper::toSummary);
+  public Page<PlaceSummaryDTO> searchPlaces(String q, PlaceKind kind, Pageable pageable) {
+    return placeSearchService.search(q, kind, pageable).map(PlaceMapper::toSummary);
   }
 
   public FacetedSearchResponse<PlaceSummaryDTO, PlaceFacets> searchPlacesFaceted(

@@ -56,9 +56,9 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
     // =========================================================
 
     @Override
-    public Page<PlaceSearchResult> search(String q, Pageable pageable) {
+    public Page<PlaceSearchResult> search(String q, PlaceKind kind, Pageable pageable) {
         NativeQuery nativeQuery = NativeQuery.builder()
-                .withQuery(buildQuery(q))
+                .withQuery(buildQuery(q, kind))
                 .withPageable(pageable)
                 .build();
 
@@ -70,12 +70,16 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
         return new PageImpl<>(results, pageable, hits.getTotalHits());
     }
 
-    private static Query buildQuery(String q) {
+    private static Query buildQuery(String q, PlaceKind kind) {
         List<Query> must = new ArrayList<>();
         must.add(Query.of(qr -> qr.term(t -> t.field("active").value(true))));
-        must.add(Query.of(qr -> qr.terms(t -> t.field("kind").terms(tv -> tv.value(List.of(
-                FieldValue.of(PlaceKind.DESTINATION.name()),
-                FieldValue.of(PlaceKind.POI.name())))))));
+        if (kind != null) {
+            must.add(Query.of(qr -> qr.term(t -> t.field("kind").value(kind.name()))));
+        } else {
+            must.add(Query.of(qr -> qr.terms(t -> t.field("kind").terms(tv -> tv.value(List.of(
+                    FieldValue.of(PlaceKind.DESTINATION.name()),
+                    FieldValue.of(PlaceKind.POI.name())))))));
+        }
 
         if (q != null && !q.isBlank()) {
             String qTrimmed = q.trim();
