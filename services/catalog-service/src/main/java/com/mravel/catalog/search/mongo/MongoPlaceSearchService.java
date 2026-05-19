@@ -30,10 +30,14 @@ public class MongoPlaceSearchService implements PlaceSearchService {
     private final MongoTemplate mongo;
 
     @Override
-    public Page<PlaceSearchResult> search(String q, Pageable pageable) {
+    public Page<PlaceSearchResult> search(String q, PlaceKind kind, Pageable pageable) {
         List<Criteria> cs = new ArrayList<>();
         cs.add(where("active").is(true));
-        cs.add(where("kind").in(List.of(PlaceKind.DESTINATION, PlaceKind.POI)));
+        if (kind != null) {
+            cs.add(where("kind").is(kind));
+        } else {
+            cs.add(where("kind").in(List.of(PlaceKind.DESTINATION, PlaceKind.POI)));
+        }
 
         if (q != null && !q.isBlank()) {
             cs.add(new Criteria().orOperator(

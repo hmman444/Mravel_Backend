@@ -42,7 +42,7 @@ public class PlaceController {
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
 
         String q = request != null ? request.q() : null;
-        return ApiResponse.success("OK", placeService.searchPlaces(q, pageable));
+        return ApiResponse.success("OK", placeService.searchPlaces(q, null, pageable));
     }
 
     @PostMapping("/search/faceted")
@@ -57,9 +57,10 @@ public class PlaceController {
     @GetMapping("/poi")
     public ApiResponse<Page<PlaceSummaryDTO>> searchPlacesLegacy(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) PlaceKind kind,
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
 
-        return ApiResponse.success("OK", placeService.searchPlaces(q, pageable));
+        return ApiResponse.success("OK", placeService.searchPlaces(q, kind, pageable));
     }
 
     // Public detail by slug
