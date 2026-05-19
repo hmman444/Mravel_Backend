@@ -14,10 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 import com.mravel.catalog.dto.place.PlaceAdminDtos.PlaceAdminResponse;
 import com.mravel.catalog.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
 import com.mravel.catalog.dto.place.PlaceDtos;
-import com.mravel.catalog.dto.place.PlaceDtos.*;
+import com.mravel.catalog.dto.place.PlaceDtos.ImageDTO;
+import com.mravel.catalog.dto.place.PlaceDtos.OpenHourDTO;
+import com.mravel.catalog.dto.place.PlaceDtos.PlaceDetailDTO;
+import com.mravel.catalog.dto.place.PlaceDtos.PlaceSummaryDTO;
+import com.mravel.catalog.dto.place.PlaceDtos.TagDTO;
+import com.mravel.catalog.dto.search.FacetedPlaceSearchRequest;
+import com.mravel.catalog.dto.search.FacetedSearchResponse;
+import com.mravel.catalog.dto.search.PlaceFacets;
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.repository.PlaceDocRepository;
+import com.mravel.catalog.search.PlaceSearchService;
+import com.mravel.catalog.search.es.IndexingService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,9 +35,16 @@ import lombok.RequiredArgsConstructor;
 public class PlaceService {
 
   private final PlaceDocRepository repo;
+  private final PlaceSearchService placeSearchService;
+  private final IndexingService indexingService;
 
   public Page<PlaceSummaryDTO> searchPlaces(String q, Pageable pageable) {
-    return repo.searchPlaces(q, pageable).map(PlaceMapper::toSummary);
+    return placeSearchService.search(q, pageable).map(PlaceMapper::toSummary);
+  }
+
+  public FacetedSearchResponse<PlaceSummaryDTO, PlaceFacets> searchPlacesFaceted(
+      FacetedPlaceSearchRequest request, Pageable pageable) {
+    return placeSearchService.searchFaceted(request, pageable);
   }
 
   public PlaceDetailDTO getBySlug(String slug) {
@@ -117,6 +133,7 @@ public class PlaceService {
       refreshChildrenCount(parent.getSlug());
     }
 
+    indexingService.syncPlace(saved);
     return toAdminResponse(saved);
   }
 
@@ -187,6 +204,7 @@ public class PlaceService {
         refreshChildrenCount(saved.getParentSlug());
     }
 
+    indexingService.syncPlace(saved);
     return toAdminResponse(saved);
   }
 
@@ -199,7 +217,8 @@ public class PlaceService {
       return;
 
     existing.setActive(false);
-    repo.save(existing);
+    PlaceDoc saved = repo.save(existing);
+    indexingService.syncPlace(saved);
 
     if (existing.getParentSlug() != null) {
       refreshChildrenCount(existing.getParentSlug());
@@ -219,7 +238,8 @@ public class PlaceService {
       return;
 
     existing.setActive(true);
-    repo.save(existing);
+    PlaceDoc saved = repo.save(existing);
+    indexingService.syncPlace(saved);
 
     if (existing.getParentSlug() != null) {
       refreshChildrenCount(existing.getParentSlug());
@@ -239,6 +259,7 @@ public class PlaceService {
     String parentSlug = existing.getParentSlug();
 
     repo.delete(existing);
+    indexingService.deletePlace(existing.getId());
 
     if (parentSlug != null) {
       refreshChildrenCount(parentSlug);
@@ -318,7 +339,8 @@ public class PlaceService {
     long count = repo.countByParentSlugAndActiveTrue(parentSlug);
     repo.findBySlug(parentSlug).ifPresent(p -> {
       p.setChildrenCount((int) count);
-      repo.save(p);
+      PlaceDoc savedParent = repo.save(p);
+      indexingService.syncPlace(savedParent);
     });
   }
 

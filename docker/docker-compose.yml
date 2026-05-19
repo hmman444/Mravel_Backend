@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  # ─────────────── Elasticsearch 8 (security disabled for dev) ───────────────
+  # ─────────────── Elasticsearch 8 ───────────────
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: elasticsearch
@@ -19,6 +19,7 @@ services:
       timeout: 10s
       retries: 5
 
+  # ─────────────── Kibana ───────────────
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: kibana
@@ -30,6 +31,7 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
 
+  # ─────────────── Zookeeper ───────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -39,6 +41,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
+  # ─────────────── Kafka ───────────────
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -49,10 +52,13 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  # ─────────────── Kafdrop ───────────────
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
     container_name: kafdrop
@@ -61,7 +67,7 @@ services:
     ports:
       - "19000:9000"
     environment:
-      KAFKA_BROKERCONNECT: kafka:9092
+      KAFKA_BROKERCONNECT: kafka:29092
       JVM_OPTS: "-Xms32M -Xmx64M"
       SERVER_PORT: 9000
 

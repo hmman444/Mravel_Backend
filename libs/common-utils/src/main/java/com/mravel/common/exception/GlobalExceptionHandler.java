@@ -39,6 +39,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(message));
     }
 
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<ApiResponse<?>> handleBaseException(BaseException ex) {
+        log.warn("Business exception [{}]: {}", ex.getStatus(), ex.getMessage());
+        return ResponseEntity
+                .status(ex.getStatus())
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
     // Bắt IllegalArgumentException
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {

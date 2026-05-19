@@ -12,8 +12,34 @@ import com.mravel.catalog.dto.place.PlaceDtos.PlaceDetailDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.PlaceSummaryDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.TagDTO;
 import com.mravel.catalog.model.doc.PlaceDoc;
+import com.mravel.catalog.search.dto.PlaceSearchResult;
 
 public class PlaceMapper {
+
+  public static PlaceSummaryDTO toSummary(PlaceSearchResult p) {
+    String cover = null;
+    if (p.images() != null && !p.images().isEmpty()) {
+      cover = p.images().stream()
+          .filter(Objects::nonNull)
+          .sorted(Comparator
+              .comparing((PlaceSearchResult.ImageRef img) -> Boolean.TRUE.equals(img.cover())).reversed()
+              .thenComparing(img -> img.sortOrder() == null ? 0 : img.sortOrder()))
+          .map(PlaceSearchResult.ImageRef::url)
+          .findFirst()
+          .orElse(null);
+    }
+
+    Double lat = (p.location() != null && p.location().length == 2) ? p.location()[1] : null;
+    Double lon = (p.location() != null && p.location().length == 2) ? p.location()[0] : null;
+
+    return new PlaceSummaryDTO(
+        p.id(), p.name(), p.slug(),
+        p.kind(), p.venueType(),
+        p.addressLine(), p.provinceName(),
+        lat, lon,
+        p.priceLevel(), p.avgRating(), p.reviewsCount(),
+        cover, Boolean.TRUE.equals(p.active()));
+  }
 
   public static PlaceSummaryDTO toSummary(PlaceDoc p) {
     String cover = null;

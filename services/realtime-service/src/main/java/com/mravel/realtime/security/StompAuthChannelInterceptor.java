@@ -52,7 +52,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             @Value("${mravel.jwt.secret}") String secret,
             @Value("${mravel.services.plan.base-url:http://localhost:8086}") String planServiceBaseUrl,
             @Value("${mravel.services.user.base-url:http://localhost:8082}") String userServiceBaseUrl,
-            @Value("${mravel.services.chat.base-url:http://localhost:8089}") String chatServiceBaseUrl) {
+            @Value("${mravel.services.chat.base-url:http://localhost:8091}") String chatServiceBaseUrl) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(2000);

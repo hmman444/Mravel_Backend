@@ -19,6 +19,7 @@ public class RestaurantDtos {
                         String id,
                         String name,
                         String slug,
+                        Boolean active,
                         String restaurantType, // enum -> String
 
                         String destinationSlug,
@@ -64,6 +65,7 @@ public class RestaurantDtos {
                         String id,
                         String name,
                         String slug,
+                        Boolean active,
                         String restaurantType,
 
                         // Ẩm thực

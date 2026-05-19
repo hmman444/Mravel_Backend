@@ -3,6 +3,7 @@ package com.mravel.catalog.service.admin;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.repository.RestaurantDocRepository;
+import com.mravel.catalog.search.es.IndexingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import java.time.Instant;
 public class AdminRestaurantModerationService {
 
     private final RestaurantDocRepository repo;
+    private final IndexingService indexingService;
 
     public RestaurantDoc approve(String id, Long adminId) {
         RestaurantDoc doc = repo.findByIdAndDeletedAtIsNull(id)
@@ -30,7 +32,9 @@ public class AdminRestaurantModerationService {
         doc.getModeration().setBlockedReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc getByIdForAdmin(String id) {
@@ -53,7 +57,9 @@ public class AdminRestaurantModerationService {
         doc.getModeration().setBlockedReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc block(String id, Long adminId, String reason) {
@@ -71,7 +77,9 @@ public class AdminRestaurantModerationService {
         doc.getModeration().setRejectionReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     public RestaurantDoc unblock(String id, Long adminId) {
@@ -92,7 +100,9 @@ public class AdminRestaurantModerationService {
         doc.getModeration().setUnlockRequestReason(null);
 
         touchAdmin(doc, adminId);
-        return repo.save(doc);
+        RestaurantDoc saved = repo.save(doc);
+        indexingService.syncRestaurant(saved);
+        return saved;
     }
 
     private void ensureStatus(RestaurantDoc.ModerationInfo mod, RestaurantDoc.RestaurantStatus expected, String msg) {

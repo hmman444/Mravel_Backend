@@ -21,6 +21,7 @@
     <module>plan-service</module>
     <module>realtime-service</module>
     <module>booking-service</module>
+    <module>review-service</module>
     <module>admin-service</module>
     <module>notification-service</module>
     <module>partner-service</module>

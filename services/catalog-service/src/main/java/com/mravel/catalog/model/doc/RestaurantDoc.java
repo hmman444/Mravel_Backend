@@ -38,6 +38,9 @@ public class RestaurantDoc {
     @Id
     private String id;
 
+    @Builder.Default
+    private Integer favoriteCount = 0;
+
     @Field
     @Indexed
     @Builder.Default

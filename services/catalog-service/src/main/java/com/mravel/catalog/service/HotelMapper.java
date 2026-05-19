@@ -8,6 +8,7 @@ import com.mravel.catalog.dto.hotel.HotelDtos.*;
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.enums.AmenityScope;
+import com.mravel.catalog.search.dto.HotelSearchResult;
 
 public class HotelMapper {
 
@@ -16,61 +17,60 @@ public class HotelMapper {
 
         // SUMMARY
 
-        public static HotelSummaryDTO toSummary(HotelDoc h) {
+        public static HotelSummaryDTO toSummary(HotelSearchResult h) {
                 String cover = null;
-                if (h.getImages() != null && !h.getImages().isEmpty()) {
-                        cover = h.getImages().stream()
+                if (h.images() != null && !h.images().isEmpty()) {
+                        cover = h.images().stream()
                                         .filter(Objects::nonNull)
                                         .sorted(Comparator
-                                                        .comparing(HotelDoc.Image::getCover,
+                                                        .comparing(HotelSearchResult.ImageRef::cover,
                                                                         Comparator.nullsLast(Boolean::compareTo))
                                                         .reversed()
-                                                        .thenComparing(HotelDoc.Image::getSortOrder,
+                                                        .thenComparing(HotelSearchResult.ImageRef::sortOrder,
                                                                         Comparator.nullsLast(Integer::compareTo)))
-                                        .map(HotelDoc.Image::getUrl)
+                                        .map(HotelSearchResult.ImageRef::url)
                                         .findFirst()
                                         .orElse(null);
                 }
 
                 Double lat = null, lon = null;
-                if (h.getLocation() != null && h.getLocation().length == 2) {
-                        lon = h.getLocation()[0];
-                        lat = h.getLocation()[1];
+                if (h.location() != null && h.location().length == 2) {
+                        lon = h.location()[0];
+                        lat = h.location()[1];
                 }
 
                 String mainFacilitiesSummary = null;
                 Double distanceToCenter = null;
-                if (h.getGeneralInfo() != null) {
-                        mainFacilitiesSummary = h.getGeneralInfo().getMainFacilitiesSummary();
-                        distanceToCenter = h.getGeneralInfo().getDistanceToCityCenterKm();
+                if (h.generalInfo() != null) {
+                        mainFacilitiesSummary = h.generalInfo().mainFacilitiesSummary();
+                        distanceToCenter = h.generalInfo().distanceToCityCenterKm();
                 }
 
-                List<String> highlightTags = List.of();
-
                 return new HotelSummaryDTO(
-                                h.getId(),
-                                h.getName(),
-                                h.getSlug(),
-                                h.getStarRating(),
-                                h.getHotelType() == null ? null : h.getHotelType().name(),
-                                h.getDestinationSlug(),
-                                h.getCityName(),
-                                h.getDistrictName(),
-                                h.getWardName(),
-                                h.getAddressLine(),
+                                h.id(),
+                                h.name(),
+                                h.slug(),
+                                h.active(),
+                                h.starRating(),
+                                h.hotelType(),
+                                h.destinationSlug(),
+                                h.cityName(),
+                                h.districtName(),
+                                h.wardName(),
+                                h.addressLine(),
                                 lat,
                                 lon,
-                                h.getAvgRating(),
-                                h.getReviewsCount(),
-                                h.getRatingLabel(),
-                                h.getMinNightlyPrice(),
-                                h.getCurrencyCode(),
-                                h.getReferenceNightlyPrice(),
-                                h.getDiscountPercent(),
+                                h.avgRating(),
+                                h.reviewsCount(),
+                                h.ratingLabel(),
+                                h.minNightlyPrice(),
+                                h.currencyCode(),
+                                h.referenceNightlyPrice(),
+                                h.discountPercent(),
                                 mainFacilitiesSummary,
                                 distanceToCenter,
                                 cover,
-                                highlightTags);
+                                List.of());
         }
 
         // DETAIL
@@ -157,6 +157,7 @@ public class HotelMapper {
                                 h.getId(),
                                 h.getName(),
                                 h.getSlug(),
+                                h.getActive(),
                                 h.getStarRating(),
                                 h.getHotelType() == null ? null : h.getHotelType().name(),
                                 h.getShortDescription(),

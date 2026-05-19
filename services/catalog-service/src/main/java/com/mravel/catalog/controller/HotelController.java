@@ -4,6 +4,7 @@ package com.mravel.catalog.controller;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,7 +44,7 @@ public class HotelController {
     @PostMapping("/search")
     public ResponseEntity<ApiResponse<Page<HotelSummaryDTO>>> searchHotels(
             @RequestBody(required = false) HotelSearchRequest request,
-            @ParameterObject Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         Page<HotelSummaryDTO> result = hotelService.searchHotels(request, pageable);
         return ResponseEntity.ok(
                 ApiResponse.success("Tìm kiếm khách sạn thành công", result));
@@ -53,11 +54,13 @@ public class HotelController {
      * Xem chi tiết khách sạn theo slug.
      */
     @GetMapping("/{slug}")
-    public ResponseEntity<ApiResponse<HotelDetailDTO>> getHotelDetail(@PathVariable String slug) {
-        HotelDetailDTO dto = hotelService.getBySlug(slug);
-        return ResponseEntity.ok(
-                ApiResponse.success("Lấy chi tiết khách sạn thành công", dto));
-    }
+        public ResponseEntity<ApiResponse<HotelDetailDTO>> getHotelDetail(
+                @PathVariable String slug,
+                @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive
+        ) {
+        HotelDetailDTO dto = hotelService.getBySlug(slug, includeInactive);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết khách sạn thành công", dto));
+        }
 
     @PostMapping("/{hotelId}/amenities:attach")
     public ResponseEntity<ApiResponse<Void>> attach(@PathVariable String hotelId,

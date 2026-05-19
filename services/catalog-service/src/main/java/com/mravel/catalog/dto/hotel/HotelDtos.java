@@ -19,6 +19,7 @@ public class HotelDtos {
                         String id,
                         String name,
                         String slug,
+                        Boolean active,
                         Integer starRating,
                         String hotelType, // enum HotelType -> String
                         String destinationSlug,
@@ -64,6 +65,7 @@ public class HotelDtos {
                         String id,
                         String name,
                         String slug,
+                        Boolean active,
                         Integer starRating,
                         String hotelType,
 
