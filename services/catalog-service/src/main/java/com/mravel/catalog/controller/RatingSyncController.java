@@ -6,6 +6,7 @@ import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.repository.HotelDocRepository;
 import com.mravel.catalog.repository.PlaceDocRepository;
 import com.mravel.catalog.repository.RestaurantDocRepository;
+import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.common.response.ApiResponse;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class RatingSyncController {
     private final HotelDocRepository hotelRepo;
     private final RestaurantDocRepository restaurantRepo;
     private final PlaceDocRepository placeRepo;
+    private final IndexingService indexingService;
 
     @PutMapping("/hotels/{id}/rating-sync")
     public ResponseEntity<ApiResponse<Void>> syncHotelRating(
@@ -47,7 +49,8 @@ public class RatingSyncController {
                 doc.setReviewStats(stats);
             }
 
-            hotelRepo.save(doc);
+            HotelDoc saved = hotelRepo.save(doc);
+            indexingService.syncHotel(saved);
         });
         return ResponseEntity.ok(ApiResponse.success("OK", null));
     }
@@ -73,7 +76,8 @@ public class RatingSyncController {
                 doc.setReviewStats(stats);
             }
 
-            restaurantRepo.save(doc);
+            RestaurantDoc saved = restaurantRepo.save(doc);
+            indexingService.syncRestaurant(saved);
         });
         return ResponseEntity.ok(ApiResponse.success("OK", null));
     }
@@ -95,7 +99,8 @@ public class RatingSyncController {
                         .toList());
             }
 
-            placeRepo.save(doc);
+            PlaceDoc saved = placeRepo.save(doc);
+            indexingService.syncPlace(saved);
         });
         return ResponseEntity.ok(ApiResponse.success("OK", null));
     }

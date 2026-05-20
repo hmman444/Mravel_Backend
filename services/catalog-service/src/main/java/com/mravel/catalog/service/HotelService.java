@@ -25,6 +25,7 @@ import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.repository.AmenityCatalogRepository;
 import com.mravel.catalog.repository.HotelDocRepository;
 import com.mravel.catalog.search.HotelSearchService;
+import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.catalog.search.dto.HotelSearchResult;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class HotelService {
     private final MongoTemplate mongoTemplate;
     private final AmenityCatalogRepository amenityCatalogRepo;
     private final AmenityCatalogService amenityCatalogService;
+    private final IndexingService indexingService;
 
     public Page<HotelSummaryDTO> searchHotels(HotelSearchRequest request, Pageable pageable) {
         Page<HotelSearchResult> page = hotelSearchService.search(request, pageable);
@@ -115,6 +117,7 @@ public class HotelService {
                 Query.query(Criteria.where("_id").is(hotelId)),
                 new Update().addToSet("amenityCodes").each(normalized.toArray()),
                 "hotels");
+        hotelRepo.findById(hotelId).ifPresent(indexingService::syncHotel);
     }
 
     public void detachHotelAmenities(String hotelId, List<String> codes) {
@@ -124,5 +127,6 @@ public class HotelService {
                 Query.query(Criteria.where("_id").is(hotelId)),
                 new Update().pullAll("amenityCodes", normalized.toArray()),
                 "hotels");
+        hotelRepo.findById(hotelId).ifPresent(indexingService::syncHotel);
     }
 }
