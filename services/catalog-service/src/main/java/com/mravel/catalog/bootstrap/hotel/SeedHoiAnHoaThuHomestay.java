@@ -137,15 +137,15 @@ public class SeedHoiAnHoaThuHomestay {
                                 paragraph(ContentSection.STORY,
                                                 "Chọn Hoa Thu Homestay cho kỳ nghỉ ở Hội An bạn không chỉ tận hưởng sự thoải mái mà còn tiết kiệm chi phí với mức giá hợp lý. Vị trí đắc địa cùng các tiện nghi và dịch vụ chất lượng chắc chắn sẽ làm hài lòng ngay cả những du khách khó tính nhất."));
 
-                // --------- Hotel amenities (từ ảnh “Tất cả những tiện ích…”) ----------
+                // --------- Hotel amenities ----------
+                // Chỉ giữ HOTEL scope canonical codes; tiện nghi phòng (TV, MINIBAR, SHOWER, AC...)
+                // đã được khai báo trong RoomType.amenityCodes của từng phòng.
                 List<AmenityCatalogDoc> hotelAmenities = List.of(
                                 // Tiện nghi chung
-                                amenity("ac", "Máy lạnh", AmenityGroup.ROOM, AmenitySection.BASIC_FACILITIES, true),
                                 amenity("family_room", "Phòng gia đình", AmenityGroup.ROOM,
                                                 AmenitySection.BASIC_FACILITIES, true),
                                 amenity("non_smoking_room", "Phòng không hút thuốc", AmenityGroup.ROOM,
-                                                AmenitySection.BASIC_FACILITIES,
-                                                false),
+                                                AmenitySection.BASIC_FACILITIES, false),
                                 amenity("smoking_area", "Khu vực hút thuốc", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.OTHER, false),
                                 amenity("terrace", "Sân thượng/sân hiên", AmenityGroup.PUBLIC_AREA,
@@ -155,13 +155,11 @@ public class SeedHoiAnHoaThuHomestay {
                                 amenity("currency_exchange", "Dịch vụ thu đổi ngoại tệ", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.OTHER, false),
                                 amenity("security_24h", "Bảo vệ 24 giờ", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.BASIC_FACILITIES,
-                                                false),
-                                amenity("laundry", "Dịch vụ giặt ủi", AmenityGroup.HOTEL_SERVICE, AmenitySection.OTHER,
-                                                false),
+                                                AmenitySection.BASIC_FACILITIES, false),
+                                amenity("laundry", "Dịch vụ giặt ủi", AmenityGroup.HOTEL_SERVICE,
+                                                AmenitySection.OTHER, false),
                                 amenity("tour_desk", "Dịch vụ hỗ trợ đặt Tour", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.OTHER,
-                                                false),
+                                                AmenitySection.OTHER, false),
 
                                 // Đưa đón
                                 amenity("airport_transfer", "Đưa đón sân bay (thu phí)", AmenityGroup.HOTEL_SERVICE,
@@ -170,16 +168,20 @@ public class SeedHoiAnHoaThuHomestay {
                                                 AmenitySection.TRANSPORT, false),
 
                                 // Kết nối mạng
-                                amenity("wifi_free", "Wifi (miễn phí)", AmenityGroup.INTERNET, AmenitySection.INTERNET,
-                                                true),
+                                amenity("wifi_free", "Wifi (miễn phí)", AmenityGroup.INTERNET,
+                                                AmenitySection.INTERNET, true),
 
                                 // Tiện ích lân cận
-                                amenity("atm", "Máy ATM/Ngân hàng", AmenityGroup.NEARBY, AmenitySection.OTHER, false),
-                                amenity("beauty_salon", "Thẩm mỹ viện", AmenityGroup.NEARBY, AmenitySection.OTHER,
-                                                false),
-                                amenity("hair_salon", "Hiệu làm tóc", AmenityGroup.NEARBY, AmenitySection.OTHER, false),
-                                amenity("shop", "Cửa hàng", AmenityGroup.NEARBY, AmenitySection.OTHER, false),
-                                amenity("supermarket", "Siêu thị", AmenityGroup.NEARBY, AmenitySection.OTHER, false),
+                                amenity("atm", "Máy ATM/Ngân hàng", AmenityGroup.NEARBY,
+                                                AmenitySection.OTHER, false),
+                                amenity("beauty_salon", "Thẩm mỹ viện", AmenityGroup.NEARBY,
+                                                AmenitySection.OTHER, false),
+                                amenity("hair_salon", "Hiệu làm tóc", AmenityGroup.NEARBY,
+                                                AmenitySection.OTHER, false),
+                                amenity("shop", "Cửa hàng", AmenityGroup.NEARBY,
+                                                AmenitySection.OTHER, false),
+                                amenity("supermarket", "Siêu thị", AmenityGroup.NEARBY,
+                                                AmenitySection.OTHER, false),
 
                                 // Vận chuyển
                                 amenity("bicycle_rental", "Dịch vụ cho thuê xe đạp", AmenityGroup.HOTEL_SERVICE,
@@ -189,27 +191,11 @@ public class SeedHoiAnHoaThuHomestay {
 
                                 // Trẻ em
                                 amenity("babysitting", "Dịch vụ giữ trẻ (thu phí)", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.OTHER,
-                                                false),
+                                                AmenitySection.OTHER, false),
 
                                 // Ẩm thực
-                                amenity("breakfast_paid", "Bữa sáng (thu phí)", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.FOOD_AND_DRINK, false),
-
-                                // Tiện nghi phòng (tổng quan)
-                                amenity("cable_tv", "Truyền hình cáp", AmenityGroup.ROOM,
-                                                AmenitySection.ROOM_FACILITIES, false),
-                                amenity("minibar", "Minibar", AmenityGroup.ROOM, AmenitySection.ROOM_FACILITIES, false),
-                                amenity("shower", "Phòng tắm vòi sen", AmenityGroup.ROOM, AmenitySection.BATHROOM,
-                                                false),
-                                amenity("tv", "TV", AmenityGroup.ROOM, AmenitySection.ROOM_FACILITIES, false),
-
-                                // Tiện nghi công cộng
-                                amenity("lobby_coffee_tea", "Cà phê/trà tại sảnh", AmenityGroup.PUBLIC_AREA,
-                                                AmenitySection.FOOD_AND_DRINK, false),
-                                amenity("public_wifi", "Wifi tại khu vực chung", AmenityGroup.INTERNET,
-                                                AmenitySection.INTERNET,
-                                                false));
+                                amenity("breakfast", "Bữa sáng (thu phí)", AmenityGroup.HOTEL_SERVICE,
+                                                AmenitySection.FOOD_AND_DRINK, false));
 
                 // --------- Room types ----------
                 // 1) Family (30.0 m² - 4 khách - 2 giường đôi)

@@ -306,6 +306,7 @@ public class PartnerDtos {
 
                         // link & location
                         @NotBlank String destinationSlug,
+                        String parentPlaceSlug,
                         String cityName,
                         String districtName,
                         String wardName,
@@ -314,16 +315,43 @@ public class PartnerDtos {
                         Double longitude,
 
                         // basic
+                        String restaurantType, // BUFFET / GOI_MON / BBQ / BAR / CAFE / LOUNGE / OTHER
                         String shortDescription,
                         String description,
+
+                        // contact
                         String phone,
                         String email,
                         String website,
+                        String facebookPage,
+                        String bookingHotline,
 
+                        // pricing
                         BigDecimal minPrice,
                         BigDecimal maxPrice,
+                        String currencyCode,
+                        String priceLevel,  // CHEAP / MODERATE / EXPENSIVE / LUXURY
+                        String priceBucket, // UNDER_150K / FROM_150K_TO_250K / ...
 
+                        // tags + time
+                        List<UpsertCuisineTagReq> cuisines,
+                        List<UpsertOpeningHourReq> openingHours,
+                        List<UpsertCodeNameReq> suitableFor,
+                        List<UpsertCodeNameReq> ambience,
+                        List<UpsertSignatureDishReq> signatureDishes,
+
+                        // capacity / parking
+                        UpsertCapacityInfoReq capacity,
+                        UpsertParkingInfoReq parking,
+
+                        // policy
+                        UpsertRestaurantPolicyReq policy,
+
+                        // media
                         List<ImageReq> images,
+                        List<ImageReq> menuImages,
+                        List<UpsertMenuSectionReq> menuSections,
+                        List<UpsertContentBlockReq> content,
 
                         // extras
                         List<String> amenityCodes,
@@ -357,5 +385,129 @@ public class PartnerDtos {
                         Integer pendingPaymentExpireMinutes,
                         Boolean depositOnly,
                         Integer maxTablesPerBooking) {
+        }
+
+        // ===
+        // RESTAURANT — SUB-RECORDS
+        // ===
+
+        public record UpsertCuisineTagReq(
+                        String code,
+                        String name,
+                        String region) {
+        }
+
+        public record UpsertOpeningHourReq(
+                        String dayOfWeek, // MONDAY / TUESDAY / ...
+                        String openTime,  // "HH:mm"
+                        String closeTime, // "HH:mm"
+                        Boolean open24h,
+                        Boolean closed) {
+        }
+
+        public record UpsertCodeNameReq(
+                        String code,
+                        String name) {
+        }
+
+        public record UpsertSignatureDishReq(
+                        @NotBlank String name,
+                        String description,
+                        BigDecimal estimatedPrice,
+                        Boolean highlight) {
+        }
+
+        public record UpsertCapacityInfoReq(
+                        Integer totalCapacity,
+                        Integer maxGroupSize,
+                        Boolean hasPrivateRooms,
+                        Integer privateRoomCount,
+                        Integer maxPrivateRoomCapacity,
+                        Boolean hasOutdoorSeating) {
+        }
+
+        public record UpsertParkingInfoReq(
+                        Boolean hasCarParking,
+                        String carParkingLocation,
+                        String carParkingFeeType, // FREE / PAID / UNKNOWN
+                        BigDecimal carParkingFeeAmount,
+                        Boolean hasMotorbikeParking,
+                        String motorbikeParkingLocation,
+                        String motorbikeParkingFeeType,
+                        BigDecimal motorbikeParkingFeeAmount,
+                        String notes) {
+        }
+
+        public record UpsertMenuSectionReq(
+                        String code,
+                        String name,
+                        List<UpsertMenuItemReq> items) {
+        }
+
+        public record UpsertMenuItemReq(
+                        @NotBlank String name,
+                        String description,
+                        BigDecimal priceFrom,
+                        BigDecimal priceTo,
+                        String unit,
+                        Boolean combo,
+                        Boolean buffetItem,
+                        List<String> tags) {
+        }
+
+        public record UpsertRestaurantPolicyReq(
+                        // Đặt cọc
+                        Boolean depositRequired,
+                        Integer depositMinGuests,
+                        BigDecimal depositAmount,
+                        String depositCurrencyCode,
+                        String depositNotes,
+
+                        // Ưu đãi & ngày ngoại lệ
+                        Boolean hasPromotion,
+                        String promotionSummary,
+                        Integer promotionMaxDiscountPercent,
+                        String promotionNote,
+                        List<UpsertBlackoutDateRuleReq> blackoutRules,
+
+                        // Thời gian đặt / giữ chỗ
+                        Integer minBookingLeadTimeMinutes,
+                        Integer maxHoldTimeMinutes,
+                        Integer minGuestsPerBooking,
+
+                        // Hóa đơn
+                        Boolean vatInvoiceAvailable,
+                        BigDecimal vatPercent,
+                        Boolean directInvoiceAvailable,
+                        String invoiceNotes,
+
+                        // Phí phục vụ
+                        BigDecimal serviceChargePercent,
+                        String serviceChargeNotes,
+
+                        // Mang đồ từ ngoài vào
+                        Boolean allowOutsideFood,
+                        Boolean allowOutsideDrink,
+                        String outsideFoodPolicy,
+                        String outsideDrinkPolicy,
+                        List<UpsertOutsideDrinkFeeReq> outsideDrinkFees) {
+        }
+
+        public record UpsertBlackoutDateRuleReq(
+                        String dateType, // GREGORIAN_DATE / DATE_RANGE / LUNAR_DATE
+                        Integer month,
+                        Integer day,
+                        String fromDate, // ISO 8601
+                        String toDate,
+                        Integer lunarMonth,
+                        Integer lunarDay,
+                        String description) {
+        }
+
+        public record UpsertOutsideDrinkFeeReq(
+                        String drinkType, // WINE / SPIRITS / BEER / OTHER
+                        BigDecimal feeAmount,
+                        String currencyCode,
+                        String note) {
         }
 }

@@ -187,110 +187,73 @@ public class SeedHoiAnReverieVillas {
                 );
 
                 // --------- Tiện ích cấp khách sạn (Hotel amenities) ----------
-                // Từ ảnh: tiện ích chính có Máy lạnh, WiFi, Nhà hàng, Hồ bơi, Chỗ đậu xe
+                // Chỉ giữ các code thuộc HOTEL scope canonical (xem SeedAmenityCatalog).
+                // Các code ROOM scope (TV, MINIBAR, SHOWER, BATHTUB...) đã chuyển vào RoomType.amenityCodes.
                 List<AmenityCatalogDoc> hotelAmenities = List.of(
 
-                                // ===== HIGHLIGHT FEATURES (tính năng nổi bật) =====
-                                amenity("free_wifi", "WiFi miễn phí", AmenityGroup.INTERNET,
+                                // ===== HIGHLIGHT FEATURES =====
+                                amenity("wifi_free", "WiFi miễn phí", AmenityGroup.INTERNET,
                                                 AmenitySection.HIGHLIGHT_FEATURES, true),
                                 amenity("outdoor_pool", "Hồ bơi ngoài trời", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.HIGHLIGHT_FEATURES, true),
-                                amenity("air_conditioning", "Máy lạnh", AmenityGroup.ROOM,
-                                                AmenitySection.HIGHLIGHT_FEATURES, true),
                                 amenity("parking", "Bãi đậu xe", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.HIGHLIGHT_FEATURES, true),
-                                amenity("airport_shuttle", "Đưa đón sân bay", AmenityGroup.HOTEL_SERVICE,
+                                amenity("airport_transfer", "Đưa đón sân bay", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.HIGHLIGHT_FEATURES, true),
 
-                                // ===== BASIC FACILITIES (tiện nghi cơ bản) =====
-                                amenity("24h_front_desk", "Lễ tân 24 giờ", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.BASIC_FACILITIES,
-                                                false),
-                                amenity("family_rooms", "Phòng gia đình", AmenityGroup.ROOM,
+                                // ===== BASIC FACILITIES =====
+                                amenity("front_desk_24h", "Lễ tân 24 giờ", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.BASIC_FACILITIES, false),
-                                amenity("non_smoking_rooms", "Phòng không hút thuốc", AmenityGroup.ROOM,
+                                amenity("family_room", "Phòng gia đình", AmenityGroup.ROOM,
+                                                AmenitySection.BASIC_FACILITIES, false),
+                                amenity("non_smoking_room", "Phòng không hút thuốc", AmenityGroup.ROOM,
                                                 AmenitySection.BASIC_FACILITIES, false),
                                 amenity("smoking_area", "Khu vực hút thuốc", AmenityGroup.PUBLIC_AREA,
-                                                AmenitySection.BASIC_FACILITIES,
-                                                false),
+                                                AmenitySection.BASIC_FACILITIES, false),
                                 amenity("terrace", "Sân thượng / Sân hiên", AmenityGroup.PUBLIC_AREA,
-                                                AmenitySection.BASIC_FACILITIES,
-                                                false),
+                                                AmenitySection.BASIC_FACILITIES, false),
 
-                                // ===== ROOM FACILITIES (tiện nghi phòng) =====
-                                amenity("tv", "TV", AmenityGroup.ROOM, AmenitySection.ROOM_FACILITIES, false),
-                                amenity("minibar", "Minibar", AmenityGroup.ROOM, AmenitySection.ROOM_FACILITIES, false),
-                                amenity("work_desk", "Bàn làm việc", AmenityGroup.ROOM, AmenitySection.ROOM_FACILITIES,
-                                                false),
-                                amenity("in_room_safe", "Két an toàn trong phòng", AmenityGroup.ROOM,
-                                                AmenitySection.ROOM_FACILITIES,
-                                                false),
-                                amenity("blackout_curtains", "Rèm cản sáng", AmenityGroup.ROOM,
-                                                AmenitySection.ROOM_FACILITIES, false),
-
-                                // ===== BATHROOM (phòng tắm) =====
-                                amenity("shower", "Vòi sen", AmenityGroup.ROOM, AmenitySection.BATHROOM, false),
-                                amenity("bathtub", "Bồn tắm", AmenityGroup.ROOM, AmenitySection.BATHROOM, false),
-                                amenity("hair_dryer", "Máy sấy tóc", AmenityGroup.ROOM, AmenitySection.BATHROOM, false),
-                                amenity("towels", "Khăn tắm", AmenityGroup.ROOM, AmenitySection.BATHROOM, false),
-                                amenity("toiletries", "Đồ vệ sinh cá nhân", AmenityGroup.ROOM, AmenitySection.BATHROOM,
-                                                false),
-
-                                // ===== FOOD & DRINK (ẩm thực) =====
+                                // ===== FOOD & DRINK =====
                                 amenity("restaurant", "Nhà hàng", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.FOOD_AND_DRINK, true),
                                 amenity("breakfast", "Bữa sáng", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.FOOD_AND_DRINK, true),
-                                amenity("bar", "Quầy bar", AmenityGroup.PUBLIC_AREA, AmenitySection.FOOD_AND_DRINK,
-                                                false),
+                                amenity("bar", "Quầy bar", AmenityGroup.PUBLIC_AREA,
+                                                AmenitySection.FOOD_AND_DRINK, false),
                                 amenity("coffee_shop", "Tiệm cà phê", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.FOOD_AND_DRINK, false),
-                                amenity("room_service", "Dịch vụ phòng", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.FOOD_AND_DRINK,
-                                                false),
+                                amenity("room_service_limited", "Dịch vụ phòng", AmenityGroup.HOTEL_SERVICE,
+                                                AmenitySection.FOOD_AND_DRINK, false),
 
-                                // ===== TRANSPORT (đưa đón / di chuyển) =====
+                                // ===== TRANSPORT =====
                                 amenity("bicycle_rental", "Cho thuê xe đạp", AmenityGroup.HOTEL_SERVICE,
-                                                AmenitySection.TRANSPORT,
-                                                false),
+                                                AmenitySection.TRANSPORT, false),
                                 amenity("car_rental", "Cho thuê xe hơi", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.TRANSPORT, false),
-                                amenity("valet_parking", "Bãi đậu xe có người phục vụ", AmenityGroup.PUBLIC_AREA,
-                                                AmenitySection.TRANSPORT, false),
-                                amenity("secured_parking", "Bãi đậu xe an ninh", AmenityGroup.PUBLIC_AREA,
-                                                AmenitySection.TRANSPORT,
-                                                false),
 
-                                // ===== INTERNET =====
-                                amenity("internet_access", "Điểm truy cập Internet", AmenityGroup.INTERNET,
-                                                AmenitySection.INTERNET,
-                                                false),
-
-                                // ===== ENTERTAINMENT (giải trí) =====
-                                amenity("spa", "Dịch vụ spa", AmenityGroup.HOTEL_SERVICE, AmenitySection.ENTERTAINMENT,
-                                                false),
-                                amenity("massage", "Mát-xa", AmenityGroup.HOTEL_SERVICE, AmenitySection.ENTERTAINMENT,
-                                                false),
-                                amenity("garden", "Vườn hoa", AmenityGroup.PUBLIC_AREA, AmenitySection.ENTERTAINMENT,
-                                                false),
-                                amenity("kids_playground", "Khu vui chơi trẻ em", AmenityGroup.PUBLIC_AREA,
+                                // ===== ENTERTAINMENT =====
+                                amenity("spa", "Dịch vụ spa", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.ENTERTAINMENT, false),
-                                amenity("tv_room", "Phòng xem TV", AmenityGroup.PUBLIC_AREA,
+                                amenity("massage", "Mát-xa", AmenityGroup.HOTEL_SERVICE,
+                                                AmenitySection.ENTERTAINMENT, false),
+                                amenity("garden", "Vườn hoa", AmenityGroup.PUBLIC_AREA,
+                                                AmenitySection.ENTERTAINMENT, false),
+                                amenity("kids_playground", "Khu vui chơi trẻ em", AmenityGroup.PUBLIC_AREA,
                                                 AmenitySection.ENTERTAINMENT, false),
 
                                 // ===== NEARBY =====
-                                amenity("supermarket_nearby", "Siêu thị gần đó", AmenityGroup.NEARBY,
+                                amenity("supermarket", "Siêu thị gần đó", AmenityGroup.NEARBY,
                                                 AmenitySection.OTHER, false),
-                                amenity("salon_nearby", "Salon tóc gần đó", AmenityGroup.NEARBY, AmenitySection.OTHER,
-                                                false),
+                                amenity("beauty_salon", "Salon tóc gần đó", AmenityGroup.NEARBY,
+                                                AmenitySection.OTHER, false),
 
                                 // ===== OTHER =====
                                 amenity("luggage_storage", "Giữ hành lý", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.OTHER, false),
-                                amenity("tour_assistance", "Hỗ trợ đặt tour", AmenityGroup.HOTEL_SERVICE,
+                                amenity("tour_desk", "Hỗ trợ đặt tour", AmenityGroup.HOTEL_SERVICE,
                                                 AmenitySection.OTHER, false),
-                                amenity("babysitting", "Giữ trẻ", AmenityGroup.HOTEL_SERVICE, AmenitySection.OTHER,
-                                                false));
+                                amenity("babysitting", "Giữ trẻ", AmenityGroup.HOTEL_SERVICE,
+                                                AmenitySection.OTHER, false));
 
                 // --------- Room types & rate plans ----------
                 RoomType deluxeDoubleGardenView = RoomType.builder()
@@ -328,11 +291,10 @@ public class SeedHoiAnReverieVillas {
                                                 img("https://ik.imagekit.io/tvlk/generic-asset/TzEv3ZUmG4-4Dz22hvmO9NUDzw1DGCIdWl4oPtKumOg=/lodging/23000000/22450000/22442300/22442222/8623d7d1_z.jpg?_src=imagekit&tr=c-at_max,f-jpg,h-460,pr-true,q-40,w-724",
                                                                 "Nhà vệ sinh sạch sẽ", false, 6)))
                                 .amenityCodes(List.of(
-                                                "AIR_CONDITIONING",
-                                                "FREE_WIFI",
+                                                "AC",
                                                 "TV",
                                                 "MINIBAR",
-                                                "WORK_DESK",
+                                                "DESK",
                                                 "BLACKOUT_CURTAINS",
                                                 "PRIVATE_BATHROOM",
                                                 "SHOWER_OR_BATHTUB",
@@ -409,8 +371,7 @@ public class SeedHoiAnReverieVillas {
                                                 img("https://ik.imagekit.io/tvlk/generic-asset/oJLNzNs71wS3RVcWVniLgofXtaluprJ7ristt-jspoM=/images//02238120009klp1rbD8DF_R5_Mtrip.jpg?_src=imagekit&tr=c-at_max,f-jpg,h-460,pr-true,q-40,w-724",
                                                                 "Nhà vệ sinh sạch sẽ", false, 2)))
                                 .amenityCodes(List.of(
-                                                "AIR_CONDITIONING",
-                                                "FREE_WIFI",
+                                                "AC",
                                                 "TV",
                                                 "SLIPPERS",
                                                 "SAFE"))
@@ -488,10 +449,9 @@ public class SeedHoiAnReverieVillas {
                                                 img("https://ik.imagekit.io/tvlk/generic-asset/dgXfoyh24ryQLRcGq00cIdKHRmotrWLNlvG-TxlcLxGkiDwaUSggleJNPRgIHCX6/hotel/asset/10029306-ba7e97cc93069e00ec0e1b000b26d88c.jpeg?_src=imagekit&tr=c-at_max,f-jpg,h-460,pr-true,q-40,w-724",
                                                                 "Phòng ốc sạch sẽ", false, 3)))
                                 .amenityCodes(List.of(
-                                                "AIR_CONDITIONING",
-                                                "FREE_WIFI",
+                                                "AC",
                                                 "TV",
-                                                "WORK_DESK",
+                                                "DESK",
                                                 "PRIVATE_BATHROOM",
                                                 "BATHTUB"))
                                 .ratePlans(List.of(
