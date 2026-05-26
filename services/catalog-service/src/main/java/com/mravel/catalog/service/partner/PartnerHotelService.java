@@ -676,10 +676,9 @@ public class PartnerHotelService {
             }
         }
 
-        if (min != null)
-            doc.setMinNightlyPrice(min);
-        if (refMin != null)
-            doc.setReferenceNightlyPrice(refMin);
+        // Always set (kể cả null) để không giữ giá stale khi partner xóa hết rate plans.
+        doc.setMinNightlyPrice(min);
+        doc.setReferenceNightlyPrice(refMin);
 
         doc.setFilterFacets(HotelDoc.HotelFilterFacets.builder()
                 .hasFreeCancellation(hasFreeCancel)

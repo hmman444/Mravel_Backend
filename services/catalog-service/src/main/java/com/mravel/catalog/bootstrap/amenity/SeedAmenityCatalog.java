@@ -206,7 +206,55 @@ public class SeedAmenityCatalog {
                                                         AmenitySection.OTHER,
                                                         false, 750,
                                                         "lucide:shopping-cart",
-                                                        List.of("supermarket", "supermarket_nearby"))));
+                                                        List.of("supermarket", "supermarket_nearby")),
+
+                                        // Highlight / Entertainment / Food & Drink — added to cover legacy hotel seed
+                                        a(now, "OUTDOOR_POOL", "Hồ bơi ngoài trời", AmenityScope.HOTEL,
+                                                        AmenityGroup.PUBLIC_AREA,
+                                                        AmenitySection.HIGHLIGHT_FEATURES, true, 760,
+                                                        "lucide:waves",
+                                                        List.of("outdoor_pool", "swimming_pool", "pool")),
+
+                                        a(now, "BAR", "Quầy bar", AmenityScope.HOTEL, AmenityGroup.PUBLIC_AREA,
+                                                        AmenitySection.FOOD_AND_DRINK, false, 770,
+                                                        "lucide:wine",
+                                                        List.of("bar")),
+
+                                        a(now, "COFFEE_SHOP", "Tiệm cà phê", AmenityScope.HOTEL,
+                                                        AmenityGroup.PUBLIC_AREA,
+                                                        AmenitySection.FOOD_AND_DRINK, false, 780,
+                                                        "lucide:coffee",
+                                                        List.of("coffee_shop", "lobby_coffee_tea")),
+
+                                        a(now, "SPA", "Dịch vụ spa", AmenityScope.HOTEL,
+                                                        AmenityGroup.HOTEL_SERVICE,
+                                                        AmenitySection.ENTERTAINMENT, false, 790,
+                                                        "lucide:flower",
+                                                        List.of("spa")),
+
+                                        a(now, "MASSAGE", "Mát-xa", AmenityScope.HOTEL,
+                                                        AmenityGroup.HOTEL_SERVICE,
+                                                        AmenitySection.ENTERTAINMENT, false, 800,
+                                                        "lucide:hand",
+                                                        List.of("massage")),
+
+                                        a(now, "KIDS_PLAYGROUND", "Khu vui chơi trẻ em", AmenityScope.HOTEL,
+                                                        AmenityGroup.PUBLIC_AREA,
+                                                        AmenitySection.ENTERTAINMENT, false, 810,
+                                                        "lucide:baby",
+                                                        List.of("kids_playground", "playground")),
+
+                                        a(now, "BABYSITTING", "Dịch vụ giữ trẻ", AmenityScope.HOTEL,
+                                                        AmenityGroup.HOTEL_SERVICE,
+                                                        AmenitySection.OTHER, false, 820,
+                                                        "lucide:baby",
+                                                        List.of("babysitting")),
+
+                                        a(now, "CAR_RENTAL", "Cho thuê xe hơi", AmenityScope.HOTEL,
+                                                        AmenityGroup.HOTEL_SERVICE,
+                                                        AmenitySection.TRANSPORT, false, 830,
+                                                        "lucide:car",
+                                                        List.of("car_rental"))));
 
                         // =========================
                         // ROOM SCOPE
