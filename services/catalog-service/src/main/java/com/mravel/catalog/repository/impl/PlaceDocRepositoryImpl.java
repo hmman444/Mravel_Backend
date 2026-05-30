@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.repository.PlaceDocRepositoryCustom;
+import com.mravel.common.i18n.LocaleConstants;
 
 @Repository
 public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
@@ -31,26 +32,28 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
     List<Criteria> cs = new ArrayList<>();
     cs.add(where("active").is(true));
 
-    // “Địa điểm” & “điểm tham quan” (POI)
     final List<PlaceKind> kinds = List.of(PlaceKind.DESTINATION, PlaceKind.POI);
     cs.add(where("kind").in(Objects.requireNonNull(kinds)));
 
-    // inline check để JDT hiểu qtext non-null
     if (qtext != null && !qtext.isBlank()) {
-      final String kw = qtext; // non-null here
+      final String kw = qtext;
 
       cs.add(new Criteria().orOperator(
-          where("name").regex(kw, "i"),
+          where("name." + LocaleConstants.VI).regex(kw, "i"),
+          where("name." + LocaleConstants.EN).regex(kw, "i"),
           where("slug").regex(kw, "i"),
-          where("addressLine").regex(kw, "i"),
-          where("provinceName").regex(kw, "i"),
-          where("districtName").regex(kw, "i"),
-          where("wardName").regex(kw, "i")));
+          where("addressLine." + LocaleConstants.VI).regex(kw, "i"),
+          where("addressLine." + LocaleConstants.EN).regex(kw, "i"),
+          where("provinceName." + LocaleConstants.VI).regex(kw, "i"),
+          where("provinceName." + LocaleConstants.EN).regex(kw, "i"),
+          where("districtName." + LocaleConstants.VI).regex(kw, "i"),
+          where("districtName." + LocaleConstants.EN).regex(kw, "i"),
+          where("wardName." + LocaleConstants.VI).regex(kw, "i"),
+          where("wardName." + LocaleConstants.EN).regex(kw, "i")));
     }
 
     q.addCriteria(Objects.requireNonNull(and(cs)));
 
-    // count phải bỏ limit/skip (giữ logic đúng paging total)
     long total = mongo.count(Query.of(q).limit(-1).skip(-1), PlaceDoc.class);
     List<PlaceDoc> data = mongo.find(q, PlaceDoc.class);
     return new PageImpl<>(data, pb, total);
@@ -65,8 +68,8 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
 
     cs.add(where("active").is(true));
     if (kind != null)
-      cs.add(where("kind").is(kind)); // POI mặc định
-    cs.add(where("parentSlug").is(parentSlug)); // ràng theo destination
+      cs.add(where("kind").is(kind));
+    cs.add(where("parentSlug").is(parentSlug));
 
     final Criteria[] arr = cs.toArray(Criteria[]::new);
     Objects.requireNonNull(arr);
@@ -91,7 +94,6 @@ public class PlaceDocRepositoryImpl implements PlaceDocRepositoryCustom {
     return new PageImpl<>(mongo.find(q, PlaceDoc.class), pb, total);
   }
 
-  // helpers
   private static Criteria and(List<Criteria> cs) {
     final Criteria[] arr = cs.toArray(Criteria[]::new);
     Objects.requireNonNull(arr, "criteria array must not be null");

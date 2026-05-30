@@ -20,6 +20,8 @@ import com.mravel.catalog.dto.SearchRequests.RestaurantSearchRequest;
 import com.mravel.catalog.model.index.RestaurantIndex;
 import com.mravel.catalog.search.RestaurantSearchService;
 import com.mravel.catalog.search.dto.RestaurantSearchResult;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
 
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
@@ -67,12 +69,18 @@ public class ElasticsearchRestaurantSearchService implements RestaurantSearchSer
             } else {
                 must.add(Query.of(q -> q.bool(b -> b
                         .should(Query.of(s -> s.multiMatch(m -> m
-                                .fields("name^4", "cityName^2", "districtName^1", "addressLine^1")
+                                .fields("nameVi^4", "nameEn^4",
+                                        "cityNameVi^2", "cityNameEn^2",
+                                        "districtNameVi^1", "districtNameEn^1",
+                                        "addressLineVi^1", "addressLineEn^1")
                                 .query(loc)
                                 .fuzziness("AUTO")
                                 .type(TextQueryType.BestFields))))
                         .should(Query.of(s -> s.multiMatch(m -> m
-                                .fields("name^4", "cityName^2", "districtName^1", "addressLine^1")
+                                .fields("nameVi^4", "nameEn^4",
+                                        "cityNameVi^2", "cityNameEn^2",
+                                        "districtNameVi^1", "districtNameEn^1",
+                                        "addressLineVi^1", "addressLineEn^1")
                                 .query(loc)
                                 .type(TextQueryType.BoolPrefix))))
                         .should(Query.of(s -> s.term(t -> t.field("destinationSlug").value(loc))))
@@ -123,14 +131,20 @@ public class ElasticsearchRestaurantSearchService implements RestaurantSearchSer
     }
 
     static RestaurantSearchResult toSearchResult(RestaurantIndex r) {
+        boolean en = LocaleConstants.EN.equals(LocaleContext.get());
+
         List<RestaurantSearchResult.CuisineRef> cuisines = r.getCuisines() == null ? List.of()
                 : r.getCuisines().stream().filter(Objects::nonNull)
-                        .map(c -> new RestaurantSearchResult.CuisineRef(c.getCode(), c.getName()))
+                        .map(c -> new RestaurantSearchResult.CuisineRef(
+                                c.getCode(),
+                                preferEn(c.getNameEn(), c.getNameVi(), en)))
                         .toList();
 
         List<RestaurantSearchResult.AmbienceRef> ambience = r.getAmbience() == null ? List.of()
                 : r.getAmbience().stream().filter(Objects::nonNull)
-                        .map(a -> new RestaurantSearchResult.AmbienceRef(a.getCode(), a.getLabel()))
+                        .map(a -> new RestaurantSearchResult.AmbienceRef(
+                                a.getCode(),
+                                preferEn(a.getLabelEn(), a.getLabelVi(), en)))
                         .toList();
 
         RestaurantSearchResult.CapacityRef capacity = (r.getTotalCapacity() == null && r.getMaxGroupSize() == null)
@@ -139,7 +153,11 @@ public class ElasticsearchRestaurantSearchService implements RestaurantSearchSer
 
         List<RestaurantSearchResult.ImageRef> images = r.getImages() == null ? List.of()
                 : r.getImages().stream().filter(Objects::nonNull)
-                        .map(img -> new RestaurantSearchResult.ImageRef(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new RestaurantSearchResult.ImageRef(
+                                img.getUrl(),
+                                preferEn(img.getCaptionEn(), img.getCaptionVi(), en),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         List<RestaurantSearchResult.OpeningHourRef> openingHours = r.getOpeningHours() == null ? List.of()
@@ -158,14 +176,31 @@ public class ElasticsearchRestaurantSearchService implements RestaurantSearchSer
         }
 
         return new RestaurantSearchResult(
-                r.getId(), r.getName(), r.getSlug(), r.getActive(),
+                r.getId(),
+                preferEn(r.getNameEn(), r.getNameVi(), en),
+                r.getSlug(),
+                r.getActive(),
                 r.getRestaurantType(),
-                r.getDestinationSlug(), r.getCityName(), r.getDistrictName(), r.getWardName(), r.getAddressLine(),
+                r.getDestinationSlug(),
+                preferEn(r.getCityNameEn(), r.getCityNameVi(), en),
+                preferEn(r.getDistrictNameEn(), r.getDistrictNameVi(), en),
+                preferEn(r.getWardNameEn(), r.getWardNameVi(), en),
+                preferEn(r.getAddressLineEn(), r.getAddressLineVi(), en),
                 location,
                 cuisines, ambience, capacity,
-                r.getAvgRating(), r.getReviewsCount(), r.getRatingLabel(),
+                r.getAvgRating(), r.getReviewsCount(),
+                preferEn(r.getRatingLabelEn(), r.getRatingLabelVi(), en),
                 r.getMinPricePerPerson(), r.getMaxPricePerPerson(), r.getCurrencyCode(),
                 r.getPriceLevel(), r.getPriceBucket(),
                 images, openingHours);
+    }
+
+    private static String preferEn(String enValue, String viValue, boolean en) {
+        if (en) {
+            if (enValue != null && !enValue.isBlank()) return enValue;
+            return viValue;
+        }
+        if (viValue != null && !viValue.isBlank()) return viValue;
+        return enValue;
     }
 }

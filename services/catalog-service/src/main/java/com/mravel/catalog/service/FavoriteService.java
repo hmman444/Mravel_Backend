@@ -23,6 +23,8 @@ import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.model.enums.TargetType;
 import com.mravel.catalog.repository.FavoriteDocRepository;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -174,7 +176,7 @@ public class FavoriteService {
                 case HOTEL -> {
                     HotelDoc hotel = mongoTemplate.findById(fav.getTargetId(), HotelDoc.class);
                     if (hotel != null) {
-                        builder.targetName(hotel.getName());
+                        builder.targetName(LocaleUtil.pick(hotel.getName(), LocaleContext.get()));
                         builder.targetSlug(hotel.getSlug());
                         if (hotel.getImages() != null && !hotel.getImages().isEmpty()) {
                             builder.targetImage(hotel.getImages().get(0).getUrl());
@@ -184,7 +186,7 @@ public class FavoriteService {
                 case RESTAURANT -> {
                     RestaurantDoc restaurant = mongoTemplate.findById(fav.getTargetId(), RestaurantDoc.class);
                     if (restaurant != null) {
-                        builder.targetName(restaurant.getName());
+                        builder.targetName(LocaleUtil.pick(restaurant.getName(), LocaleContext.get()));
                         builder.targetSlug(restaurant.getSlug());
                         if (restaurant.getImages() != null && !restaurant.getImages().isEmpty()) {
                             builder.targetImage(restaurant.getImages().get(0).getUrl());
@@ -194,7 +196,7 @@ public class FavoriteService {
                 case PLACE -> {
                     PlaceDoc place = mongoTemplate.findById(fav.getTargetId(), PlaceDoc.class);
                     if (place != null) {
-                        builder.targetName(place.getName());
+                        builder.targetName(LocaleUtil.pick(place.getName(), LocaleContext.get()));
                         builder.targetSlug(place.getSlug());
                         if (place.getImages() != null && !place.getImages().isEmpty()) {
                             builder.targetImage(place.getImages().get(0).getUrl());

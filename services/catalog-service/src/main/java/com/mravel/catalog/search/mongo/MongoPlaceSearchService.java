@@ -19,6 +19,9 @@ import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.search.PlaceSearchService;
 import com.mravel.catalog.search.dto.PlaceSearchResult;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,11 +44,15 @@ public class MongoPlaceSearchService implements PlaceSearchService {
 
         if (q != null && !q.isBlank()) {
             cs.add(new Criteria().orOperator(
-                    where("name").regex(q, "i"),
+                    where("name." + LocaleConstants.VI).regex(q, "i"),
+                    where("name." + LocaleConstants.EN).regex(q, "i"),
                     where("slug").regex(q, "i"),
-                    where("addressLine").regex(q, "i"),
-                    where("provinceName").regex(q, "i"),
-                    where("districtName").regex(q, "i")
+                    where("addressLine." + LocaleConstants.VI).regex(q, "i"),
+                    where("addressLine." + LocaleConstants.EN).regex(q, "i"),
+                    where("provinceName." + LocaleConstants.VI).regex(q, "i"),
+                    where("provinceName." + LocaleConstants.EN).regex(q, "i"),
+                    where("districtName." + LocaleConstants.VI).regex(q, "i"),
+                    where("districtName." + LocaleConstants.EN).regex(q, "i")
             ));
         }
 
@@ -60,15 +67,24 @@ public class MongoPlaceSearchService implements PlaceSearchService {
     }
 
     private static PlaceSearchResult toSearchResult(PlaceDoc p) {
+        String locale = LocaleContext.get();
+
         List<PlaceSearchResult.ImageRef> images = p.getImages() == null ? List.of()
                 : p.getImages().stream().filter(Objects::nonNull)
-                        .map(img -> new PlaceSearchResult.ImageRef(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new PlaceSearchResult.ImageRef(
+                                img.getUrl(),
+                                LocaleUtil.pick(img.getCaption(), locale),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         return new PlaceSearchResult(
-                p.getId(), p.getName(), p.getSlug(),
+                p.getId(),
+                LocaleUtil.pick(p.getName(), locale),
+                p.getSlug(),
                 p.getKind(), p.getVenueType(),
-                p.getAddressLine(), p.getProvinceName(),
+                LocaleUtil.pick(p.getAddressLine(), locale),
+                LocaleUtil.pick(p.getProvinceName(), locale),
                 p.getLocation(),
                 p.getPriceLevel(), p.getAvgRating(), p.getReviewsCount(),
                 images, p.getActive());
@@ -78,7 +94,7 @@ public class MongoPlaceSearchService implements PlaceSearchService {
         q.fields()
                 .include("name").include("slug").include("active").include("kind")
                 .include("venueType").include("parentSlug")
-                .include("cityName").include("districtName").include("wardName")
+                .include("districtName").include("wardName")
                 .include("provinceName").include("addressLine").include("location")
                 .include("shortDescription").include("priceLevel")
                 .include("images").include("categories").include("tags")

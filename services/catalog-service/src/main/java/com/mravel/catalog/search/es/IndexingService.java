@@ -19,6 +19,7 @@ import com.mravel.catalog.model.index.RestaurantIndex;
 import com.mravel.catalog.repository.HotelDocRepository;
 import com.mravel.catalog.repository.PlaceDocRepository;
 import com.mravel.catalog.repository.RestaurantDocRepository;
+import com.mravel.common.i18n.LocaleConstants;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -174,33 +175,45 @@ public class IndexingService {
         List<HotelIndex.ImageData> images = h.getImages() == null ? List.of()
                 : h.getImages().stream()
                         .filter(img -> img != null)
-                        .map(img -> new HotelIndex.ImageData(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new HotelIndex.ImageData(
+                                img.getUrl(),
+                                pick(img.getCaption(), LocaleConstants.VI),
+                                pick(img.getCaption(), LocaleConstants.EN),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         HotelIndex.GeneralInfoData generalInfo = null;
         if (h.getGeneralInfo() != null) {
             generalInfo = new HotelIndex.GeneralInfoData(
-                    h.getGeneralInfo().getMainFacilitiesSummary(),
+                    pick(h.getGeneralInfo().getMainFacilitiesSummary(), LocaleConstants.VI),
+                    pick(h.getGeneralInfo().getMainFacilitiesSummary(), LocaleConstants.EN),
                     h.getGeneralInfo().getDistanceToCityCenterKm());
         }
 
         return HotelIndex.builder()
                 .id(h.getId())
-                .name(h.getName())
+                .nameVi(pick(h.getName(), LocaleConstants.VI))
+                .nameEn(pick(h.getName(), LocaleConstants.EN))
                 .slug(h.getSlug())
                 .active(h.getActive())
                 .moderationStatus(moderationStatus)
                 .starRating(h.getStarRating())
                 .hotelType(h.getHotelType() == null ? null : h.getHotelType().name())
                 .destinationSlug(h.getDestinationSlug())
-                .cityName(h.getCityName())
-                .districtName(h.getDistrictName())
-                .wardName(h.getWardName())
-                .addressLine(h.getAddressLine())
+                .cityNameVi(pick(h.getCityName(), LocaleConstants.VI))
+                .cityNameEn(pick(h.getCityName(), LocaleConstants.EN))
+                .districtNameVi(pick(h.getDistrictName(), LocaleConstants.VI))
+                .districtNameEn(pick(h.getDistrictName(), LocaleConstants.EN))
+                .wardNameVi(pick(h.getWardName(), LocaleConstants.VI))
+                .wardNameEn(pick(h.getWardName(), LocaleConstants.EN))
+                .addressLineVi(pick(h.getAddressLine(), LocaleConstants.VI))
+                .addressLineEn(pick(h.getAddressLine(), LocaleConstants.EN))
                 .location(toGeoPoint(h.getLocation()))
                 .avgRating(h.getAvgRating())
                 .reviewsCount(h.getReviewsCount())
-                .ratingLabel(h.getRatingLabel())
+                .ratingLabelVi(pick(h.getRatingLabel(), LocaleConstants.VI))
+                .ratingLabelEn(pick(h.getRatingLabel(), LocaleConstants.EN))
                 .minNightlyPrice(h.getMinNightlyPrice())
                 .currencyCode(h.getCurrencyCode())
                 .referenceNightlyPrice(h.getReferenceNightlyPrice())
@@ -229,13 +242,19 @@ public class IndexingService {
         List<RestaurantIndex.CuisineData> cuisines = r.getCuisines() == null ? List.of()
                 : r.getCuisines().stream()
                         .filter(c -> c != null)
-                        .map(c -> new RestaurantIndex.CuisineData(c.getCode(), c.getName()))
+                        .map(c -> new RestaurantIndex.CuisineData(
+                                c.getCode(),
+                                pick(c.getName(), LocaleConstants.VI),
+                                pick(c.getName(), LocaleConstants.EN)))
                         .toList();
 
         List<RestaurantIndex.AmbienceData> ambience = r.getAmbience() == null ? List.of()
                 : r.getAmbience().stream()
                         .filter(a -> a != null)
-                        .map(a -> new RestaurantIndex.AmbienceData(a.getCode(), a.getLabel()))
+                        .map(a -> new RestaurantIndex.AmbienceData(
+                                a.getCode(),
+                                pick(a.getLabel(), LocaleConstants.VI),
+                                pick(a.getLabel(), LocaleConstants.EN)))
                         .toList();
 
         Integer totalCapacity = null, maxGroupSize = null;
@@ -247,7 +266,12 @@ public class IndexingService {
         List<RestaurantIndex.ImageData> images = r.getImages() == null ? List.of()
                 : r.getImages().stream()
                         .filter(img -> img != null)
-                        .map(img -> new RestaurantIndex.ImageData(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new RestaurantIndex.ImageData(
+                                img.getUrl(),
+                                pick(img.getCaption(), LocaleConstants.VI),
+                                pick(img.getCaption(), LocaleConstants.EN),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         List<RestaurantIndex.OpeningHourData> openingHours = r.getOpeningHours() == null ? List.of()
@@ -263,17 +287,22 @@ public class IndexingService {
 
         return RestaurantIndex.builder()
                 .id(r.getId())
-                .name(r.getName())
+                .nameVi(pick(r.getName(), LocaleConstants.VI))
+                .nameEn(pick(r.getName(), LocaleConstants.EN))
                 .slug(r.getSlug())
                 .active(r.getActive())
                 .moderationStatus(moderationStatus)
                 .restaurantType(r.getRestaurantType() == null ? null : r.getRestaurantType().name())
                 .destinationSlug(r.getDestinationSlug())
                 .parentPlaceSlug(r.getParentPlaceSlug())
-                .cityName(r.getCityName())
-                .districtName(r.getDistrictName())
-                .wardName(r.getWardName())
-                .addressLine(r.getAddressLine())
+                .cityNameVi(pick(r.getCityName(), LocaleConstants.VI))
+                .cityNameEn(pick(r.getCityName(), LocaleConstants.EN))
+                .districtNameVi(pick(r.getDistrictName(), LocaleConstants.VI))
+                .districtNameEn(pick(r.getDistrictName(), LocaleConstants.EN))
+                .wardNameVi(pick(r.getWardName(), LocaleConstants.VI))
+                .wardNameEn(pick(r.getWardName(), LocaleConstants.EN))
+                .addressLineVi(pick(r.getAddressLine(), LocaleConstants.VI))
+                .addressLineEn(pick(r.getAddressLine(), LocaleConstants.EN))
                 .location(toGeoPoint(r.getLocation()))
                 .cuisineCodes(cuisineCodes)
                 .cuisines(cuisines)
@@ -282,7 +311,8 @@ public class IndexingService {
                 .maxGroupSize(maxGroupSize)
                 .avgRating(r.getAvgRating())
                 .reviewsCount(r.getReviewsCount())
-                .ratingLabel(r.getRatingLabel())
+                .ratingLabelVi(pick(r.getRatingLabel(), LocaleConstants.VI))
+                .ratingLabelEn(pick(r.getRatingLabel(), LocaleConstants.EN))
                 .minPricePerPerson(r.getMinPricePerPerson())
                 .maxPricePerPerson(r.getMaxPricePerPerson())
                 .currencyCode(r.getCurrencyCode())
@@ -302,7 +332,12 @@ public class IndexingService {
         List<PlaceIndex.ImageData> images = p.getImages() == null ? List.of()
                 : p.getImages().stream()
                         .filter(img -> img != null)
-                        .map(img -> new PlaceIndex.ImageData(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new PlaceIndex.ImageData(
+                                img.getUrl(),
+                                pick(img.getCaption(), LocaleConstants.VI),
+                                pick(img.getCaption(), LocaleConstants.EN),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         List<String> categorySlugs = p.getCategories() == null ? List.of()
@@ -311,11 +346,15 @@ public class IndexingService {
                         .map(PlaceDoc.CategoryMini::getSlug)
                         .toList();
 
-        // Encode as "slug::DisplayName" — self-contained label, no post-hoc lookup needed
+        // Encode as "slug::nameVi::nameEn" — pick per locale at extract time
         List<String> categoryLabels = p.getCategories() == null ? List.of()
                 : p.getCategories().stream()
                         .filter(c -> c != null && c.getSlug() != null)
-                        .map(c -> c.getSlug() + "::" + (c.getName() != null ? c.getName() : c.getSlug()))
+                        .map(c -> {
+                            String vi = pick(c.getName(), LocaleConstants.VI);
+                            String en = pick(c.getName(), LocaleConstants.EN);
+                            return c.getSlug() + "::" + nullToEmpty(vi) + "::" + nullToEmpty(en);
+                        })
                         .toList();
 
         List<String> bestVisitTime = p.getBestVisitTime() == null ? List.of()
@@ -326,15 +365,19 @@ public class IndexingService {
 
         return PlaceIndex.builder()
                 .id(p.getId())
-                .name(p.getName())
+                .nameVi(pick(p.getName(), LocaleConstants.VI))
+                .nameEn(pick(p.getName(), LocaleConstants.EN))
                 .slug(p.getSlug())
                 .active(p.getActive())
                 .kind(p.getKind()         == null ? null : p.getKind().name())
                 .venueType(p.getVenueType()    == null ? null : p.getVenueType().name())
                 .parentSlug(p.getParentSlug())
-                .addressLine(p.getAddressLine())
-                .provinceName(p.getProvinceName())
-                .districtName(p.getDistrictName())
+                .addressLineVi(pick(p.getAddressLine(), LocaleConstants.VI))
+                .addressLineEn(pick(p.getAddressLine(), LocaleConstants.EN))
+                .provinceNameVi(pick(p.getProvinceName(), LocaleConstants.VI))
+                .provinceNameEn(pick(p.getProvinceName(), LocaleConstants.EN))
+                .districtNameVi(pick(p.getDistrictName(), LocaleConstants.VI))
+                .districtNameEn(pick(p.getDistrictName(), LocaleConstants.EN))
                 .location(toGeoPoint(p.getLocation()))
                 .priceLevel(p.getPriceLevel()    == null ? null : p.getPriceLevel().name())
                 .avgRating(p.getAvgRating())
@@ -367,5 +410,16 @@ public class IndexingService {
     private static GeoPoint toGeoPoint(double[] loc) {
         if (loc == null || loc.length < 2) return null;
         return new GeoPoint(loc[1], loc[0]);
+    }
+
+    /** Direct read of a single locale value from localized Map (no cross-locale fallback for indexing). */
+    private static String pick(Map<String, String> localized, String locale) {
+        if (localized == null) return null;
+        String v = localized.get(locale);
+        return (v == null || v.isBlank()) ? null : v;
+    }
+
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
     }
 }

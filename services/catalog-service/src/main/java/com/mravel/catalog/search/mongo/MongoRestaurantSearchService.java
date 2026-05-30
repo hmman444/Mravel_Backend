@@ -19,6 +19,9 @@ import com.mravel.catalog.dto.SearchRequests.RestaurantSearchRequest;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.search.RestaurantSearchService;
 import com.mravel.catalog.search.dto.RestaurantSearchResult;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,14 +45,18 @@ public class MongoRestaurantSearchService implements RestaurantSearchService {
     }
 
     private static RestaurantSearchResult toSearchResult(RestaurantDoc r) {
+        String locale = LocaleContext.get();
+
         List<RestaurantSearchResult.CuisineRef> cuisines = r.getCuisines() == null ? List.of()
                 : r.getCuisines().stream().filter(Objects::nonNull)
-                        .map(c -> new RestaurantSearchResult.CuisineRef(c.getCode(), c.getName()))
+                        .map(c -> new RestaurantSearchResult.CuisineRef(c.getCode(),
+                                LocaleUtil.pick(c.getName(), locale)))
                         .toList();
 
         List<RestaurantSearchResult.AmbienceRef> ambience = r.getAmbience() == null ? List.of()
                 : r.getAmbience().stream().filter(Objects::nonNull)
-                        .map(a -> new RestaurantSearchResult.AmbienceRef(a.getCode(), a.getLabel()))
+                        .map(a -> new RestaurantSearchResult.AmbienceRef(a.getCode(),
+                                LocaleUtil.pick(a.getLabel(), locale)))
                         .toList();
 
         RestaurantSearchResult.CapacityRef capacity = r.getCapacity() == null ? null
@@ -57,7 +64,11 @@ public class MongoRestaurantSearchService implements RestaurantSearchService {
 
         List<RestaurantSearchResult.ImageRef> images = r.getImages() == null ? List.of()
                 : r.getImages().stream().filter(Objects::nonNull)
-                        .map(img -> new RestaurantSearchResult.ImageRef(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new RestaurantSearchResult.ImageRef(
+                                img.getUrl(),
+                                LocaleUtil.pick(img.getCaption(), locale),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         List<RestaurantSearchResult.OpeningHourRef> openingHours = r.getOpeningHours() == null ? List.of()
@@ -67,12 +78,20 @@ public class MongoRestaurantSearchService implements RestaurantSearchService {
                         .toList();
 
         return new RestaurantSearchResult(
-                r.getId(), r.getName(), r.getSlug(), r.getActive(),
+                r.getId(),
+                LocaleUtil.pick(r.getName(), locale),
+                r.getSlug(),
+                r.getActive(),
                 r.getRestaurantType() == null ? null : r.getRestaurantType().name(),
-                r.getDestinationSlug(), r.getCityName(), r.getDistrictName(), r.getWardName(), r.getAddressLine(),
+                r.getDestinationSlug(),
+                LocaleUtil.pick(r.getCityName(), locale),
+                LocaleUtil.pick(r.getDistrictName(), locale),
+                LocaleUtil.pick(r.getWardName(), locale),
+                LocaleUtil.pick(r.getAddressLine(), locale),
                 r.getLocation(),
                 cuisines, ambience, capacity,
-                r.getAvgRating(), r.getReviewsCount(), r.getRatingLabel(),
+                r.getAvgRating(), r.getReviewsCount(),
+                LocaleUtil.pick(r.getRatingLabel(), locale),
                 r.getMinPricePerPerson(), r.getMaxPricePerPerson(), r.getCurrencyCode(),
                 r.getPriceLevel() == null ? null : r.getPriceLevel().name(),
                 r.getPriceBucket() == null ? null : r.getPriceBucket().name(),
@@ -93,9 +112,12 @@ public class MongoRestaurantSearchService implements RestaurantSearchService {
             cs.add(new Criteria().orOperator(
                     where("destinationSlug").is(loc),
                     where("parentPlaceSlug").is(loc),
-                    where("cityName").regex(loc, "i"),
-                    where("districtName").regex(loc, "i"),
-                    where("addressLine").regex(loc, "i")
+                    where("cityName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("cityName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.VI).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.EN).regex(loc, "i")
             ));
         }
 
@@ -130,7 +152,7 @@ public class MongoRestaurantSearchService implements RestaurantSearchService {
                 .include("destinationSlug").include("cityName").include("districtName")
                 .include("wardName").include("addressLine").include("location")
                 .include("cuisines.name").include("cuisines.code")
-                .include("ambience.label")
+                .include("ambience.label").include("ambience.code")
                 .include("capacity.totalCapacity").include("capacity.maxGroupSize")
                 .include("avgRating").include("reviewsCount").include("ratingLabel")
                 .include("minPricePerPerson").include("maxPricePerPerson")

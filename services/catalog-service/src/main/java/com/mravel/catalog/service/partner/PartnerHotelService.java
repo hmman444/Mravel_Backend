@@ -7,6 +7,8 @@ import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.repository.HotelDocRepository;
 import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.catalog.service.AmenityCatalogService;
+import com.mravel.catalog.translation.LocalizedTranslator;
+import com.mravel.common.i18n.LocaleConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -30,6 +32,7 @@ public class PartnerHotelService {
     private final AmenityCatalogService amenityCatalogService;
     private final UserServiceClient userServiceClient;
     private final IndexingService indexingService;
+    private final LocalizedTranslator localizedTranslator;
 
     // == LIST giữ nguyên như bạn đang làm ==
 
@@ -46,10 +49,10 @@ public class PartnerHotelService {
 
         // location
         doc.setDestinationSlug(req.destinationSlug());
-        doc.setCityName(req.cityName());
-        doc.setDistrictName(req.districtName());
-        doc.setWardName(req.wardName());
-        doc.setAddressLine(req.addressLine());
+        doc.setCityName(wrap(req.cityName()));
+        doc.setDistrictName(wrap(req.districtName()));
+        doc.setWardName(wrap(req.wardName()));
+        doc.setAddressLine(wrap(req.addressLine()));
         if (req.longitude() != null && req.latitude() != null) {
             doc.setLocation(new double[] { req.longitude(), req.latitude() });
         } else {
@@ -57,14 +60,14 @@ public class PartnerHotelService {
         }
 
         // basic
-        doc.setName(req.name());
+        doc.setName(wrap(req.name()));
         String slugBase = (req.slug() != null && !req.slug().isBlank()) ? req.slug() : req.name();
         doc.setSlug(genUniqueSlugForCreate(slugBase));
 
         doc.setHotelType(parseEnum(req.hotelType(), HotelDoc.HotelType.class, "hotelType"));
         doc.setStarRating(req.starRating());
-        doc.setShortDescription(req.shortDescription());
-        doc.setDescription(req.description());
+        doc.setShortDescription(wrap(req.shortDescription()));
+        doc.setDescription(wrap(req.description()));
         doc.setPhone(req.phone());
         doc.setEmail(req.email());
         doc.setWebsite(req.website());
@@ -279,7 +282,7 @@ public class PartnerHotelService {
 
         // basic
         if (req.name() != null)
-            doc.setName(req.name());
+            doc.setName(wrap(req.name()));
 
         // slug: chỉ đổi nếu user gửi slug khác slug hiện tại
         if (req.slug() != null && !req.slug().isBlank()) {
@@ -296,9 +299,9 @@ public class PartnerHotelService {
             doc.setStarRating(req.starRating());
 
         if (req.shortDescription() != null)
-            doc.setShortDescription(req.shortDescription());
+            doc.setShortDescription(wrap(req.shortDescription()));
         if (req.description() != null)
-            doc.setDescription(req.description());
+            doc.setDescription(wrap(req.description()));
         if (req.phone() != null)
             doc.setPhone(req.phone());
         if (req.email() != null)
@@ -310,13 +313,13 @@ public class PartnerHotelService {
         if (req.destinationSlug() != null)
             doc.setDestinationSlug(req.destinationSlug());
         if (req.cityName() != null)
-            doc.setCityName(req.cityName());
+            doc.setCityName(wrap(req.cityName()));
         if (req.districtName() != null)
-            doc.setDistrictName(req.districtName());
+            doc.setDistrictName(wrap(req.districtName()));
         if (req.wardName() != null)
-            doc.setWardName(req.wardName());
+            doc.setWardName(wrap(req.wardName()));
         if (req.addressLine() != null)
-            doc.setAddressLine(req.addressLine());
+            doc.setAddressLine(wrap(req.addressLine()));
 
         if (req.longitude() != null && req.latitude() != null) {
             doc.setLocation(new double[] { req.longitude(), req.latitude() });
@@ -415,7 +418,7 @@ public class PartnerHotelService {
                 .filter(Objects::nonNull)
                 .map((i) -> HotelDoc.Image.builder()
                         .url(i.url())
-                        .caption(i.caption())
+                        .caption(wrap(i.caption()))
                         .cover(Boolean.TRUE.equals(i.cover()))
                         .sortOrder(i.sortOrder() == null ? 0 : i.sortOrder())
                         .build())
@@ -438,13 +441,13 @@ public class PartnerHotelService {
                     HotelDoc.ContentBlock.ContentBlockBuilder cb = HotelDoc.ContentBlock.builder()
                             .type(parseEnum(b.type(), HotelDoc.ContentBlock.BlockType.class))
                             .section(parseEnum(b.section(), HotelDoc.ContentBlock.ContentSection.class))
-                            .text(b.text());
+                            .text(wrap(b.text()));
 
                     // image
                     if (b.image() != null) {
                         cb.image(HotelDoc.Image.builder()
                                 .url(b.image().url())
-                                .caption(b.image().caption())
+                                .caption(wrap(b.image().caption()))
                                 .cover(Boolean.TRUE.equals(b.image().cover()))
                                 .sortOrder(b.image().sortOrder() == null ? 0 : b.image().sortOrder())
                                 .build());
@@ -472,8 +475,8 @@ public class PartnerHotelService {
                 .filter(Objects::nonNull)
                 .map(n -> HotelDoc.NearbyPlace.builder()
                         .placeSlug(n.placeSlug())
-                        .name(n.name())
-                        .category(n.category())
+                        .name(wrap(n.name()))
+                        .category(wrap(n.category()))
                         .distanceMeters(n.distanceMeters())
                         .build())
                 .toList();
@@ -489,8 +492,8 @@ public class PartnerHotelService {
                     .filter(Objects::nonNull)
                     .map(it -> HotelDoc.PolicyItem.builder()
                             .section(parseEnum(it.section(), HotelDoc.PolicySection.class))
-                            .title(it.title())
-                            .content(it.content())
+                            .title(wrap(it.title()))
+                            .content(wrap(it.content()))
                             .build())
                     .toList();
         }
@@ -506,13 +509,13 @@ public class PartnerHotelService {
         if (gi == null)
             return null;
         return HotelDoc.GeneralInfo.builder()
-                .mainFacilitiesSummary(gi.mainFacilitiesSummary())
+                .mainFacilitiesSummary(wrap(gi.mainFacilitiesSummary()))
                 .distanceToCityCenterKm(gi.distanceToCityCenterKm())
-                .popularAreaSummary(gi.popularAreaSummary())
+                .popularAreaSummary(wrap(gi.popularAreaSummary()))
                 .totalRooms(gi.totalRooms())
                 .totalFloors(gi.totalFloors())
-                .otherHighlightFacilities(gi.otherHighlightFacilities())
-                .interestingPlacesSummary(gi.interestingPlacesSummary())
+                .otherHighlightFacilities(wrap(gi.otherHighlightFacilities()))
+                .interestingPlacesSummary(wrap(gi.interestingPlacesSummary()))
                 .build();
     }
 
@@ -522,8 +525,8 @@ public class PartnerHotelService {
         return faqs.stream()
                 .filter(Objects::nonNull)
                 .map(f -> HotelDoc.FaqItem.builder()
-                        .question(f.question())
-                        .answer(f.answer())
+                        .question(wrap(f.question()))
+                        .answer(wrap(f.answer()))
                         .build())
                 .toList();
     }
@@ -576,13 +579,13 @@ public class PartnerHotelService {
 
                     return HotelDoc.RoomType.builder()
                             .id(rtId)
-                            .name(rt.name())
-                            .shortDescription(rt.shortDescription())
-                            .description(rt.description())
+                            .name(wrap(rt.name()))
+                            .shortDescription(wrap(rt.shortDescription()))
+                            .description(wrap(rt.description()))
                             .areaSqm(rt.areaSqm())
                             .bedType(parseEnum(rt.bedType(), HotelDoc.BedType.class))
                             .bedsCount(rt.bedsCount())
-                            .bedLayoutDescription(rt.bedLayoutDescription())
+                            .bedLayoutDescription(wrap(rt.bedLayoutDescription()))
                             .bedOptions(bedOptions)
 
                             .maxAdults(rt.maxAdults())
@@ -617,12 +620,12 @@ public class PartnerHotelService {
 
         return HotelDoc.RatePlan.builder()
                 .id(rpId)
-                .name(rp.name())
+                .name(wrap(rp.name()))
 
                 .boardType(parseEnum(rp.boardType(), HotelDoc.BoardType.class))
                 .paymentType(parseEnum(rp.paymentType(), HotelDoc.PaymentType.class))
                 .refundable(rp.refundable())
-                .cancellationPolicy(rp.cancellationPolicy())
+                .cancellationPolicy(wrap(rp.cancellationPolicy()))
 
                 .pricePerNight(rp.pricePerNight())
                 .referencePricePerNight(rp.referencePricePerNight())
@@ -635,9 +638,14 @@ public class PartnerHotelService {
 
                 .lengthOfStayDiscounts(los)
 
-                .promoLabel(rp.promoLabel())
+                .promoLabel(wrap(rp.promoLabel()))
                 .showLowAvailability(rp.showLowAvailability())
                 .build();
+    }
+
+    // Đưa String (theo locale admin/partner đang nhập) thành Map song ngữ: tự dịch sang locale còn lại.
+    private Map<String, String> wrap(String value) {
+        return localizedTranslator.resolveFromString(value, null);
     }
 
     // recompute denormalized

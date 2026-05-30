@@ -1,7 +1,9 @@
 package com.mravel.common.exception;
 
+import com.mravel.common.i18n.MessageUtil;
 import com.mravel.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,29 +18,43 @@ import java.lang.reflect.UndeclaredThrowableException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * Optional: chỉ có khi service component-scan com.mravel.common (catalog, auth...).
+     * Service không scan → null → dùng fallback tiếng Việt mặc định.
+     * Giữ field injection (không phải constructor) để subclass như ChatExceptionHandler
+     * vẫn dùng được no-arg super constructor.
+     */
+    @Autowired(required = false)
+    private MessageUtil messageUtil;
+
+    private String msg(String code, String fallbackVi) {
+        return messageUtil != null ? messageUtil.get(code) : fallbackVi;
+    }
+
     // Lỗi parse JSON, enum sai, request body sai format
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<?>> handleJsonParse(HttpMessageNotReadableException ex) {
         log.warn("JSON parse error: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
+                .body(ApiResponse.error(msg("error.invalid_payload", "Dữ liệu gửi lên không hợp lệ")));
     }
 
-    // Lỗi validation
+    // Lỗi validation — message của field giữ nguyên (business-specific), prefix field name
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<?>> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors()
                 .stream()
                 .findFirst()
                 .map(err -> err.getField() + " " + err.getDefaultMessage())
-                .orElse("Dữ liệu không hợp lệ");
+                .orElse(msg("error.validation", "Dữ liệu không hợp lệ"));
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message));
     }
 
+    // Business exception — message do service cung cấp (đã có ngữ cảnh cụ thể)
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<ApiResponse<?>> handleBaseException(BaseException ex) {
         log.warn("Business exception [{}]: {}", ex.getStatus(), ex.getMessage());
@@ -47,7 +63,7 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    // Bắt IllegalArgumentException
+    // Bắt IllegalArgumentException — message do service cung cấp
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity
@@ -59,7 +75,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({ AopInvocationException.class, UndeclaredThrowableException.class })
     public ResponseEntity<ApiResponse<?>> handleAopWrapper(Exception ex) {
         Throwable root = ex.getCause() != null ? ex.getCause() : ex;
-        String message = root.getMessage() != null ? root.getMessage() : "Lỗi xử lý yêu cầu";
+        String message = root.getMessage() != null ? root.getMessage()
+                : msg("error.processing", "Lỗi xử lý yêu cầu");
 
         log.warn("AOP wrapped exception: {}", message);
         return ResponseEntity
@@ -81,6 +98,6 @@ public class GlobalExceptionHandler {
         log.error("Unexpected error", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Đã xảy ra lỗi hệ thống"));
+                .body(ApiResponse.error(msg("error.system", "Đã xảy ra lỗi hệ thống")));
     }
 }

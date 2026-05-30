@@ -5,9 +5,9 @@ import java.util.List;
 import org.springframework.web.bind.annotation.*;
 
 import com.mravel.common.response.ApiResponse;
+import com.mravel.catalog.dto.amenity.AmenityResponseDTO;
 import com.mravel.catalog.dto.amenity.AmenityUpsertRequest;
 import com.mravel.catalog.dto.amenity.AmenityGroupedResponse;
-import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.service.AmenityCatalogService;
 
@@ -21,12 +21,12 @@ public class AmenityCatalogController {
     private final AmenityCatalogService service;
 
     @PostMapping
-    public ApiResponse<AmenityCatalogDoc> create(@RequestBody AmenityUpsertRequest req) {
+    public ApiResponse<AmenityResponseDTO> create(@RequestBody AmenityUpsertRequest req) {
         return ApiResponse.success("Tạo tiện ích thành công", service.create(req));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<AmenityCatalogDoc> update(@PathVariable String id, @RequestBody AmenityUpsertRequest req) {
+    public ApiResponse<AmenityResponseDTO> update(@PathVariable String id, @RequestBody AmenityUpsertRequest req) {
         return ApiResponse.success("Cập nhật tiện ích thành công", service.update(id, req));
     }
 
@@ -47,7 +47,7 @@ public class AmenityCatalogController {
             AmenityGroupedResponse data = service.grouped(scope);
             return ApiResponse.success("OK", data);
         }
-        List<AmenityCatalogDoc> data = service.list(scope, active);
+        List<AmenityResponseDTO> data = service.list(scope, active);
         return ApiResponse.success("OK", data);
     }
 }

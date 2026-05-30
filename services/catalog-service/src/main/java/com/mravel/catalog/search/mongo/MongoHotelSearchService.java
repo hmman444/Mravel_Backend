@@ -19,6 +19,9 @@ import com.mravel.catalog.dto.SearchRequests.HotelSearchRequest;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.search.HotelSearchService;
 import com.mravel.catalog.search.dto.HotelSearchResult;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,15 +45,21 @@ public class MongoHotelSearchService implements HotelSearchService {
     }
 
     private static HotelSearchResult toSearchResult(HotelDoc h) {
+        String locale = LocaleContext.get();
+
         HotelSearchResult.GeneralInfoRef generalInfo = h.getGeneralInfo() == null ? null
                 : new HotelSearchResult.GeneralInfoRef(
-                        h.getGeneralInfo().getMainFacilitiesSummary(),
+                        LocaleUtil.pick(h.getGeneralInfo().getMainFacilitiesSummary(), locale),
                         h.getGeneralInfo().getDistanceToCityCenterKm());
 
         List<HotelSearchResult.ImageRef> images = h.getImages() == null ? List.of()
                 : h.getImages().stream()
                         .filter(Objects::nonNull)
-                        .map(img -> new HotelSearchResult.ImageRef(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new HotelSearchResult.ImageRef(
+                                img.getUrl(),
+                                LocaleUtil.pick(img.getCaption(), locale),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         List<HotelSearchResult.RoomTypeMini> roomTypes = h.getRoomTypes() == null ? List.of()
@@ -60,11 +69,20 @@ public class MongoHotelSearchService implements HotelSearchService {
                         .toList();
 
         return new HotelSearchResult(
-                h.getId(), h.getName(), h.getSlug(), h.getActive(),
-                h.getStarRating(), h.getHotelType() == null ? null : h.getHotelType().name(),
-                h.getDestinationSlug(), h.getCityName(), h.getDistrictName(), h.getWardName(), h.getAddressLine(),
+                h.getId(),
+                LocaleUtil.pick(h.getName(), locale),
+                h.getSlug(),
+                h.getActive(),
+                h.getStarRating(),
+                h.getHotelType() == null ? null : h.getHotelType().name(),
+                h.getDestinationSlug(),
+                LocaleUtil.pick(h.getCityName(), locale),
+                LocaleUtil.pick(h.getDistrictName(), locale),
+                LocaleUtil.pick(h.getWardName(), locale),
+                LocaleUtil.pick(h.getAddressLine(), locale),
                 h.getLocation(),
-                h.getAvgRating(), h.getReviewsCount(), h.getRatingLabel(),
+                h.getAvgRating(), h.getReviewsCount(),
+                LocaleUtil.pick(h.getRatingLabel(), locale),
                 h.getMinNightlyPrice(), h.getCurrencyCode(), h.getReferenceNightlyPrice(), h.getDiscountPercent(),
                 generalInfo, images, roomTypes);
     }
@@ -82,9 +100,12 @@ public class MongoHotelSearchService implements HotelSearchService {
             String loc = r.location().trim();
             cs.add(new Criteria().orOperator(
                     where("destinationSlug").is(loc),
-                    where("cityName").regex(loc, "i"),
-                    where("districtName").regex(loc, "i"),
-                    where("addressLine").regex(loc, "i")
+                    where("cityName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("cityName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.VI).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.EN).regex(loc, "i")
             ));
         }
 

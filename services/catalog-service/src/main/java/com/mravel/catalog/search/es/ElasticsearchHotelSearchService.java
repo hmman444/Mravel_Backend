@@ -26,6 +26,8 @@ import com.mravel.catalog.model.index.HotelIndex;
 import com.mravel.catalog.search.HotelSearchService;
 import com.mravel.catalog.search.dto.HotelSearchResult;
 import com.mravel.catalog.service.HotelMapper;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
@@ -82,12 +84,18 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
             } else {
                 must.add(Query.of(q -> q.bool(b -> b
                         .should(Query.of(s -> s.multiMatch(m -> m
-                                .fields("name^4", "cityName^2", "districtName^1", "addressLine^1")
+                                .fields("nameVi^4", "nameEn^4",
+                                        "cityNameVi^2", "cityNameEn^2",
+                                        "districtNameVi^1", "districtNameEn^1",
+                                        "addressLineVi^1", "addressLineEn^1")
                                 .query(loc)
                                 .fuzziness("AUTO")
                                 .type(TextQueryType.BestFields))))
                         .should(Query.of(s -> s.multiMatch(m -> m
-                                .fields("name^4", "cityName^2", "districtName^1", "addressLine^1")
+                                .fields("nameVi^4", "nameEn^4",
+                                        "cityNameVi^2", "cityNameEn^2",
+                                        "districtNameVi^1", "districtNameEn^1",
+                                        "addressLineVi^1", "addressLineEn^1")
                                 .query(loc)
                                 .type(TextQueryType.BoolPrefix))))
                         .should(Query.of(s -> s.term(t -> t.field("destinationSlug").value(loc))))
@@ -147,15 +155,22 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
     }
 
     static HotelSearchResult toSearchResult(HotelIndex h) {
+        boolean en = LocaleConstants.EN.equals(LocaleContext.get());
+
         HotelSearchResult.GeneralInfoRef generalInfo = h.getGeneralInfo() == null ? null
                 : new HotelSearchResult.GeneralInfoRef(
-                        h.getGeneralInfo().getMainFacilitiesSummary(),
+                        preferEn(h.getGeneralInfo().getMainFacilitiesSummaryEn(),
+                                h.getGeneralInfo().getMainFacilitiesSummaryVi(), en),
                         h.getGeneralInfo().getDistanceToCityCenterKm());
 
         List<HotelSearchResult.ImageRef> images = h.getImages() == null ? List.of()
                 : h.getImages().stream()
                         .filter(Objects::nonNull)
-                        .map(img -> new HotelSearchResult.ImageRef(img.getUrl(), img.getCaption(), img.getCover(), img.getSortOrder()))
+                        .map(img -> new HotelSearchResult.ImageRef(
+                                img.getUrl(),
+                                preferEn(img.getCaptionEn(), img.getCaptionVi(), en),
+                                img.getCover(),
+                                img.getSortOrder()))
                         .toList();
 
         List<HotelSearchResult.RoomTypeMini> roomTypes = h.getRoomTypes() == null ? List.of()
@@ -170,18 +185,32 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
         }
 
         return new HotelSearchResult(
-                h.getId(), h.getName(), h.getSlug(), h.getActive(),
-                h.getStarRating(), h.getHotelType(),
-                h.getDestinationSlug(), h.getCityName(), h.getDistrictName(), h.getWardName(), h.getAddressLine(),
+                h.getId(),
+                preferEn(h.getNameEn(), h.getNameVi(), en),
+                h.getSlug(),
+                h.getActive(),
+                h.getStarRating(),
+                h.getHotelType(),
+                h.getDestinationSlug(),
+                preferEn(h.getCityNameEn(), h.getCityNameVi(), en),
+                preferEn(h.getDistrictNameEn(), h.getDistrictNameVi(), en),
+                preferEn(h.getWardNameEn(), h.getWardNameVi(), en),
+                preferEn(h.getAddressLineEn(), h.getAddressLineVi(), en),
                 location,
-                h.getAvgRating(), h.getReviewsCount(), h.getRatingLabel(),
+                h.getAvgRating(), h.getReviewsCount(),
+                preferEn(h.getRatingLabelEn(), h.getRatingLabelVi(), en),
                 h.getMinNightlyPrice(), h.getCurrencyCode(), h.getReferenceNightlyPrice(), h.getDiscountPercent(),
                 generalInfo, images, roomTypes);
     }
 
-    // =========================================================
-    // FACETED SEARCH — new, does NOT touch search() above
-    // =========================================================
+    private static String preferEn(String enValue, String viValue, boolean en) {
+        if (en) {
+            if (enValue != null && !enValue.isBlank()) return enValue;
+            return viValue;
+        }
+        if (viValue != null && !viValue.isBlank()) return viValue;
+        return enValue;
+    }
 
     public FacetedSearchResponse<HotelSummaryDTO, HotelFacets> searchFaceted(
             FacetedHotelSearchRequest request, Pageable pageable) {
@@ -229,8 +258,6 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
         }
     }
 
-    // ── (A) Context query: active + approved + location ──────────────────────
-
     private static Query buildContextQuery(FacetedHotelSearchRequest r) {
         List<Query> must = new ArrayList<>();
         must.add(Query.of(q -> q.term(t -> t.field("active").value(true))));
@@ -243,7 +270,10 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
             } else {
                 must.add(Query.of(q -> q.bool(b -> b
                         .should(Query.of(s -> s.multiMatch(m -> m
-                                .fields("name^4", "cityName^2", "districtName^1", "addressLine^1")
+                                .fields("nameVi^4", "nameEn^4",
+                                        "cityNameVi^2", "cityNameEn^2",
+                                        "districtNameVi^1", "districtNameEn^1",
+                                        "addressLineVi^1", "addressLineEn^1")
                                 .query(loc)
                                 .fuzziness("AUTO")
                                 .type(TextQueryType.BestFields))))
@@ -253,8 +283,6 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
         }
         return boolMust(must);
     }
-
-    // ── (B) Post-filter: user-selected facets, does NOT affect agg counts ────
 
     private static Query buildPostFilter(FacetedHotelSearchRequest r) {
         if (r == null) return Query.of(q -> q.matchAll(m -> m));
@@ -271,7 +299,6 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
             filters.add(Query.of(q -> q.terms(t -> t.field("hotelType").terms(tv -> tv.value(vals)))));
         }
         if (r.amenities() != null && !r.amenities().isEmpty()) {
-            // AND semantics: hotel must have every selected amenity
             for (String code : r.amenities()) {
                 String c = code;
                 filters.add(Query.of(q -> q.term(t -> t.field("amenityCodes").value(c))));
@@ -293,8 +320,6 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
         if (filters.isEmpty()) return Query.of(q -> q.matchAll(m -> m));
         return Query.of(q -> q.bool(b -> { filters.forEach(b::filter); return b; }));
     }
-
-    // ── (C) Extract aggregations → HotelFacets ───────────────────────────────
 
     private static HotelFacets extractFacets(java.util.Map<String, Aggregate> aggs) {
         if (aggs == null) return new HotelFacets(List.of(), List.of(), List.of(), List.of(), null);

@@ -4,6 +4,7 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.data.domain.Page;
@@ -13,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.mravel.catalog.dto.place.PlaceAdminDtos.PlaceAdminResponse;
 import com.mravel.catalog.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
-import com.mravel.catalog.dto.place.PlaceDtos;
+import com.mravel.catalog.dto.place.PlaceDtos.CategoryDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.ImageDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.OpenHourDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.PlaceDetailDTO;
@@ -27,6 +28,10 @@ import com.mravel.catalog.model.enums.PlaceKind;
 import com.mravel.catalog.repository.PlaceDocRepository;
 import com.mravel.catalog.search.PlaceSearchService;
 import com.mravel.catalog.search.es.IndexingService;
+import com.mravel.catalog.translation.LocalizedTranslator;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,6 +42,7 @@ public class PlaceService {
   private final PlaceDocRepository repo;
   private final PlaceSearchService placeSearchService;
   private final IndexingService indexingService;
+  private final LocalizedTranslator localizedTranslator;
 
   public Page<PlaceSummaryDTO> searchPlaces(String q, PlaceKind kind, Pageable pageable) {
     return placeSearchService.search(q, kind, pageable).map(PlaceMapper::toSummary);
@@ -56,8 +62,8 @@ public class PlaceService {
     var hours = p.getOpenHours() == null ? List.<OpenHourDTO>of()
         : p.getOpenHours().stream().map(PlaceMapper::toOpenHour).toList();
 
-    var categories = p.getCategories() == null ? List.<PlaceDtos.CategoryDTO>of()
-        : p.getCategories().stream().map(c -> new PlaceDtos.CategoryDTO(c.getName(), c.getSlug())).toList();
+    var categories = p.getCategories() == null ? List.<CategoryDTO>of()
+        : p.getCategories().stream().map(PlaceMapper::toCategory).toList();
 
     var tags = p.getTags() == null ? List.<TagDTO>of()
         : p.getTags().stream().map(PlaceMapper::toTag).toList();
@@ -95,23 +101,23 @@ public class PlaceService {
         .ancestors(buildAncestors(parent))
         .childrenCount(0)
 
-        .name(req.name())
+        .name(localizedTranslator.resolveCreate(req.name()))
         .slug(slug)
-        .shortDescription(req.shortDescription())
-        .description(req.description())
+        .shortDescription(localizedTranslator.resolveCreate(req.shortDescription()))
+        .description(localizedTranslator.resolveCreate(req.description()))
 
         .phone(req.phone())
         .email(req.email())
         .website(req.website())
 
-        .addressLine(req.addressLine())
+        .addressLine(localizedTranslator.resolveCreate(req.addressLine()))
         .countryCode(req.countryCode() == null ? "VN" : req.countryCode())
         .provinceCode(req.provinceCode())
         .districtCode(req.districtCode())
         .wardCode(req.wardCode())
-        .provinceName(req.provinceName())
-        .districtName(req.districtName())
-        .wardName(req.wardName())
+        .provinceName(localizedTranslator.resolveCreate(req.provinceName()))
+        .districtName(localizedTranslator.resolveCreate(req.districtName()))
+        .wardName(localizedTranslator.resolveCreate(req.wardName()))
 
         .location(buildLocation(req.longitude(), req.latitude()))
 
@@ -119,16 +125,15 @@ public class PlaceService {
         .minPrice(req.minPrice())
         .maxPrice(req.maxPrice())
 
-        .images(mapImages(req.images()))
+        .images(mapImages(req.images(), null))
         .openHours(mapOpenHours(req.openHours()))
-        .categories(mapCategories(req.categories()))
-        .tags(mapTags(req.tags()))
-        .content(mapContent(req.content()))
+        .categories(mapCategories(req.categories(), null))
+        .tags(mapTags(req.tags(), null))
+        .content(mapContent(req.content(), null))
         .build();
 
     PlaceDoc saved = repo.save(doc);
 
-    // cập nhật childrenCount cho parent (nếu có)
     if (parent != null) {
       refreshChildrenCount(parent.getSlug());
     }
@@ -137,7 +142,6 @@ public class PlaceService {
     return toAdminResponse(saved);
   }
 
-  // === UPDATE ===
   @Transactional
   public PlaceAdminResponse update(String id, UpsertPlaceRequest req) {
     PlaceDoc existing = repo.findById(id)
@@ -147,7 +151,6 @@ public class PlaceService {
 
     String oldParentSlug = existing.getParentSlug();
 
-    // slug: cho phép update nếu bạn muốn (mặc định: cho phép nhưng validate unique)
     String newSlug = normalizeSlug(req.slug(), req.name());
     if (!Objects.equals(existing.getSlug(), newSlug)) {
       if (repo.existsBySlugAndIdNot(newSlug, id)) {
@@ -165,22 +168,22 @@ public class PlaceService {
     existing.setParentSlug(newParent == null ? null : newParent.getSlug());
     existing.setAncestors(buildAncestors(newParent));
 
-    existing.setName(req.name());
-    existing.setShortDescription(req.shortDescription());
-    existing.setDescription(req.description());
+    existing.setName(localizedTranslator.resolve(req.name(), existing.getName()));
+    existing.setShortDescription(localizedTranslator.resolve(req.shortDescription(), existing.getShortDescription()));
+    existing.setDescription(localizedTranslator.resolve(req.description(), existing.getDescription()));
 
     existing.setPhone(req.phone());
     existing.setEmail(req.email());
     existing.setWebsite(req.website());
 
-    existing.setAddressLine(req.addressLine());
+    existing.setAddressLine(localizedTranslator.resolve(req.addressLine(), existing.getAddressLine()));
     existing.setCountryCode(req.countryCode() == null ? existing.getCountryCode() : req.countryCode());
     existing.setProvinceCode(req.provinceCode());
     existing.setDistrictCode(req.districtCode());
     existing.setWardCode(req.wardCode());
-    existing.setProvinceName(req.provinceName());
-    existing.setDistrictName(req.districtName());
-    existing.setWardName(req.wardName());
+    existing.setProvinceName(localizedTranslator.resolve(req.provinceName(), existing.getProvinceName()));
+    existing.setDistrictName(localizedTranslator.resolve(req.districtName(), existing.getDistrictName()));
+    existing.setWardName(localizedTranslator.resolve(req.wardName(), existing.getWardName()));
 
     existing.setLocation(buildLocation(req.longitude(), req.latitude()));
 
@@ -188,15 +191,14 @@ public class PlaceService {
     existing.setMinPrice(req.minPrice());
     existing.setMaxPrice(req.maxPrice());
 
-    existing.setImages(mapImages(req.images()));
+    existing.setImages(mapImages(req.images(), existing.getImages()));
     existing.setOpenHours(mapOpenHours(req.openHours()));
-    existing.setCategories(mapCategories(req.categories()));
-    existing.setTags(mapTags(req.tags()));
-    existing.setContent(mapContent(req.content()));
+    existing.setCategories(mapCategories(req.categories(), existing.getCategories()));
+    existing.setTags(mapTags(req.tags(), existing.getTags()));
+    existing.setContent(mapContent(req.content(), existing.getContent()));
 
     PlaceDoc saved = repo.save(existing);
 
-    // nếu đổi parent => refresh childrenCount cả 2 bên
     if (!Objects.equals(oldParentSlug, saved.getParentSlug())) {
       if (oldParentSlug != null)
         refreshChildrenCount(oldParentSlug);
@@ -271,10 +273,9 @@ public class PlaceService {
       throw new IllegalArgumentException("Request is required");
     if (req.kind() == null)
       throw new IllegalArgumentException("kind is required");
-    if (req.name() == null || req.name().trim().isEmpty())
-      throw new IllegalArgumentException("name is required");
+    if (!hasAnyLocaleValue(req.name()))
+      throw new IllegalArgumentException("name is required (at least one locale)");
 
-    // kind rules
     if (req.kind() == PlaceKind.DESTINATION) {
       if (req.parentSlug() != null && !req.parentSlug().isBlank())
         throw new IllegalArgumentException("Địa điểm phải bảo gồm slug điểm đến cha");
@@ -296,7 +297,6 @@ public class PlaceService {
         throw new IllegalArgumentException("VENUE requires venueType");
     }
 
-    // location: nếu nhập 1 cái mà thiếu cái còn lại => lỗi
     boolean hasLat = req.latitude() != null;
     boolean hasLon = req.longitude() != null;
     if (hasLat ^ hasLon) {
@@ -311,7 +311,6 @@ public class PlaceService {
     PlaceDoc parent = repo.findBySlug(parentSlug)
         .orElseThrow(() -> new IllegalArgumentException("Parent not found: " + parentSlug));
 
-    // Quy ước theo seed: POI/VENUE thường nằm dưới DESTINATION
     if (parent.getKind() != PlaceKind.DESTINATION) {
       throw new IllegalArgumentException(
           "Điểm đến cha phải là một điểm đến (DESTINATION): hiện tại: " + parent.getKind());
@@ -345,9 +344,10 @@ public class PlaceService {
   }
 
   private PlaceAdminResponse toAdminResponse(PlaceDoc p) {
+    String locale = LocaleContext.get();
     return new PlaceAdminResponse(
         p.getId(),
-        p.getName(),
+        LocaleUtil.pick(p.getName(), locale),
         p.getSlug(),
         p.getKind(),
         p.getVenueType(),
@@ -357,19 +357,33 @@ public class PlaceService {
         p.getChildrenCount());
   }
 
-  // mapping lists to embedded docs
-  private List<PlaceDoc.Image> mapImages(List<com.mravel.catalog.dto.place.PlaceAdminDtos.ImageReq> imgs) {
+  private List<PlaceDoc.Image> mapImages(List<com.mravel.catalog.dto.place.PlaceAdminDtos.ImageReq> imgs,
+      List<PlaceDoc.Image> old) {
     if (imgs == null)
       return List.of();
+    Map<String, Map<String, String>> oldByUrl = captionsByUrl(old);
     return imgs.stream()
         .filter(Objects::nonNull)
         .map(i -> PlaceDoc.Image.builder()
             .url(i.url())
-            .caption(i.caption())
+            .caption(localizedTranslator.resolve(i.caption(), oldByUrl.get(i.url())))
             .cover(i.cover() != null && i.cover())
             .sortOrder(i.sortOrder() == null ? 0 : i.sortOrder())
             .build())
         .toList();
+  }
+
+  // Lookup caption (Map locale->value) cũ theo url ảnh — để giữ bản dịch khi caption không đổi.
+  private static Map<String, Map<String, String>> captionsByUrl(List<PlaceDoc.Image> old) {
+    Map<String, Map<String, String>> m = new java.util.HashMap<>();
+    if (old != null) {
+      for (PlaceDoc.Image o : old) {
+        if (o != null && o.getUrl() != null) {
+          m.put(o.getUrl(), o.getCaption());
+        }
+      }
+    }
+    return m;
   }
 
   private List<PlaceDoc.OpenHour> mapOpenHours(List<com.mravel.catalog.dto.place.PlaceAdminDtos.OpenHourReq> hours) {
@@ -388,25 +402,41 @@ public class PlaceService {
   }
 
   private List<PlaceDoc.CategoryMini> mapCategories(
-      List<com.mravel.catalog.dto.place.PlaceAdminDtos.CategoryReq> categories) {
+      List<com.mravel.catalog.dto.place.PlaceAdminDtos.CategoryReq> categories,
+      List<PlaceDoc.CategoryMini> old) {
     if (categories == null)
       return List.of();
+    Map<String, Map<String, String>> oldBySlug = new java.util.HashMap<>();
+    if (old != null) {
+      for (PlaceDoc.CategoryMini o : old) {
+        if (o != null && o.getSlug() != null)
+          oldBySlug.put(o.getSlug(), o.getName());
+      }
+    }
     return categories.stream()
         .filter(Objects::nonNull)
         .map(c -> PlaceDoc.CategoryMini.builder()
-            .name(c.name())
+            .name(localizedTranslator.resolve(c.name(), oldBySlug.get(c.slug())))
             .slug(c.slug())
             .build())
         .toList();
   }
 
-  private List<PlaceDoc.TagMini> mapTags(List<com.mravel.catalog.dto.place.PlaceAdminDtos.TagReq> tags) {
+  private List<PlaceDoc.TagMini> mapTags(List<com.mravel.catalog.dto.place.PlaceAdminDtos.TagReq> tags,
+      List<PlaceDoc.TagMini> old) {
     if (tags == null)
       return List.of();
+    Map<String, Map<String, String>> oldBySlug = new java.util.HashMap<>();
+    if (old != null) {
+      for (PlaceDoc.TagMini o : old) {
+        if (o != null && o.getSlug() != null)
+          oldBySlug.put(o.getSlug(), o.getName());
+      }
+    }
     return tags.stream()
         .filter(Objects::nonNull)
         .map(t -> PlaceDoc.TagMini.builder()
-            .name(t.name())
+            .name(localizedTranslator.resolve(t.name(), oldBySlug.get(t.slug())))
             .slug(t.slug())
             .type(t.type())
             .build())
@@ -414,44 +444,57 @@ public class PlaceService {
   }
 
   private List<PlaceDoc.ContentBlock> mapContent(
-      List<com.mravel.catalog.dto.place.PlaceAdminDtos.ContentBlockReq> content) {
+      List<com.mravel.catalog.dto.place.PlaceAdminDtos.ContentBlockReq> content,
+      List<PlaceDoc.ContentBlock> old) {
     if (content == null)
       return List.of();
-    return content.stream()
-        .filter(Objects::nonNull)
-        .map(b -> PlaceDoc.ContentBlock.builder()
-            .type(b.type())
-            .text(b.text())
-            .image(b.image() == null ? null
-                : PlaceDoc.Image.builder()
-                    .url(b.image().url())
-                    .caption(b.image().caption())
-                    .cover(b.image().cover() != null && b.image().cover())
-                    .sortOrder(b.image().sortOrder() == null ? 0 : b.image().sortOrder())
-                    .build())
-            .gallery(b.gallery() == null ? List.of()
-                : b.gallery().stream()
-                    .filter(Objects::nonNull)
-                    .map(i -> PlaceDoc.Image.builder()
-                        .url(i.url())
-                        .caption(i.caption())
-                        .cover(i.cover() != null && i.cover())
-                        .sortOrder(i.sortOrder() == null ? 0 : i.sortOrder())
-                        .build())
-                    .toList())
-            .mapLocation((b.mapLon() != null && b.mapLat() != null) ? new double[] { b.mapLon(), b.mapLat() } : null)
-            .build())
-        .toList();
+    List<PlaceDoc.ContentBlock> result = new ArrayList<>();
+    for (int idx = 0; idx < content.size(); idx++) {
+      var b = content.get(idx);
+      if (b == null)
+        continue;
+      // Khớp block cũ theo INDEX để giữ bản dịch khi text không đổi.
+      PlaceDoc.ContentBlock oldBlock = (old != null && idx < old.size()) ? old.get(idx) : null;
+      Map<String, String> oldText = oldBlock != null ? oldBlock.getText() : null;
+      Map<String, String> oldImgCaption = (oldBlock != null && oldBlock.getImage() != null)
+          ? oldBlock.getImage().getCaption()
+          : null;
+      Map<String, Map<String, String>> oldGalleryByUrl = (oldBlock != null) ? captionsByUrl(oldBlock.getGallery())
+          : java.util.Map.of();
+
+      result.add(PlaceDoc.ContentBlock.builder()
+          .type(b.type())
+          .text(localizedTranslator.resolve(b.text(), oldText))
+          .image(b.image() == null ? null
+              : PlaceDoc.Image.builder()
+                  .url(b.image().url())
+                  .caption(localizedTranslator.resolve(b.image().caption(), oldImgCaption))
+                  .cover(b.image().cover() != null && b.image().cover())
+                  .sortOrder(b.image().sortOrder() == null ? 0 : b.image().sortOrder())
+                  .build())
+          .gallery(b.gallery() == null ? List.of()
+              : b.gallery().stream()
+                  .filter(Objects::nonNull)
+                  .map(i -> PlaceDoc.Image.builder()
+                      .url(i.url())
+                      .caption(localizedTranslator.resolve(i.caption(), oldGalleryByUrl.get(i.url())))
+                      .cover(i.cover() != null && i.cover())
+                      .sortOrder(i.sortOrder() == null ? 0 : i.sortOrder())
+                      .build())
+                  .toList())
+          .mapLocation((b.mapLon() != null && b.mapLat() != null) ? new double[] { b.mapLon(), b.mapLat() } : null)
+          .build());
+    }
+    return result;
   }
 
-  // slug helper
-  private String normalizeSlug(String slug, String name) {
-    String base = (slug != null && !slug.isBlank()) ? slug : name;
+  private String normalizeSlug(String slug, Map<String, String> name) {
+    String base = (slug != null && !slug.isBlank()) ? slug : pickForSlug(name);
     if (base == null)
       throw new IllegalArgumentException("slug or name is required");
 
     String s = base.trim().toLowerCase(Locale.ROOT);
-    s = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", ""); // bỏ dấu
+    s = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
     s = s.replaceAll("[^a-z0-9\\s-]", "");
     s = s.replaceAll("\\s+", "-");
     s = s.replaceAll("-{2,}", "-");
@@ -459,5 +502,20 @@ public class PlaceService {
     if (s.isBlank())
       throw new IllegalArgumentException("Invalid slug after normalize");
     return s;
+  }
+
+  /** Slug derivation: prefer VI (more likely to be original/authoritative), then EN, then any. */
+  private static String pickForSlug(Map<String, String> name) {
+    if (name == null || name.isEmpty()) return null;
+    String vi = name.get(LocaleConstants.VI);
+    if (vi != null && !vi.isBlank()) return vi;
+    String en = name.get(LocaleConstants.EN);
+    if (en != null && !en.isBlank()) return en;
+    return name.values().stream().filter(v -> v != null && !v.isBlank()).findFirst().orElse(null);
+  }
+
+  private static boolean hasAnyLocaleValue(Map<String, String> map) {
+    if (map == null || map.isEmpty()) return false;
+    return map.values().stream().anyMatch(v -> v != null && !v.isBlank());
   }
 }

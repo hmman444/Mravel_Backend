@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.doc.HotelDoc.HotelStatus;
 import com.mravel.catalog.repository.HotelDocRepositoryCustom;
+import com.mravel.common.i18n.LocaleConstants;
 
 @Repository
 public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
@@ -40,23 +41,23 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
 
         List<Criteria> cs = new ArrayList<>();
         cs.add(where("active").is(true));
-        // chỉ show hotel đã duyệt
         cs.add(where("moderation.status").is(HotelStatus.APPROVED));
 
-        // location
-        // inline check để JDT hiểu chắc chắn non-null (thay vì has())
         if (location != null && !location.isBlank()) {
             final String loc = location.trim();
 
             cs.add(new Criteria().orOperator(
                     where("destinationSlug").is(loc),
-                    where("cityName").regex(loc, "i"),
-                    where("districtName").regex(loc, "i"),
-                    where("wardName").regex(loc, "i"),
-                    where("addressLine").regex(loc, "i")));
+                    where("cityName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("cityName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("wardName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("wardName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.VI).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.EN).regex(loc, "i")));
         }
 
-        // capacity theo roomTypes
         if (minGuestsPerRoom != null || requiredRooms != null) {
             List<Criteria> roomConditions = new ArrayList<>();
 
@@ -80,7 +81,6 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
 
         q.addCriteria(and(cs));
 
-        // count phải bỏ limit/skip
         Query countQ = Query.of(q).limit(-1).skip(-1);
 
         long total = mongo.count(countQ, HotelDoc.class);
@@ -89,8 +89,6 @@ public class HotelDocRepositoryImpl implements HotelDocRepositoryCustom {
         Pageable pb = (pageable != null) ? pageable : Pageable.unpaged();
         return new PageImpl<>(data, pb, total);
     }
-
-    // helpers
 
     private static Criteria and(List<Criteria> cs) {
         final Criteria[] arr = cs.toArray(Criteria[]::new);

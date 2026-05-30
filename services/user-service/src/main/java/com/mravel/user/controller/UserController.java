@@ -1,9 +1,11 @@
 package com.mravel.user.controller;
 
+import com.mravel.common.i18n.LocaleUtil;
 import com.mravel.common.request.UpdateUserProfileRequest;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.user.client.PlanProfileClient;
 import com.mravel.user.dto.PlanFeedItem;
+import com.mravel.user.dto.UpdateLocaleRequest;
 import com.mravel.user.dto.UserMiniResponse;
 import com.mravel.user.dto.UserProfilePageResponse;
 import com.mravel.user.model.Gender;
@@ -96,6 +98,25 @@ public class UserController {
 
         applyFullProfileUpdates(user, request);
 
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return toResponse(user);
+    }
+
+    // cập nhật ngôn ngữ ưu tiên của user (vi/en) — dùng cho background job (email, notification)
+    @PutMapping("/me/locale")
+    public UserProfileResponse updateMyLocale(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestBody UpdateLocaleRequest request) {
+
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+
+        UserProfile user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserId));
+
+        // normalize về vi/en, fallback vi nếu locale không hợp lệ
+        user.setLocale(LocaleUtil.normalize(request.locale()));
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
 

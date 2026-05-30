@@ -8,31 +8,47 @@ import java.util.List;
 public final class ContentBlocks {
   private ContentBlocks() {}
 
-  public static ContentBlock heading(String text) {
+  public static ContentBlock heading(String vi) {
+    return heading(vi, null);
+  }
+
+  public static ContentBlock heading(String vi, String en) {
     return ContentBlock.builder()
         .type(ContentBlock.BlockType.HEADING)
-        .text(text)
+        .text(Localized.of(vi, en))
         .build();
   }
 
-  public static ContentBlock paragraph(String text) {
+  public static ContentBlock paragraph(String vi) {
+    return paragraph(vi, null);
+  }
+
+  public static ContentBlock paragraph(String vi, String en) {
     return ContentBlock.builder()
         .type(ContentBlock.BlockType.PARAGRAPH)
-        .text(text)
+        .text(Localized.of(vi, en))
         .build();
   }
 
-  public static ContentBlock quote(String text) {
+  public static ContentBlock quote(String vi) {
+    return quote(vi, null);
+  }
+
+  public static ContentBlock quote(String vi, String en) {
     return ContentBlock.builder()
         .type(ContentBlock.BlockType.QUOTE)
-        .text(text)
+        .text(Localized.of(vi, en))
         .build();
   }
 
-  public static ContentBlock infoBox(String text) {
+  public static ContentBlock infoBox(String vi) {
+    return infoBox(vi, null);
+  }
+
+  public static ContentBlock infoBox(String vi, String en) {
     return ContentBlock.builder()
         .type(ContentBlock.BlockType.INFOBOX)
-        .text(text)
+        .text(Localized.of(vi, en))
         .build();
   }
 

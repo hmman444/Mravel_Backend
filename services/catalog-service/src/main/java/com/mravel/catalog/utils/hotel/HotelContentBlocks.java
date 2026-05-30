@@ -1,18 +1,23 @@
-// src/main/java/com/mravel/catalog/utils/hotel/HotelContentBlocks.java
 package com.mravel.catalog.utils.hotel;
 
 import com.mravel.catalog.model.doc.HotelDoc.ContentBlock;
 import com.mravel.catalog.model.doc.HotelDoc.ContentBlock.BlockType;
 import com.mravel.catalog.model.doc.HotelDoc.ContentBlock.ContentSection;
 
+import java.util.Map;
+
 public final class HotelContentBlocks {
 
     private HotelContentBlocks() {
     }
 
-    // = HÀM CŨ (không có section) - vẫn giữ để seed cũ chạy bình thường =
+    // No-section overloads (legacy). Bản String delegate sang bản Map (chỉ vi).
 
     public static ContentBlock heading(String text) {
+        return heading(Localized.vi(text));
+    }
+
+    public static ContentBlock heading(Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.HEADING)
                 .text(text)
@@ -20,6 +25,10 @@ public final class HotelContentBlocks {
     }
 
     public static ContentBlock paragraph(String text) {
+        return paragraph(Localized.vi(text));
+    }
+
+    public static ContentBlock paragraph(Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.PARAGRAPH)
                 .text(text)
@@ -27,6 +36,10 @@ public final class HotelContentBlocks {
     }
 
     public static ContentBlock quote(String text) {
+        return quote(Localized.vi(text));
+    }
+
+    public static ContentBlock quote(Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.QUOTE)
                 .text(text)
@@ -46,9 +59,13 @@ public final class HotelContentBlocks {
                 .build();
     }
 
-    // = HÀM MỚI (có ContentSection) =
+    // With-section overloads
 
     public static ContentBlock heading(ContentSection section, String text) {
+        return heading(section, Localized.vi(text));
+    }
+
+    public static ContentBlock heading(ContentSection section, Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.HEADING)
                 .section(section)
@@ -57,6 +74,10 @@ public final class HotelContentBlocks {
     }
 
     public static ContentBlock paragraph(ContentSection section, String text) {
+        return paragraph(section, Localized.vi(text));
+    }
+
+    public static ContentBlock paragraph(ContentSection section, Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.PARAGRAPH)
                 .section(section)
@@ -65,6 +86,10 @@ public final class HotelContentBlocks {
     }
 
     public static ContentBlock quote(ContentSection section, String text) {
+        return quote(section, Localized.vi(text));
+    }
+
+    public static ContentBlock quote(ContentSection section, Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.QUOTE)
                 .section(section)

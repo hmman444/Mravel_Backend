@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.model.enums.PlaceKind;
@@ -15,28 +16,28 @@ public class PlaceAdminDtos {
 
         // UPSERT REQUEST
         public record UpsertPlaceRequest(
-                        Boolean active, // optional (default true on create)
-                        PlaceKind kind, // required
-                        VenueType venueType, // required when kind=VENUE
-                        String parentSlug, // required when kind=POI/VENUE
+                        Boolean active,
+                        PlaceKind kind,
+                        VenueType venueType,
+                        String parentSlug,
 
-                        String name, // required
-                        String slug, // optional: nếu null -> auto generate từ name (service xử lý)
-                        String shortDescription,
-                        String description,
+                        Map<String, String> name,
+                        String slug,
+                        Map<String, String> shortDescription,
+                        Map<String, String> description,
 
                         String phone,
                         String email,
                         String website,
 
-                        String addressLine,
+                        Map<String, String> addressLine,
                         String countryCode,
                         String provinceCode,
                         String districtCode,
                         String wardCode,
-                        String provinceName,
-                        String districtName,
-                        String wardName,
+                        Map<String, String> provinceName,
+                        Map<String, String> districtName,
+                        Map<String, String> wardName,
 
                         Double latitude,
                         Double longitude,
@@ -52,13 +53,13 @@ public class PlaceAdminDtos {
                         List<ContentBlockReq> content) {
         }
 
-        public record ImageReq(String url, String caption, Boolean cover, Integer sortOrder) {
+        public record ImageReq(String url, Map<String, String> caption, Boolean cover, Integer sortOrder) {
         }
 
-        public record CategoryReq(String name, String slug) {
+        public record CategoryReq(Map<String, String> name, String slug) {
         }
 
-        public record TagReq(String name, String slug, TagType type) {
+        public record TagReq(Map<String, String> name, String slug, TagType type) {
         }
 
         public record OpenHourReq(
@@ -71,14 +72,14 @@ public class PlaceAdminDtos {
 
         public record ContentBlockReq(
                         PlaceDoc.ContentBlock.BlockType type,
-                        String text,
+                        Map<String, String> text,
                         ImageReq image,
                         List<ImageReq> gallery,
                         Double mapLat,
                         Double mapLon) {
         }
 
-        // SIMPLE RESPONSE
+        // SIMPLE RESPONSE — flat String (already flattened in mapper)
         public record PlaceAdminResponse(
                         String id,
                         String name,

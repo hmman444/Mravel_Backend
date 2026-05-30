@@ -33,7 +33,13 @@ public class HotelIndex {
         mainField = @Field(type = FieldType.Text, analyzer = "vn_text"),
         otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
     )
-    private String name;
+    private String nameVi;
+
+    @MultiField(
+        mainField = @Field(type = FieldType.Text, analyzer = "english"),
+        otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    )
+    private String nameEn;
 
     @Field(type = FieldType.Keyword)
     private String slug;
@@ -41,7 +47,6 @@ public class HotelIndex {
     @Field(type = FieldType.Boolean)
     private Boolean active;
 
-    /** Denormalized từ moderation.status */
     @Field(type = FieldType.Keyword)
     private String moderationStatus;
 
@@ -58,16 +63,31 @@ public class HotelIndex {
         mainField = @Field(type = FieldType.Text, analyzer = "vn_text"),
         otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
     )
-    private String cityName;
+    private String cityNameVi;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
-    private String districtName;
+    @MultiField(
+        mainField = @Field(type = FieldType.Text, analyzer = "english"),
+        otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    )
+    private String cityNameEn;
+
+    @Field(type = FieldType.Text, analyzer = "vn_text")
+    private String districtNameVi;
+
+    @Field(type = FieldType.Text, analyzer = "english")
+    private String districtNameEn;
 
     @Field(type = FieldType.Keyword)
-    private String wardName;
+    private String wardNameVi;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
-    private String addressLine;
+    @Field(type = FieldType.Keyword)
+    private String wardNameEn;
+
+    @Field(type = FieldType.Text, analyzer = "vn_text")
+    private String addressLineVi;
+
+    @Field(type = FieldType.Text, analyzer = "english")
+    private String addressLineEn;
 
     @GeoPointField
     private GeoPoint location;
@@ -79,7 +99,10 @@ public class HotelIndex {
     private Integer reviewsCount;
 
     @Field(type = FieldType.Keyword)
-    private String ratingLabel;
+    private String ratingLabelVi;
+
+    @Field(type = FieldType.Keyword)
+    private String ratingLabelEn;
 
     @Field(type = FieldType.Scaled_Float, scalingFactor = 100)
     private BigDecimal minNightlyPrice;
@@ -102,20 +125,21 @@ public class HotelIndex {
     @Field(type = FieldType.Object, enabled = false)
     private List<ImageData> images;
 
-    /** nested để filter kết hợp maxGuests AND totalRooms trên cùng 1 phần tử */
     @Field(type = FieldType.Nested)
     private List<RoomTypeData> roomTypes;
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class GeneralInfoData {
-        private String mainFacilitiesSummary;
+        private String mainFacilitiesSummaryVi;
+        private String mainFacilitiesSummaryEn;
         private Double distanceToCityCenterKm;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class ImageData {
         private String url;
-        private String caption;
+        private String captionVi;
+        private String captionEn;
         private Boolean cover;
         private Integer sortOrder;
     }

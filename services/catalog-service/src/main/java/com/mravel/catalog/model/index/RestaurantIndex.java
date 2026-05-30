@@ -33,7 +33,13 @@ public class RestaurantIndex {
         mainField = @Field(type = FieldType.Text, analyzer = "vn_text"),
         otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
     )
-    private String name;
+    private String nameVi;
+
+    @MultiField(
+        mainField = @Field(type = FieldType.Text, analyzer = "english"),
+        otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    )
+    private String nameEn;
 
     @Field(type = FieldType.Keyword)
     private String slug;
@@ -57,25 +63,38 @@ public class RestaurantIndex {
         mainField = @Field(type = FieldType.Text, analyzer = "vn_text"),
         otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
     )
-    private String cityName;
+    private String cityNameVi;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
-    private String districtName;
+    @MultiField(
+        mainField = @Field(type = FieldType.Text, analyzer = "english"),
+        otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    )
+    private String cityNameEn;
+
+    @Field(type = FieldType.Text, analyzer = "vn_text")
+    private String districtNameVi;
+
+    @Field(type = FieldType.Text, analyzer = "english")
+    private String districtNameEn;
 
     @Field(type = FieldType.Keyword)
-    private String wardName;
+    private String wardNameVi;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
-    private String addressLine;
+    @Field(type = FieldType.Keyword)
+    private String wardNameEn;
+
+    @Field(type = FieldType.Text, analyzer = "vn_text")
+    private String addressLineVi;
+
+    @Field(type = FieldType.Text, analyzer = "english")
+    private String addressLineEn;
 
     @GeoPointField
     private GeoPoint location;
 
-    /** Denormalized từ cuisines[].code — dùng cho filter nhanh */
     @Field(type = FieldType.Keyword)
     private List<String> cuisineCodes;
 
-    /** Store only — dùng cho response */
     @Field(type = FieldType.Object, enabled = false)
     private List<CuisineData> cuisines;
 
@@ -95,7 +114,10 @@ public class RestaurantIndex {
     private Integer reviewsCount;
 
     @Field(type = FieldType.Keyword)
-    private String ratingLabel;
+    private String ratingLabelVi;
+
+    @Field(type = FieldType.Keyword)
+    private String ratingLabelEn;
 
     @Field(type = FieldType.Scaled_Float, scalingFactor = 100)
     private BigDecimal minPricePerPerson;
@@ -118,31 +140,32 @@ public class RestaurantIndex {
     @Field(type = FieldType.Object, enabled = false)
     private List<ImageData> images;
 
-    /** Store only — filter giờ mở cửa xử lý ở application layer */
     @Field(type = FieldType.Object, enabled = false)
     private List<OpeningHourData> openingHours;
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class CuisineData {
         private String code;
-        private String name;
+        private String nameVi;
+        private String nameEn;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class AmbienceData {
         private String code;
-        private String label;
+        private String labelVi;
+        private String labelEn;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class ImageData {
         private String url;
-        private String caption;
+        private String captionVi;
+        private String captionEn;
         private Boolean cover;
         private Integer sortOrder;
     }
 
-    /** dayOfWeek: enum name (e.g. "MONDAY"), openTime/closeTime: "HH:mm" string */
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class OpeningHourData {
         private String dayOfWeek;

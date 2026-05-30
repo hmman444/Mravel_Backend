@@ -12,10 +12,10 @@ import com.mravel.catalog.dto.restaurant.RestaurantDtos.*;
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.search.dto.RestaurantSearchResult;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 public class RestaurantMapper {
-
-        // SUMMARY
 
         public static RestaurantSummaryDTO toSummary(RestaurantSearchResult r) {
                 String cover = null;
@@ -90,17 +90,15 @@ public class RestaurantMapper {
                                 List.of());
         }
 
-        // DETAIL
-
         public static RestaurantDetailDTO toDetail(RestaurantDoc r, Map<String, AmenityCatalogDoc> catalogMap) {
-                // Location
+                String locale = LocaleContext.get();
+
                 Double lat = null, lon = null;
                 if (r.getLocation() != null && r.getLocation().length == 2) {
                         lon = r.getLocation()[0];
                         lat = r.getLocation()[1];
                 }
 
-                // Cuisines
                 List<CuisineTagDTO> cuisines = r.getCuisines() == null
                                 ? List.of()
                                 : r.getCuisines().stream()
@@ -108,7 +106,6 @@ public class RestaurantMapper {
                                                 .map(RestaurantMapper::toCuisineTag)
                                                 .toList();
 
-                // Opening hours
                 List<OpeningHourDTO> openingHours = r.getOpeningHours() == null
                                 ? List.of()
                                 : r.getOpeningHours().stream()
@@ -116,7 +113,6 @@ public class RestaurantMapper {
                                                 .map(RestaurantMapper::toOpeningHour)
                                                 .toList();
 
-                // SuitableFor
                 List<SuitableForDTO> suitableFor = r.getSuitableFor() == null
                                 ? List.of()
                                 : r.getSuitableFor().stream()
@@ -124,7 +120,6 @@ public class RestaurantMapper {
                                                 .map(RestaurantMapper::toSuitableFor)
                                                 .toList();
 
-                // Ambience
                 List<AmbienceTagDTO> ambience = r.getAmbience() == null
                                 ? List.of()
                                 : r.getAmbience().stream()
@@ -132,10 +127,8 @@ public class RestaurantMapper {
                                                 .map(RestaurantMapper::toAmbience)
                                                 .toList();
 
-                // Capacity
                 CapacityInfoDTO capacity = r.getCapacity() == null ? null : toCapacity(r.getCapacity());
 
-                // Signature dishes
                 List<SignatureDishDTO> signatureDishes = r.getSignatureDishes() == null
                                 ? List.of()
                                 : r.getSignatureDishes().stream()
@@ -143,7 +136,6 @@ public class RestaurantMapper {
                                                 .map(RestaurantMapper::toSignatureDish)
                                                 .toList();
 
-                // Images (gallery)
                 List<ImageDTO> images = r.getImages() == null
                                 ? List.of()
                                 : r.getImages().stream()
@@ -156,7 +148,6 @@ public class RestaurantMapper {
                                                                                                 Integer::compareTo)))
                                                 .toList();
 
-                // Menu images
                 List<ImageDTO> menuImages = r.getMenuImages() == null
                                 ? List.of()
                                 : r.getMenuImages().stream()
@@ -169,7 +160,6 @@ public class RestaurantMapper {
                                                                                                 Integer::compareTo)))
                                                 .toList();
 
-                // Content blocks
                 List<ContentBlockDTO> content = r.getContent() == null
                                 ? List.of()
                                 : r.getContent().stream()
@@ -178,7 +168,6 @@ public class RestaurantMapper {
                                                 .filter(Objects::nonNull)
                                                 .toList();
 
-                // Menu sections
                 List<MenuSectionDTO> menuSections = r.getMenuSections() == null
                                 ? List.of()
                                 : r.getMenuSections().stream()
@@ -186,16 +175,12 @@ public class RestaurantMapper {
                                                 .map(RestaurantMapper::toMenuSection)
                                                 .toList();
 
-                // Parking
                 ParkingInfoDTO parking = r.getParking() == null ? null : toParking(r.getParking());
 
-                // Policy
                 RestaurantPolicyDTO policy = r.getPolicy() == null ? null : toPolicy(r.getPolicy());
 
-                // Review stats
                 ReviewStatsDTO reviewStats = r.getReviewStats() == null ? null : toReviewStats(r.getReviewStats());
 
-                // Publisher & moderation
                 PublisherDTO publisher = r.getPublisher() == null ? null : toPublisher(r.getPublisher());
                 ModerationDTO moderation = r.getModeration() == null ? null : toModeration(r.getModeration());
 
@@ -208,22 +193,22 @@ public class RestaurantMapper {
 
                 return new RestaurantDetailDTO(
                                 r.getId(),
-                                r.getName(),
+                                LocaleUtil.pick(r.getName(), locale),
                                 r.getSlug(),
                                 r.getActive(),
                                 r.getRestaurantType() == null ? null : r.getRestaurantType().name(),
 
                                 cuisines,
 
-                                r.getShortDescription(),
-                                r.getDescription(),
+                                LocaleUtil.pick(r.getShortDescription(), locale),
+                                LocaleUtil.pick(r.getDescription(), locale),
 
                                 r.getDestinationSlug(),
                                 r.getParentPlaceSlug(),
-                                r.getCityName(),
-                                r.getDistrictName(),
-                                r.getWardName(),
-                                r.getAddressLine(),
+                                LocaleUtil.pick(r.getCityName(), locale),
+                                LocaleUtil.pick(r.getDistrictName(), locale),
+                                LocaleUtil.pick(r.getWardName(), locale),
+                                LocaleUtil.pick(r.getAddressLine(), locale),
                                 lat,
                                 lon,
 
@@ -259,7 +244,7 @@ public class RestaurantMapper {
 
                                 r.getAvgRating(),
                                 r.getReviewsCount(),
-                                r.getRatingLabel(),
+                                LocaleUtil.pick(r.getRatingLabel(), locale),
                                 reviewStats,
 
                                 publisher,
@@ -269,26 +254,23 @@ public class RestaurantMapper {
                                 bookingConfig);
         }
 
-        // SUB MAPPERS
-
-        // Image
         public static ImageDTO toImage(RestaurantDoc.Image img) {
+                String locale = LocaleContext.get();
                 return new ImageDTO(
                                 img.getUrl(),
-                                img.getCaption(),
+                                LocaleUtil.pick(img.getCaption(), locale),
                                 Boolean.TRUE.equals(img.getCover()),
                                 img.getSortOrder());
         }
 
-        // CuisineTag
         public static CuisineTagDTO toCuisineTag(RestaurantDoc.CuisineTag c) {
+                String locale = LocaleContext.get();
                 return new CuisineTagDTO(
                                 c.getCode(),
-                                c.getName(),
+                                LocaleUtil.pick(c.getName(), locale),
                                 c.getRegion());
         }
 
-        // OpeningHour
         public static OpeningHourDTO toOpeningHour(RestaurantDoc.OpeningHour oh) {
                 return new OpeningHourDTO(
                                 oh.getDayOfWeek(),
@@ -298,21 +280,20 @@ public class RestaurantMapper {
                                 Boolean.TRUE.equals(oh.getClosed()));
         }
 
-        // SuitableFor
         public static SuitableForDTO toSuitableFor(RestaurantDoc.SuitableFor sf) {
+                String locale = LocaleContext.get();
                 return new SuitableForDTO(
                                 sf.getCode(),
-                                sf.getLabel());
+                                LocaleUtil.pick(sf.getLabel(), locale));
         }
 
-        // Ambience
         public static AmbienceTagDTO toAmbience(RestaurantDoc.AmbienceTag a) {
+                String locale = LocaleContext.get();
                 return new AmbienceTagDTO(
                                 a.getCode(),
-                                a.getLabel());
+                                LocaleUtil.pick(a.getLabel(), locale));
         }
 
-        // Capacity
         public static CapacityInfoDTO toCapacity(RestaurantDoc.CapacityInfo c) {
                 return new CapacityInfoDTO(
                                 c.getTotalCapacity(),
@@ -323,19 +304,19 @@ public class RestaurantMapper {
                                 Boolean.TRUE.equals(c.getHasOutdoorSeating()));
         }
 
-        // SignatureDish
         public static SignatureDishDTO toSignatureDish(RestaurantDoc.SignatureDish d) {
+                String locale = LocaleContext.get();
                 return new SignatureDishDTO(
-                                d.getName(),
-                                d.getDescription(),
+                                LocaleUtil.pick(d.getName(), locale),
+                                LocaleUtil.pick(d.getDescription(), locale),
                                 d.getEstimatedPrice(),
                                 Boolean.TRUE.equals(d.getHighlight()));
         }
 
-        // ContentBlock
         public static ContentBlockDTO toContentBlock(RestaurantDoc.ContentBlock b) {
                 if (b == null)
                         return null;
+                String locale = LocaleContext.get();
 
                 ImageDTO image = b.getImage() == null ? null : toImage(b.getImage());
 
@@ -358,15 +339,15 @@ public class RestaurantMapper {
                 return new ContentBlockDTO(
                                 type,
                                 section,
-                                b.getText(),
+                                LocaleUtil.pick(b.getText(), locale),
                                 image,
                                 gallery,
                                 mapLat,
                                 mapLon);
         }
 
-        // MenuSection
         public static MenuSectionDTO toMenuSection(RestaurantDoc.MenuSection ms) {
+                String locale = LocaleContext.get();
                 List<MenuItemDTO> items = ms.getItems() == null
                                 ? List.of()
                                 : ms.getItems().stream()
@@ -376,43 +357,43 @@ public class RestaurantMapper {
 
                 return new MenuSectionDTO(
                                 ms.getCode(),
-                                ms.getName(),
+                                LocaleUtil.pick(ms.getName(), locale),
                                 items);
         }
 
-        // MenuItem
         public static MenuItemDTO toMenuItem(RestaurantDoc.MenuItem item) {
+                String locale = LocaleContext.get();
                 return new MenuItemDTO(
-                                item.getName(),
-                                item.getDescription(),
+                                LocaleUtil.pick(item.getName(), locale),
+                                LocaleUtil.pick(item.getDescription(), locale),
                                 item.getPriceFrom(),
                                 item.getPriceTo(),
-                                item.getUnit(),
+                                LocaleUtil.pick(item.getUnit(), locale),
                                 Boolean.TRUE.equals(item.getCombo()),
                                 Boolean.TRUE.equals(item.getBuffetItem()),
                                 item.getTags() == null ? List.of() : item.getTags());
         }
 
-        // Parking
         public static ParkingInfoDTO toParking(RestaurantDoc.ParkingInfo p) {
+                String locale = LocaleContext.get();
                 String carFeeType = p.getCarParkingFeeType() == null ? null : p.getCarParkingFeeType().name();
                 String motorFeeType = p.getMotorbikeParkingFeeType() == null ? null
                                 : p.getMotorbikeParkingFeeType().name();
 
                 return new ParkingInfoDTO(
                                 Boolean.TRUE.equals(p.getHasCarParking()),
-                                p.getCarParkingLocation(),
+                                LocaleUtil.pick(p.getCarParkingLocation(), locale),
                                 carFeeType,
                                 p.getCarParkingFeeAmount(),
                                 Boolean.TRUE.equals(p.getHasMotorbikeParking()),
-                                p.getMotorbikeParkingLocation(),
+                                LocaleUtil.pick(p.getMotorbikeParkingLocation(), locale),
                                 motorFeeType,
                                 p.getMotorbikeParkingFeeAmount(),
-                                p.getNotes());
+                                LocaleUtil.pick(p.getNotes(), locale));
         }
 
-        // Policy
         public static RestaurantPolicyDTO toPolicy(RestaurantDoc.RestaurantPolicy p) {
+                String locale = LocaleContext.get();
                 List<BlackoutDateRuleDTO> blackoutRules = p.getBlackoutRules() == null
                                 ? List.of()
                                 : p.getBlackoutRules().stream()
@@ -432,12 +413,12 @@ public class RestaurantMapper {
                                 p.getDepositMinGuests(),
                                 p.getDepositAmount(),
                                 p.getDepositCurrencyCode(),
-                                p.getDepositNotes(),
+                                LocaleUtil.pick(p.getDepositNotes(), locale),
 
                                 Boolean.TRUE.equals(p.getHasPromotion()),
-                                p.getPromotionSummary(),
+                                LocaleUtil.pick(p.getPromotionSummary(), locale),
                                 p.getPromotionMaxDiscountPercent(),
-                                p.getPromotionNote(),
+                                LocaleUtil.pick(p.getPromotionNote(), locale),
                                 blackoutRules,
 
                                 p.getMinBookingLeadTimeMinutes(),
@@ -447,19 +428,20 @@ public class RestaurantMapper {
                                 Boolean.TRUE.equals(p.getVatInvoiceAvailable()),
                                 p.getVatPercent(),
                                 Boolean.TRUE.equals(p.getDirectInvoiceAvailable()),
-                                p.getInvoiceNotes(),
+                                LocaleUtil.pick(p.getInvoiceNotes(), locale),
 
                                 p.getServiceChargePercent(),
-                                p.getServiceChargeNotes(),
+                                LocaleUtil.pick(p.getServiceChargeNotes(), locale),
 
                                 Boolean.TRUE.equals(p.getAllowOutsideFood()),
                                 Boolean.TRUE.equals(p.getAllowOutsideDrink()),
-                                p.getOutsideFoodPolicy(),
-                                p.getOutsideDrinkPolicy(),
+                                LocaleUtil.pick(p.getOutsideFoodPolicy(), locale),
+                                LocaleUtil.pick(p.getOutsideDrinkPolicy(), locale),
                                 outsideDrinkFees);
         }
 
         public static BlackoutDateRuleDTO toBlackoutRule(RestaurantDoc.BlackoutDateRule b) {
+                String locale = LocaleContext.get();
                 String dateType = b.getDateType() == null ? null : b.getDateType().name();
 
                 return new BlackoutDateRuleDTO(
@@ -470,18 +452,18 @@ public class RestaurantMapper {
                                 b.getToDate(),
                                 b.getLunarMonth(),
                                 b.getLunarDay(),
-                                b.getDescription());
+                                LocaleUtil.pick(b.getDescription(), locale));
         }
 
         public static OutsideDrinkFeeDTO toOutsideDrinkFee(RestaurantDoc.OutsideDrinkFee f) {
+                String locale = LocaleContext.get();
                 return new OutsideDrinkFeeDTO(
                                 f.getDrinkType(),
                                 f.getFeeAmount(),
                                 f.getCurrencyCode(),
-                                f.getNote());
+                                LocaleUtil.pick(f.getNote(), locale));
         }
 
-        // ReviewStats
         public static ReviewStatsDTO toReviewStats(RestaurantDoc.ReviewStats rs) {
                 List<ReviewKeywordDTO> keywords = rs.getKeywords() == null
                                 ? List.of()
@@ -500,13 +482,13 @@ public class RestaurantMapper {
         }
 
         public static ReviewKeywordDTO toReviewKeyword(RestaurantDoc.ReviewKeywordStat k) {
+                String locale = LocaleContext.get();
                 return new ReviewKeywordDTO(
                                 k.getCode(),
-                                k.getLabel(),
+                                LocaleUtil.pick(k.getLabel(), locale),
                                 k.getCount());
         }
 
-        // Publisher
         public static PublisherDTO toPublisher(RestaurantDoc.PublisherInfo p) {
                 String createdAt = p.getCreatedAt() == null ? null : p.getCreatedAt().toString();
                 String lastUpdatedAt = p.getLastUpdatedAt() == null ? null : p.getLastUpdatedAt().toString();
@@ -520,7 +502,6 @@ public class RestaurantMapper {
                                 lastUpdatedAt);
         }
 
-        // Moderation
         public static ModerationDTO toModeration(RestaurantDoc.ModerationInfo m) {
                 String lastActionAt = m.getLastActionAt() == null ? null : m.getLastActionAt().toString();
 
@@ -536,9 +517,10 @@ public class RestaurantMapper {
         public static TableTypeDTO toTableType(RestaurantDoc.TableType t) {
                 if (t == null)
                         return null;
+                String locale = LocaleContext.get();
                 return new TableTypeDTO(
                                 t.getId(),
-                                t.getName(),
+                                LocaleUtil.pick(t.getName(), locale),
                                 t.getSeats(),
                                 t.getMinPeople(),
                                 t.getMaxPeople(),
@@ -549,10 +531,9 @@ public class RestaurantMapper {
                                 Boolean.TRUE.equals(t.getPrivateRoom()),
                                 t.getAllowedDurationsMinutes() == null ? List.of() : t.getAllowedDurationsMinutes(),
                                 t.getDefaultDurationMinutes(),
-                                t.getNote());
+                                LocaleUtil.pick(t.getNote(), locale));
         }
 
-        // BookingConfig
         public static RestaurantBookingConfigDTO toBookingConfig(RestaurantDoc.BookingConfig c) {
                 if (c == null)
                         return null;
@@ -589,9 +570,10 @@ public class RestaurantMapper {
         }
 
         private static AmenityDTO toAmenityFromCatalog(AmenityCatalogDoc a) {
+                String locale = LocaleContext.get();
                 return new AmenityDTO(
                                 a.getCode(),
-                                a.getName(),
+                                LocaleUtil.pick(a.getName(), locale),
                                 a.getGroup(),
                                 a.getSection(),
                                 a.getIcon());

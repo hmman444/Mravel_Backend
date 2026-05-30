@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -81,17 +82,17 @@ public class PlaceDoc {
   private Integer childrenCount = 0;
 
   // =====================================================================
-  // BASIC INFO
+  // BASIC INFO (localized)
   // =====================================================================
 
   @TextIndexed(weight = 10)
-  private String name;
+  private Map<String, String> name;
 
   @Indexed(name = "slug_unique_idx", unique = true)
   private String slug;
 
-  private String shortDescription;
-  private String description;
+  private Map<String, String> shortDescription;
+  private Map<String, String> description;
 
   private String phone;
   private String email;
@@ -101,7 +102,7 @@ public class PlaceDoc {
   // ADDRESS
   // =====================================================================
 
-  private String addressLine;
+  private Map<String, String> addressLine;
 
   @Field
   @Indexed
@@ -112,9 +113,9 @@ public class PlaceDoc {
   @Field @Indexed private String districtCode;
   @Field @Indexed private String wardCode;
 
-  @TextIndexed(weight = 5) private String provinceName;
-  @TextIndexed(weight = 5) private String districtName;
-  @TextIndexed(weight = 5) private String wardName;
+  @TextIndexed(weight = 5) private Map<String, String> provinceName;
+  @TextIndexed(weight = 5) private Map<String, String> districtName;
+  @TextIndexed(weight = 5) private Map<String, String> wardName;
 
   @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE, name = "loc_2dsphere_idx")
   private double[] location;
@@ -147,7 +148,7 @@ public class PlaceDoc {
   // =====================================================================
 
   private List<String> vibes;
-  private String       atmosphere;
+  private Map<String, String> atmosphere;
   private List<String> travelStyle;
 
   // =====================================================================
@@ -189,14 +190,14 @@ public class PlaceDoc {
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
   public static class ReviewKeywordStat {
     private String  code;
-    private String  label;
+    private Map<String, String> label;
     private Integer count;
   }
 
   @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
   public static class Image {
     private String  url;
-    private String  caption;
+    private Map<String, String> caption;
     @Builder.Default private Boolean cover      = false;
     @Builder.Default private Integer sortOrder  = 0;
   }
@@ -221,7 +222,7 @@ public class PlaceDoc {
   @Builder
   public static class CategoryMini {
     private String id;
-    private String name;
+    private Map<String, String> name;
     private String slug;
   }
 
@@ -231,7 +232,7 @@ public class PlaceDoc {
   @AllArgsConstructor
   @Builder
   public static class TagMini {
-    private String  name;
+    private Map<String, String> name;
     private String  slug;
     private TagType type;
   }
@@ -247,20 +248,9 @@ public class PlaceDoc {
     }
 
     private BlockType   type;
-    private String      text;
+    private Map<String, String> text;
     private Image       image;
     private List<Image> gallery;
     private double[]    mapLocation;
   }
 }
-
-/*
-CHANGELOG:
-- added: vibes, suitableFor, visitPurpose
-- converted: crowdLevel (String → CrowdLevel enum: LOW/MEDIUM/HIGH)
-- converted: noiseLevel (String → NoiseLevel enum: QUIET/MODERATE/LOUD)
-- converted: bestVisitTime (String → List<BestVisitTime> enum: MORNING/AFTERNOON/EVENING/NIGHT)
-- converted: bestSeason (String → BestSeason enum: DRY_SEASON/WET_SEASON/YEAR_ROUND)
-- merged: isIndoor + isOutdoor → venueContext (VenueContext enum: INDOOR/OUTDOOR/MIXED)
-- kept: atmosphere, travelStyle, isFamilyFriendly, visitDurationMinutes, photographyScore, romanticScore, localExperienceScore
-*/

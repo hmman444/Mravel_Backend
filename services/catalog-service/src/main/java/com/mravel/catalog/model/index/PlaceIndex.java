@@ -29,12 +29,18 @@ public class PlaceIndex {
     private String id;
 
     @MultiField(
-        mainField = @Field(type = FieldType.Text, analyzer = "standard"),
+        mainField = @Field(type = FieldType.Text, analyzer = "vn_text"),
         otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
     )
-    private String name;
+    private String nameVi;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
+    @MultiField(
+        mainField = @Field(type = FieldType.Text, analyzer = "english"),
+        otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    )
+    private String nameEn;
+
+    @Field(type = FieldType.Keyword)
     private String slug;
 
     @Field(type = FieldType.Boolean)
@@ -46,17 +52,29 @@ public class PlaceIndex {
     @Field(type = FieldType.Keyword)
     private String venueType;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
-    private String addressLine;
+    @Field(type = FieldType.Text, analyzer = "vn_text")
+    private String addressLineVi;
+
+    @Field(type = FieldType.Text, analyzer = "english")
+    private String addressLineEn;
 
     @MultiField(
-        mainField = @Field(type = FieldType.Text, analyzer = "standard"),
+        mainField = @Field(type = FieldType.Text, analyzer = "vn_text"),
         otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
     )
-    private String provinceName;
+    private String provinceNameVi;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
-    private String districtName;
+    @MultiField(
+        mainField = @Field(type = FieldType.Text, analyzer = "english"),
+        otherFields = @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    )
+    private String provinceNameEn;
+
+    @Field(type = FieldType.Text, analyzer = "vn_text")
+    private String districtNameVi;
+
+    @Field(type = FieldType.Text, analyzer = "english")
+    private String districtNameEn;
 
     @GeoPointField
     private GeoPoint location;
@@ -76,7 +94,7 @@ public class PlaceIndex {
     @Field(type = FieldType.Keyword)
     private List<String> categorySlugs;
 
-    /** Encoded as "slug::DisplayName" for facet label resolution without lookup. */
+    /** Encoded as "slug::nameVi::nameEn" — picked per locale at extract time. */
     @Field(type = FieldType.Keyword)
     private List<String> categoryLabels;
 
@@ -127,7 +145,8 @@ public class PlaceIndex {
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class ImageData {
         private String url;
-        private String caption;
+        private String captionVi;
+        private String captionEn;
         private Boolean cover;
         private Integer sortOrder;
     }

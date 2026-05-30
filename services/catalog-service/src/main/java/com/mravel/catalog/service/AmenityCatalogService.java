@@ -8,12 +8,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.mravel.catalog.dto.amenity.AmenityGroupedResponse;
+import com.mravel.catalog.dto.amenity.AmenityResponseDTO;
 import com.mravel.catalog.dto.amenity.AmenityUpsertRequest;
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.enums.AmenityGroup;
 import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.model.enums.AmenitySection;
 import com.mravel.catalog.repository.AmenityCatalogRepository;
+import com.mravel.catalog.translation.LocalizedTranslator;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,16 +27,17 @@ import lombok.RequiredArgsConstructor;
 public class AmenityCatalogService {
 
     private final AmenityCatalogRepository repo;
+    private final LocalizedTranslator localizedTranslator;
 
-    public AmenityCatalogDoc create(AmenityUpsertRequest req) {
+    public AmenityResponseDTO create(AmenityUpsertRequest req) {
         AmenityCatalogDoc doc = AmenityCatalogDoc.builder()
                 .code(normalizeCode(req.getCode()))
-                .name(req.getName())
+                .name(localizedTranslator.resolveFromString(req.getName(), null))
                 .scope(req.getScope())
                 .group(req.getGroup())
                 .section(req.getSection())
                 .icon(req.getIcon())
-                .description(req.getDescription())
+                .description(localizedTranslator.resolveFromString(req.getDescription(), null))
                 .aliases(normalizeAliases(req.getAliases()))
                 .sortOrder(req.getSortOrder() != null ? req.getSortOrder() : 0)
                 .active(req.getActive() == null ? true : req.getActive())
@@ -39,23 +45,22 @@ public class AmenityCatalogService {
                 .updatedAt(Instant.now())
                 .build();
 
-        // check unique code+scope
         repo.findByCodeAndScope(doc.getCode(), doc.getScope())
                 .ifPresent(x -> {
                     throw new IllegalArgumentException("Mã tiện ích đã tồn tại trong phạm vi");
                 });
 
-        return repo.save(doc);
+        return toResponse(repo.save(doc));
     }
 
-    public AmenityCatalogDoc update(String id, AmenityUpsertRequest req) {
+    public AmenityResponseDTO update(String id, AmenityUpsertRequest req) {
         AmenityCatalogDoc doc = repo.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy tiện ích"));
 
         if (StringUtils.hasText(req.getCode()))
             doc.setCode(normalizeCode(req.getCode()));
         if (StringUtils.hasText(req.getName()))
-            doc.setName(req.getName());
+            doc.setName(localizedTranslator.resolveFromString(req.getName(), doc.getName()));
         if (req.getScope() != null)
             doc.setScope(req.getScope());
         if (req.getGroup() != null)
@@ -65,7 +70,7 @@ public class AmenityCatalogService {
         if (req.getIcon() != null)
             doc.setIcon(req.getIcon());
         if (req.getDescription() != null)
-            doc.setDescription(req.getDescription());
+            doc.setDescription(localizedTranslator.resolveFromString(req.getDescription(), doc.getDescription()));
         if (req.getAliases() != null)
             doc.setAliases(normalizeAliases(req.getAliases()));
         if (req.getSortOrder() != null)
@@ -75,14 +80,13 @@ public class AmenityCatalogService {
 
         doc.setUpdatedAt(Instant.now());
 
-        // optional: enforce uniqueness again (code+scope) if changed
         repo.findByCodeAndScope(doc.getCode(), doc.getScope())
                 .filter(x -> !x.getId().equals(doc.getId()))
                 .ifPresent(x -> {
                     throw new IllegalArgumentException("Mã tiện ích đã tồn tại trong phạm vi");
                 });
 
-        return repo.save(doc);
+        return toResponse(repo.save(doc));
     }
 
     public void softDelete(String id) {
@@ -93,15 +97,18 @@ public class AmenityCatalogService {
         repo.save(doc);
     }
 
-    public List<AmenityCatalogDoc> list(AmenityScope scope, boolean activeOnly) {
-        if (scope == null)
-            return repo.findAll();
-        if (activeOnly)
-            return repo.findByScopeAndActiveTrue(scope);
-        // fallback: filter in-memory (hoặc viết query riêng)
-        return repo.findAll().stream()
-                .filter(a -> a.getScope() == scope)
-                .collect(Collectors.toList());
+    public List<AmenityResponseDTO> list(AmenityScope scope, boolean activeOnly) {
+        List<AmenityCatalogDoc> docs;
+        if (scope == null) {
+            docs = repo.findAll();
+        } else if (activeOnly) {
+            docs = repo.findByScopeAndActiveTrue(scope);
+        } else {
+            docs = repo.findAll().stream()
+                    .filter(a -> a.getScope() == scope)
+                    .collect(Collectors.toList());
+        }
+        return docs.stream().map(this::toResponse).toList();
     }
 
     /** Validate codes exist & active & scope match */
@@ -123,9 +130,9 @@ public class AmenityCatalogService {
 
     /** Grouped response for FE form */
     public AmenityGroupedResponse grouped(AmenityScope scope) {
+        String locale = LocaleContext.get();
         List<AmenityCatalogDoc> items = repo.findByScopeAndActiveTrue(scope);
 
-        // group(enum) -> section(enum) -> items
         Map<AmenityGroup, Map<AmenitySection, List<AmenityCatalogDoc>>> tree = items.stream()
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparingInt(a -> Optional.ofNullable(a.getSortOrder()).orElse(0)))
@@ -146,7 +153,7 @@ public class AmenityCatalogService {
                                                         s.getValue().stream()
                                                                 .map(a -> AmenityGroupedResponse.ItemNode.builder()
                                                                         .code(a.getCode())
-                                                                        .name(a.getName())
+                                                                        .name(LocaleUtil.pick(a.getName(), locale))
                                                                         .icon(a.getIcon())
                                                                         .sortOrder(a.getSortOrder())
                                                                         .active(a.isActive())
@@ -164,6 +171,30 @@ public class AmenityCatalogService {
     }
 
     // helpers
+
+    private AmenityResponseDTO toResponse(AmenityCatalogDoc d) {
+        String locale = LocaleContext.get();
+        return new AmenityResponseDTO(
+                d.getId(),
+                d.getCode(),
+                LocaleUtil.pick(d.getName(), locale),
+                d.getScope(),
+                d.getGroup(),
+                d.getSection(),
+                d.getIcon(),
+                LocaleUtil.pick(d.getDescription(), locale),
+                d.getAliases(),
+                d.getSortOrder(),
+                d.isActive(),
+                d.getCreatedAt(),
+                d.getUpdatedAt());
+    }
+
+    private static Map<String, String> wrap(String value) {
+        if (value == null || value.isBlank())
+            return null;
+        return Map.of(LocaleConstants.VI, value);
+    }
 
     private static String normalizeCode(String code) {
         if (!StringUtils.hasText(code))

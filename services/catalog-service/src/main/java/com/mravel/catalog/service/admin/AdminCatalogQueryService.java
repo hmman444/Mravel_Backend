@@ -3,6 +3,9 @@ package com.mravel.catalog.service.admin;
 import com.mravel.catalog.dto.admin.AdminCatalogDtos.AdminServiceSummaryDTO;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -95,9 +98,11 @@ public class AdminCatalogQueryService {
             String raw = q.trim();
             Pattern p = Pattern.compile(Pattern.quote(raw), Pattern.CASE_INSENSITIVE);
 
-            // match name OR slug
+            // match localized name sub-fields OR legacy flat name OR slug
             and.add(new Criteria().orOperator(
                     Criteria.where("name").regex(p),
+                    Criteria.where("name." + LocaleConstants.VI).regex(p),
+                    Criteria.where("name." + LocaleConstants.EN).regex(p),
                     Criteria.where("slug").regex(p)));
         }
 
@@ -110,12 +115,13 @@ public class AdminCatalogQueryService {
     private AdminServiceSummaryDTO mapHotel(HotelDoc d) {
         var pub = d.getPublisher();
         var mod = d.getModeration();
+        String locale = LocaleContext.get();
         return new AdminServiceSummaryDTO(
                 d.getId(),
-                d.getName(),
+                LocaleUtil.pick(d.getName(), locale),
                 d.getSlug(),
                 d.getDestinationSlug(),
-                d.getCityName(),
+                LocaleUtil.pick(d.getCityName(), locale),
                 d.getActive(),
 
                 pub != null ? pub.getPartnerId() : null,
@@ -137,12 +143,13 @@ public class AdminCatalogQueryService {
     private AdminServiceSummaryDTO mapRestaurant(RestaurantDoc d) {
         var pub = d.getPublisher();
         var mod = d.getModeration();
+        String locale = LocaleContext.get();
         return new AdminServiceSummaryDTO(
                 d.getId(),
-                d.getName(),
+                LocaleUtil.pick(d.getName(), locale),
                 d.getSlug(),
                 d.getDestinationSlug(),
-                d.getCityName(),
+                LocaleUtil.pick(d.getCityName(), locale),
                 d.getActive(),
 
                 pub != null ? pub.getPartnerId() : null,
