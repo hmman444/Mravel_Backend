@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import com.mravel.admin.enums.place.PlaceKind;
 import com.mravel.admin.enums.place.PriceLevel;
@@ -18,23 +19,23 @@ public class PlaceAdminDtos {
                         VenueType venueType,
                         String parentSlug,
 
-                        String name,
+                        Map<String, String> name,
                         String slug,
-                        String shortDescription,
-                        String description,
+                        Map<String, String> shortDescription,
+                        Map<String, String> description,
 
                         String phone,
                         String email,
                         String website,
 
-                        String addressLine,
+                        Map<String, String> addressLine,
                         String countryCode,
                         String provinceCode,
                         String districtCode,
                         String wardCode,
-                        String provinceName,
-                        String districtName,
-                        String wardName,
+                        Map<String, String> provinceName,
+                        Map<String, String> districtName,
+                        Map<String, String> wardName,
 
                         Double latitude,
                         Double longitude,
@@ -50,13 +51,13 @@ public class PlaceAdminDtos {
                         List<ContentBlockReq> content) {
         }
 
-        public record ImageReq(String url, String caption, Boolean cover, Integer sortOrder) {
+        public record ImageReq(String url, Map<String, String> caption, Boolean cover, Integer sortOrder) {
         }
 
-        public record CategoryReq(String name, String slug) {
+        public record CategoryReq(Map<String, String> name, String slug) {
         }
 
-        public record TagReq(String name, String slug, TagType type) {
+        public record TagReq(Map<String, String> name, String slug, TagType type) {
         }
 
         public record OpenHourReq(
@@ -69,7 +70,7 @@ public class PlaceAdminDtos {
 
         public record ContentBlockReq(
                         BlockType type,
-                        String text,
+                        Map<String, String> text,
                         ImageReq image,
                         List<ImageReq> gallery,
                         Double mapLat,

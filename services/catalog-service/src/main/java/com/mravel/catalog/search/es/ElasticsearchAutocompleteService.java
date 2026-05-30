@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import com.mravel.catalog.dto.AutocompleteItemDTO;
 import com.mravel.catalog.model.index.HotelIndex;
 import com.mravel.catalog.model.index.RestaurantIndex;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
 
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
@@ -30,15 +32,19 @@ public class ElasticsearchAutocompleteService {
 
     public List<AutocompleteItemDTO> suggestHotels(String q, int limit) {
         try {
+            boolean en = LocaleConstants.EN.equals(LocaleContext.get());
             NativeQuery nq = NativeQuery.builder()
-                    .withQuery(buildPrefixQuery(q))
+                    .withQuery(buildHotelPrefixQuery(q))
                     .withPageable(PageRequest.of(0, limit))
                     .build();
             return esOps.search(nq, HotelIndex.class)
                     .getSearchHits().stream()
                     .map(SearchHit::getContent)
                     .map(h -> new AutocompleteItemDTO(
-                            h.getId(), h.getName(), h.getSlug(), h.getCityName(),
+                            h.getId(),
+                            preferEn(h.getNameEn(), h.getNameVi(), en),
+                            h.getSlug(),
+                            preferEn(h.getCityNameEn(), h.getCityNameVi(), en),
                             coverUrl(h.getImages(), HotelIndex.ImageData::getCover, HotelIndex.ImageData::getUrl),
                             "HOTEL"))
                     .toList();
@@ -50,15 +56,19 @@ public class ElasticsearchAutocompleteService {
 
     public List<AutocompleteItemDTO> suggestRestaurants(String q, int limit) {
         try {
+            boolean en = LocaleConstants.EN.equals(LocaleContext.get());
             NativeQuery nq = NativeQuery.builder()
-                    .withQuery(buildPrefixQuery(q))
+                    .withQuery(buildRestaurantPrefixQuery(q))
                     .withPageable(PageRequest.of(0, limit))
                     .build();
             return esOps.search(nq, RestaurantIndex.class)
                     .getSearchHits().stream()
                     .map(SearchHit::getContent)
                     .map(r -> new AutocompleteItemDTO(
-                            r.getId(), r.getName(), r.getSlug(), r.getCityName(),
+                            r.getId(),
+                            preferEn(r.getNameEn(), r.getNameVi(), en),
+                            r.getSlug(),
+                            preferEn(r.getCityNameEn(), r.getCityNameVi(), en),
                             coverUrl(r.getImages(), RestaurantIndex.ImageData::getCover, RestaurantIndex.ImageData::getUrl),
                             "RESTAURANT"))
                     .toList();
@@ -68,14 +78,35 @@ public class ElasticsearchAutocompleteService {
         }
     }
 
-    private static Query buildPrefixQuery(String q) {
+    private static Query buildHotelPrefixQuery(String q) {
         return Query.of(qb -> qb.bool(b -> b
                 .must(Query.of(s -> s.term(t -> t.field("active").value(true))))
                 .must(Query.of(s -> s.term(t -> t.field("moderationStatus").value("APPROVED"))))
                 .must(Query.of(s -> s.multiMatch(m -> m
-                        .fields("name^3", "cityName^1")
+                        .fields("nameVi^3", "nameEn^3",
+                                "cityNameVi^1", "cityNameEn^1")
                         .query(q)
                         .type(TextQueryType.BoolPrefix))))));
+    }
+
+    private static Query buildRestaurantPrefixQuery(String q) {
+        return Query.of(qb -> qb.bool(b -> b
+                .must(Query.of(s -> s.term(t -> t.field("active").value(true))))
+                .must(Query.of(s -> s.term(t -> t.field("moderationStatus").value("APPROVED"))))
+                .must(Query.of(s -> s.multiMatch(m -> m
+                        .fields("nameVi^3", "nameEn^3",
+                                "cityNameVi^1", "cityNameEn^1")
+                        .query(q)
+                        .type(TextQueryType.BoolPrefix))))));
+    }
+
+    private static String preferEn(String enValue, String viValue, boolean en) {
+        if (en) {
+            if (enValue != null && !enValue.isBlank()) return enValue;
+            return viValue;
+        }
+        if (viValue != null && !viValue.isBlank()) return viValue;
+        return enValue;
     }
 
     private static <T> String coverUrl(List<T> images, Function<T, Boolean> getCover, Function<T, String> getUrl) {

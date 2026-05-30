@@ -17,6 +17,7 @@ import org.springframework.stereotype.Repository;
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc.RestaurantStatus;
 import com.mravel.catalog.repository.RestaurantDocRepositoryCustom;
+import com.mravel.common.i18n.LocaleConstants;
 
 @Repository
 public class RestaurantDocRepositoryImpl implements RestaurantDocRepositoryCustom {
@@ -31,7 +32,6 @@ public class RestaurantDocRepositoryImpl implements RestaurantDocRepositoryCusto
 
         Query q = new Query();
 
-        // áp paging/sort lên query find (giữ nguyên logic)
         if (pb.isPaged())
             q.with(pb);
         else
@@ -41,34 +41,34 @@ public class RestaurantDocRepositoryImpl implements RestaurantDocRepositoryCusto
         cs.add(where("active").is(true));
         cs.add(where("moderation.status").is(RestaurantStatus.APPROVED));
 
-        // location
         if (location != null && !location.isBlank()) {
-            final String loc = location.trim(); // non-null here
+            final String loc = location.trim();
 
             cs.add(new Criteria().orOperator(
                     where("destinationSlug").is(loc),
                     where("parentPlaceSlug").is(loc),
-                    where("cityName").regex(loc, "i"),
-                    where("districtName").regex(loc, "i"),
-                    where("wardName").regex(loc, "i"),
-                    where("addressLine").regex(loc, "i")));
+                    where("cityName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("cityName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("districtName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("wardName." + LocaleConstants.VI).regex(loc, "i"),
+                    where("wardName." + LocaleConstants.EN).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.VI).regex(loc, "i"),
+                    where("addressLine." + LocaleConstants.EN).regex(loc, "i")));
         }
 
-        // people
         if (people != null && people > 0) {
             cs.add(new Criteria().orOperator(
                     where("capacity.maxGroupSize").gte(people),
                     where("capacity.totalCapacity").gte(people)));
         }
 
-        // cuisines
         if (cuisineSlugs != null && !cuisineSlugs.isEmpty()) {
             cs.add(where("cuisines.code").in(cuisineSlugs));
         }
 
         q.addCriteria(Objects.requireNonNull(and(cs)));
 
-        // count phải bỏ limit/skip (giống HotelDocRepositoryImpl)
         Query countQ = Query.of(q).limit(-1).skip(-1);
         long total = mongo.count(countQ, RestaurantDoc.class);
 

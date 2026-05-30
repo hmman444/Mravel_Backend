@@ -13,6 +13,8 @@ import com.mravel.catalog.dto.place.PlaceDtos.PlaceSummaryDTO;
 import com.mravel.catalog.dto.place.PlaceDtos.TagDTO;
 import com.mravel.catalog.model.doc.PlaceDoc;
 import com.mravel.catalog.search.dto.PlaceSearchResult;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 public class PlaceMapper {
 
@@ -42,11 +44,11 @@ public class PlaceMapper {
   }
 
   public static PlaceSummaryDTO toSummary(PlaceDoc p) {
+    String locale = LocaleContext.get();
     String cover = null;
     if (p.getImages() != null && !p.getImages().isEmpty()) {
       cover = p.getImages().stream()
           .filter(Objects::nonNull)
-          // ưu tiên cover=true, rồi sortOrder nhỏ
           .sorted(Comparator
               .comparing((PlaceDoc.Image img) -> Boolean.TRUE.equals(img.getCover())).reversed()
               .thenComparing(img -> img.getSortOrder() == null ? 0 : img.getSortOrder()))
@@ -60,12 +62,12 @@ public class PlaceMapper {
 
     return new PlaceSummaryDTO(
         p.getId(),
-        p.getName(),
+        LocaleUtil.pick(p.getName(), locale),
         p.getSlug(),
         p.getKind(),
         p.getVenueType(),
-        p.getAddressLine(),
-        p.getProvinceName(),
+        LocaleUtil.pick(p.getAddressLine(), locale),
+        LocaleUtil.pick(p.getProvinceName(), locale),
         lat,
         lon,
         p.getPriceLevel(),
@@ -78,9 +80,10 @@ public class PlaceMapper {
   public static ImageDTO toImage(PlaceDoc.Image img) {
     if (img == null)
       return null;
+    String locale = LocaleContext.get();
     return new ImageDTO(
         img.getUrl(),
-        img.getCaption(),
+        LocaleUtil.pick(img.getCaption(), locale),
         Boolean.TRUE.equals(img.getCover()),
         img.getSortOrder() == null ? 0 : img.getSortOrder());
   }
@@ -88,11 +91,18 @@ public class PlaceMapper {
   public static TagDTO toTag(PlaceDoc.TagMini t) {
     if (t == null)
       return null;
+    String locale = LocaleContext.get();
     return new TagDTO(
-        t.getName(),
+        LocaleUtil.pick(t.getName(), locale),
         t.getSlug(),
-        t.getType() // TagType, không .name()
-    );
+        t.getType());
+  }
+
+  public static CategoryDTO toCategory(PlaceDoc.CategoryMini c) {
+    if (c == null)
+      return null;
+    String locale = LocaleContext.get();
+    return new CategoryDTO(LocaleUtil.pick(c.getName(), locale), c.getSlug());
   }
 
   public static OpenHourDTO toOpenHour(PlaceDoc.OpenHour oh) {
@@ -109,6 +119,7 @@ public class PlaceMapper {
   public static ContentBlockDTO toContentBlock(PlaceDoc.ContentBlock b) {
     if (b == null)
       return null;
+    String locale = LocaleContext.get();
 
     ImageDTO image = (b.getImage() == null) ? null : toImage(b.getImage());
     List<ImageDTO> gallery = (b.getGallery() == null)
@@ -125,10 +136,9 @@ public class PlaceMapper {
       mapLat = b.getMapLocation()[1];
     }
 
-    // DTO dùng luôn PlaceDoc.ContentBlock.BlockType nên không cần convert valueOf
     return new ContentBlockDTO(
         b.getType(),
-        b.getText(),
+        LocaleUtil.pick(b.getText(), locale),
         image,
         gallery,
         mapLat,
@@ -143,6 +153,8 @@ public class PlaceMapper {
       List<TagDTO> tags) {
     if (p == null)
       return null;
+
+    String locale = LocaleContext.get();
 
     images = (images == null ? List.<ImageDTO>of() : images).stream()
         .filter(Objects::nonNull)
@@ -163,23 +175,23 @@ public class PlaceMapper {
 
     return new PlaceDetailDTO(
         p.getId(),
-        p.getName(),
+        LocaleUtil.pick(p.getName(), locale),
         p.getSlug(),
         p.getKind(),
         p.getVenueType(),
-        p.getShortDescription(),
-        p.getDescription(),
+        LocaleUtil.pick(p.getShortDescription(), locale),
+        LocaleUtil.pick(p.getDescription(), locale),
         p.getPhone(),
         p.getEmail(),
         p.getWebsite(),
-        p.getAddressLine(),
+        LocaleUtil.pick(p.getAddressLine(), locale),
         p.getCountryCode(),
         p.getProvinceCode(),
         p.getDistrictCode(),
         p.getWardCode(),
-        p.getProvinceName(),
-        p.getDistrictName(),
-        p.getWardName(),
+        LocaleUtil.pick(p.getProvinceName(), locale),
+        LocaleUtil.pick(p.getDistrictName(), locale),
+        LocaleUtil.pick(p.getWardName(), locale),
         lat,
         lon,
         p.getPriceLevel(),

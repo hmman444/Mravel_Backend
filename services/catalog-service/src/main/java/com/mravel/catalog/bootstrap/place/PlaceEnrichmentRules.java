@@ -5,6 +5,7 @@ import com.mravel.catalog.model.doc.PlaceDoc.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public final class PlaceEnrichmentRules {
 
@@ -231,10 +232,10 @@ public final class PlaceEnrichmentRules {
     // =====================================================================
 
     private static String extractContextHint(PlaceDoc doc) {
-        String text = String.join(" ", 
-            doc.getName() != null ? doc.getName() : "", 
-            doc.getShortDescription() != null ? doc.getShortDescription() : "", 
-            doc.getDescription() != null ? doc.getDescription() : ""
+        String text = String.join(" ",
+            flatten(doc.getName()),
+            flatten(doc.getShortDescription()),
+            flatten(doc.getDescription())
         ).toLowerCase();
 
         if (containsAny(text, "beach", "biển", "coastal", "đảo", "island")) return "coastal";
@@ -259,5 +260,10 @@ public final class PlaceEnrichmentRules {
             if (text.contains(k)) return true;
         }
         return false;
+    }
+
+    private static String flatten(Map<String, String> localized) {
+        if (localized == null || localized.isEmpty()) return "";
+        return String.join(" ", localized.values());
     }
 }

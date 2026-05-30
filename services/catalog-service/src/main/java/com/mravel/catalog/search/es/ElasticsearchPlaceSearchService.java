@@ -28,6 +28,8 @@ import com.mravel.catalog.model.index.PlaceIndex;
 import com.mravel.catalog.search.PlaceSearchService;
 import com.mravel.catalog.search.dto.PlaceSearchResult;
 import com.mravel.catalog.service.PlaceMapper;
+import com.mravel.common.i18n.LocaleConstants;
+import com.mravel.common.i18n.LocaleContext;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
@@ -50,10 +52,6 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
 
     private final ElasticsearchOperations esOps;
     private final ElasticsearchClient esClient;
-
-    // =========================================================
-    // LEGACY SEARCH (unchanged)
-    // =========================================================
 
     @Override
     public Page<PlaceSearchResult> search(String q, PlaceKind kind, Pageable pageable) {
@@ -84,11 +82,15 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
         if (q != null && !q.isBlank()) {
             String qTrimmed = q.trim();
             must.add(Query.of(qr -> qr.bool(b -> b
-                    .should(Query.of(s -> s.match(m -> m.field("name").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("nameVi").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("nameEn").query(qTrimmed))))
                     .should(Query.of(s -> s.match(m -> m.field("slug").query(qTrimmed))))
-                    .should(Query.of(s -> s.match(m -> m.field("addressLine").query(qTrimmed))))
-                    .should(Query.of(s -> s.match(m -> m.field("provinceName").query(qTrimmed))))
-                    .should(Query.of(s -> s.match(m -> m.field("districtName").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("addressLineVi").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("addressLineEn").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("provinceNameVi").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("provinceNameEn").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("districtNameVi").query(qTrimmed))))
+                    .should(Query.of(s -> s.match(m -> m.field("districtNameEn").query(qTrimmed))))
                     .minimumShouldMatch("1"))));
         }
 
@@ -99,9 +101,14 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
     }
 
     static PlaceSearchResult toSearchResult(PlaceIndex p) {
+        boolean en = LocaleConstants.EN.equals(LocaleContext.get());
+
         List<PlaceSearchResult.ImageRef> images = p.getImages() == null ? List.of()
                 : p.getImages().stream().filter(Objects::nonNull)
-                        .map(img -> new PlaceSearchResult.ImageRef(img.getUrl(), img.getCaption(), img.getCover(),
+                        .map(img -> new PlaceSearchResult.ImageRef(
+                                img.getUrl(),
+                                pickCaption(img, en),
+                                img.getCover(),
                                 img.getSortOrder()))
                         .toList();
 
@@ -115,17 +122,29 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
         PriceLevel priceLevel = p.getPriceLevel() == null ? null : PriceLevel.valueOf(p.getPriceLevel());
 
         return new PlaceSearchResult(
-                p.getId(), p.getName(), p.getSlug(),
+                p.getId(),
+                preferEn(p.getNameEn(), p.getNameVi(), en),
+                p.getSlug(),
                 kind, venueType,
-                p.getAddressLine(), p.getProvinceName(),
+                preferEn(p.getAddressLineEn(), p.getAddressLineVi(), en),
+                preferEn(p.getProvinceNameEn(), p.getProvinceNameVi(), en),
                 location,
                 priceLevel, p.getAvgRating(), p.getReviewsCount(),
                 images, p.getActive());
     }
 
-    // =========================================================
-    // FACETED SEARCH
-    // =========================================================
+    private static String pickCaption(PlaceIndex.ImageData img, boolean en) {
+        return preferEn(img.getCaptionEn(), img.getCaptionVi(), en);
+    }
+
+    private static String preferEn(String enValue, String viValue, boolean en) {
+        if (en) {
+            if (enValue != null && !enValue.isBlank()) return enValue;
+            return viValue;
+        }
+        if (viValue != null && !viValue.isBlank()) return viValue;
+        return enValue;
+    }
 
     @Override
     public FacetedSearchResponse<PlaceSummaryDTO, PlaceFacets> searchFaceted(
@@ -166,19 +185,15 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
         }
     }
 
-    // ── (A) Context query: active + kind + optional text ─────────────────────
-
     private static Query buildContextQuery(FacetedPlaceSearchRequest r) {
         List<Query> must = new ArrayList<>();
         must.add(Query.of(q -> q.term(t -> t.field("active").value(true))));
 
         if (r != null && r.parentSlug() != null && !r.parentSlug().isBlank()) {
-            // Scoped to child POIs of a specific destination
             must.add(Query.of(q -> q.term(t -> t.field("kind").value(PlaceKind.POI.name()))));
             String ps = r.parentSlug();
             must.add(Query.of(q -> q.term(t -> t.field("parentSlug").value(ps))));
         } else {
-            // Global search: include both DESTINATION and POI
             must.add(Query.of(q -> q.terms(t -> t.field("kind").terms(tv -> tv.value(List.of(
                     FieldValue.of(PlaceKind.DESTINATION.name()),
                     FieldValue.of(PlaceKind.POI.name())))))));
@@ -187,17 +202,19 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
         if (r != null && r.q() != null && !r.q().isBlank()) {
             String text = r.q().trim();
             must.add(Query.of(q -> q.bool(b -> b
-                    .should(Query.of(s -> s.match(m -> m.field("name").query(text))))
-                    .should(Query.of(s -> s.match(m -> m.field("provinceName").query(text))))
-                    .should(Query.of(s -> s.match(m -> m.field("addressLine").query(text))))
-                    .should(Query.of(s -> s.match(m -> m.field("districtName").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("nameVi").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("nameEn").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("provinceNameVi").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("provinceNameEn").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("addressLineVi").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("addressLineEn").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("districtNameVi").query(text))))
+                    .should(Query.of(s -> s.match(m -> m.field("districtNameEn").query(text))))
                     .minimumShouldMatch("1"))));
         }
 
         return boolMust(must);
     }
-
-    // ── (B) Post-filter: user-selected facets, does NOT affect agg counts ────
 
     private static Query buildPostFilter(FacetedPlaceSearchRequest r) {
         if (r == null)
@@ -229,23 +246,24 @@ public class ElasticsearchPlaceSearchService implements PlaceSearchService {
         }));
     }
 
-    // ── (C) Extract aggregations → PlaceFacets ───────────────────────────────
-
     private static PlaceFacets extractFacets(java.util.Map<String, Aggregate> aggs) {
         if (aggs == null)
             return new PlaceFacets(List.of(), List.of(), List.of());
 
+        boolean en = LocaleConstants.EN.equals(LocaleContext.get());
         java.util.Map<String, String> errors = new java.util.LinkedHashMap<>();
 
-        // by_category aggregates on "categoryLabels" field encoded as
-        // "slug::DisplayName"
+        // by_category encoded as "slug::nameVi::nameEn"
         List<FacetBucket> categories = safeAgg(aggs, "by_category", errors,
                 agg -> agg.sterms().buckets().array().stream()
                         .map(b -> {
-                            String encoded = b.key().stringValue(); // "kien-truc::Kiến trúc"
-                            int sep = encoded.indexOf("::");
-                            String slug = sep >= 0 ? encoded.substring(0, sep) : encoded;
-                            String name = sep >= 0 ? encoded.substring(sep + 2) : encoded;
+                            String encoded = b.key().stringValue();
+                            String[] parts = encoded.split("::", -1);
+                            String slug = parts.length > 0 ? parts[0] : encoded;
+                            String nameVi = parts.length > 1 ? parts[1] : "";
+                            String nameEn = parts.length > 2 ? parts[2] : "";
+                            String name = preferEn(nameEn, nameVi, en);
+                            if (name == null || name.isBlank()) name = slug;
                             return new FacetBucket(slug, name, b.docCount());
                         })
                         .toList());

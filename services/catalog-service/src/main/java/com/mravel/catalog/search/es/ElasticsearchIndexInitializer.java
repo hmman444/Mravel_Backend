@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.data.elasticsearch.core.document.Document;
@@ -21,6 +23,7 @@ import com.mravel.catalog.repository.PlaceDocRepository;
 import com.mravel.catalog.repository.RestaurantDocRepository;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 @ConditionalOnProperty(name = "catalog.search.engine", havingValue = "elasticsearch")
 @RequiredArgsConstructor
 @Slf4j
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class ElasticsearchIndexInitializer implements ApplicationRunner {
 
     private final ElasticsearchOperations esOps;
@@ -40,8 +44,21 @@ public class ElasticsearchIndexInitializer implements ApplicationRunner {
     @Value("${catalog.search.reindex-on-startup-if-empty:true}")
     private boolean reindexOnStartupIfEmpty;
 
+    /**
+     * T?o index + settings TRU?C khi Spring kh?i t?o các CommandLineRunner (seed).
+     * Tránh race: seed runner g?i indexingService.syncX() ? ES auto-create index
+     * v?i default settings (thi?u vn_text analyzer) ? khi?n putMapping ? run() fail.
+     */
+    @PostConstruct
+    void initIndexesEarly() {
+        ensureIndex(HotelIndex.class);
+        ensureIndex(RestaurantIndex.class);
+        ensureIndex(PlaceIndex.class);
+    }
+
     @Override
     public void run(ApplicationArguments args) {
+        // Idempotent re-check sau khi m?i bean lifecycle ?n d?nh.
         ensureIndex(HotelIndex.class);
         ensureIndex(RestaurantIndex.class);
         ensureIndex(PlaceIndex.class);
@@ -59,8 +76,17 @@ public class ElasticsearchIndexInitializer implements ApplicationRunner {
             ops.create(buildSettings());
             log.info("[ES] Created index with vn_text analyzer: {}", indexName(clazz));
         }
-        ops.putMapping(ops.createMapping());
-        log.info("[ES] Mapping updated: {}", indexName(clazz));
+        try {
+            ops.putMapping(ops.createMapping());
+            log.info("[ES] Mapping updated: {}", indexName(clazz));
+        } catch (Exception ex) {
+            // Mapping conflict: index dã có settings/mapping cu không tuong thích.
+            // Ch? log c?nh báo — user c?n DELETE index th? công d? recreate.
+            log.warn("[ES] putMapping failed for {} ({}). " +
+                    "Có kh? nang index dã t?n t?i v?i settings cu thi?u analyzer 'vn_text'. " +
+                    "Hãy DELETE index này (curl -X DELETE http://localhost:9200/{}) r?i restart.",
+                    indexName(clazz), ex.getMessage(), indexName(clazz));
+        }
     }
 
     private static Document buildSettings() {

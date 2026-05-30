@@ -1,4 +1,3 @@
-// src/main/java/com/mravel/catalog/utils/HotelImages.java
 package com.mravel.catalog.utils.hotel;
 
 import com.mravel.catalog.model.doc.HotelDoc.Image;
@@ -11,10 +10,14 @@ public final class HotelImages {
 
   private HotelImages() {}
 
-  public static Image img(String url, String caption, boolean cover, Integer sortOrder) {
+  public static Image img(String url, String captionVi, boolean cover, Integer sortOrder) {
+    return img(url, captionVi, null, cover, sortOrder);
+  }
+
+  public static Image img(String url, String captionVi, String captionEn, boolean cover, Integer sortOrder) {
     return Image.builder()
         .url(url)
-        .caption(caption)
+        .caption(Localized.of(captionVi, captionEn))
         .cover(cover)
         .sortOrder(sortOrder == null ? 0 : sortOrder)
         .build();

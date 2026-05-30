@@ -7,6 +7,8 @@ import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.repository.RestaurantDocRepository;
 import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.catalog.service.AmenityCatalogService;
+import com.mravel.catalog.translation.LocalizedTranslator;
+import com.mravel.common.i18n.LocaleConstants;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -19,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -31,6 +34,7 @@ public class PartnerRestaurantService {
     private final AmenityCatalogService amenityCatalogService;
     private final UserServiceClient userServiceClient;
     private final IndexingService indexingService;
+    private final LocalizedTranslator localizedTranslator;
 
     public Page<RestaurantDoc> listMyRestaurants(Long partnerId, String status, Integer page, Integer size) {
         String pid = String.valueOf(partnerId);
@@ -71,9 +75,6 @@ public class PartnerRestaurantService {
         };
     }
 
-    // ===
-    // CREATE (default list rỗng + default bookingConfig)
-    // ===
     public RestaurantDoc create(Long partnerId,
             PartnerCatalogDtos.PendingReason pendingReason,
             PartnerCatalogDtos.UpsertRestaurantReq req,
@@ -85,17 +86,17 @@ public class PartnerRestaurantService {
         doc.setDeletedAt(null);
 
         if (req.name() != null)
-            doc.setName(req.name());
+            doc.setName(wrap(req.name()));
         rejectBlankIfPresent(req.name(), "name");
         String slugBase = (req.slug() != null && !req.slug().isBlank()) ? req.slug() : req.name();
         doc.setSlug(genUniqueSlugForCreate(slugBase));
 
         doc.setDestinationSlug(req.destinationSlug());
         doc.setParentPlaceSlug(req.parentPlaceSlug());
-        doc.setCityName(req.cityName());
-        doc.setDistrictName(req.districtName());
-        doc.setWardName(req.wardName());
-        doc.setAddressLine(req.addressLine());
+        doc.setCityName(wrap(req.cityName()));
+        doc.setDistrictName(wrap(req.districtName()));
+        doc.setWardName(wrap(req.wardName()));
+        doc.setAddressLine(wrap(req.addressLine()));
 
         if (req.latitude() != null && req.longitude() != null) {
             doc.setLocation(new double[] { req.longitude(), req.latitude() });
@@ -114,33 +115,29 @@ public class PartnerRestaurantService {
         if (req.priceBucket() != null)
             doc.setPriceBucket(parseEnum(req.priceBucket(), RestaurantDoc.PriceBucket.class, "priceBucket"));
 
-        doc.setShortDescription(req.shortDescription());
-        doc.setDescription(req.description());
+        doc.setShortDescription(wrap(req.shortDescription()));
+        doc.setDescription(wrap(req.description()));
         doc.setWebsite(req.website());
         doc.setPhone(req.phone());
         doc.setEmail(req.email());
         doc.setFacebookPage(req.facebookPage());
         doc.setBookingHotline(req.bookingHotline());
 
-        // tags + time
         doc.setCuisines(req.cuisines() == null ? List.of() : mapCuisines(req.cuisines()));
         doc.setOpeningHours(req.openingHours() == null ? List.of() : mapOpeningHours(req.openingHours()));
         doc.setSuitableFor(req.suitableFor() == null ? List.of() : mapSuitableFor(req.suitableFor()));
         doc.setAmbience(req.ambience() == null ? List.of() : mapAmbience(req.ambience()));
         doc.setSignatureDishes(req.signatureDishes() == null ? List.of() : mapSignatureDishes(req.signatureDishes()));
 
-        // capacity / parking / policy
         doc.setCapacity(mapCapacity(req.capacity()));
         doc.setParking(mapParking(req.parking()));
         doc.setPolicy(mapPolicy(req.policy()));
 
-        // media
         doc.setImages(req.images() == null ? List.of() : mapResImages(req.images()));
         doc.setMenuImages(req.menuImages() == null ? List.of() : mapResImages(req.menuImages()));
         doc.setMenuSections(req.menuSections() == null ? List.of() : mapMenuSections(req.menuSections()));
         doc.setContent(req.content() == null ? List.of() : mapContentBlocks(req.content()));
 
-        // amenityCodes: validate + default list rỗng
         if (req.amenityCodes() != null) {
             amenityCatalogService.validateCodes(AmenityScope.RESTAURANT, req.amenityCodes());
             doc.setAmenityCodes(normalizeCodes(req.amenityCodes()));
@@ -148,10 +145,8 @@ public class PartnerRestaurantService {
             doc.setAmenityCodes(List.of());
         }
 
-        // tableTypes default list rỗng
         doc.setTableTypes(req.tableTypes() == null ? List.of() : mapTableTypes(req.tableTypes()));
 
-        // bookingConfig luôn có default (kể cả req.bookingConfig null)
         doc.setBookingConfig(buildBookingConfigOrDefault(req.bookingConfig()));
 
         RestaurantDoc.PublisherInfo pub = RestaurantDoc.PublisherInfo.builder()
@@ -175,9 +170,6 @@ public class PartnerRestaurantService {
         return saved;
     }
 
-    // ===
-    // UPDATE (bookingConfig merge, không set null đè config cũ)
-    // ===
     public RestaurantDoc update(String id,
             Long partnerId,
             PartnerCatalogDtos.PendingReason pendingReason,
@@ -189,9 +181,8 @@ public class PartnerRestaurantService {
                 .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
         assertOwner(doc, partnerId);
 
-        // name là @NotBlank => luôn có
         if (req.name() != null)
-            doc.setName(req.name());
+            doc.setName(wrap(req.name()));
         rejectBlankIfPresent(req.name(), "name");
 
         if (req.slug() != null && !req.slug().isBlank()) {
@@ -206,13 +197,13 @@ public class PartnerRestaurantService {
         if (req.parentPlaceSlug() != null)
             doc.setParentPlaceSlug(req.parentPlaceSlug());
         if (req.cityName() != null)
-            doc.setCityName(req.cityName());
+            doc.setCityName(wrap(req.cityName()));
         if (req.districtName() != null)
-            doc.setDistrictName(req.districtName());
+            doc.setDistrictName(wrap(req.districtName()));
         if (req.wardName() != null)
-            doc.setWardName(req.wardName());
+            doc.setWardName(wrap(req.wardName()));
         if (req.addressLine() != null)
-            doc.setAddressLine(req.addressLine());
+            doc.setAddressLine(wrap(req.addressLine()));
 
         if (req.latitude() != null && req.longitude() != null) {
             doc.setLocation(new double[] { req.longitude(), req.latitude() });
@@ -221,9 +212,9 @@ public class PartnerRestaurantService {
         if (req.restaurantType() != null)
             doc.setRestaurantType(parseEnum(req.restaurantType(), RestaurantDoc.RestaurantType.class, "restaurantType"));
         if (req.shortDescription() != null)
-            doc.setShortDescription(req.shortDescription());
+            doc.setShortDescription(wrap(req.shortDescription()));
         if (req.description() != null)
-            doc.setDescription(req.description());
+            doc.setDescription(wrap(req.description()));
 
         if (req.phone() != null)
             doc.setPhone(req.phone());
@@ -287,12 +278,10 @@ public class PartnerRestaurantService {
             doc.setTableTypes(mapTableTypes(req.tableTypes()));
         }
 
-        // MERGE bookingConfig: chỉ set field nào != null
         if (req.bookingConfig() != null) {
             var c = req.bookingConfig();
 
             if (doc.getBookingConfig() == null) {
-                // nếu doc chưa có config -> set default trước cho an toàn
                 doc.setBookingConfig(buildBookingConfigOrDefault(null));
             }
 
@@ -405,10 +394,6 @@ public class PartnerRestaurantService {
         return doc;
     }
 
-    // ===
-    // HELPERS
-    // ===
-
     private RestaurantDoc.BookingConfig buildBookingConfigOrDefault(
             PartnerCatalogDtos.UpsertRestaurantBookingConfigReq c) {
         return RestaurantDoc.BookingConfig.builder()
@@ -436,7 +421,7 @@ public class PartnerRestaurantService {
                 .filter(Objects::nonNull)
                 .map(i -> RestaurantDoc.Image.builder()
                         .url(i.url())
-                        .caption(i.caption())
+                        .caption(wrap(i.caption()))
                         .cover(Boolean.TRUE.equals(i.cover()))
                         .sortOrder(i.sortOrder() == null ? 0 : i.sortOrder())
                         .build())
@@ -459,7 +444,7 @@ public class PartnerRestaurantService {
                 .filter(Objects::nonNull)
                 .map(t -> RestaurantDoc.TableType.builder()
                         .id((t.id() == null || t.id().isBlank()) ? UUID.randomUUID().toString() : t.id())
-                        .name(t.name())
+                        .name(wrap(t.name()))
                         .seats(t.seats())
                         .minPeople(t.minPeople())
                         .maxPeople(t.maxPeople())
@@ -470,15 +455,10 @@ public class PartnerRestaurantService {
                         .privateRoom(Boolean.TRUE.equals(t.privateRoom()))
                         .allowedDurationsMinutes(t.allowedDurationsMinutes())
                         .defaultDurationMinutes(t.defaultDurationMinutes())
-                        .note(t.note())
+                        .note(wrap(t.note()))
                         .build())
                 .toList();
     }
-
-    // ===
-    // NEW MAPPERS (cuisines, openingHours, suitableFor, ambience, signatureDishes,
-    // capacity, parking, policy, menuSections, contentBlocks)
-    // ===
 
     private List<RestaurantDoc.CuisineTag> mapCuisines(List<PartnerCatalogDtos.UpsertCuisineTagReq> items) {
         if (items == null) return null;
@@ -486,7 +466,7 @@ public class PartnerRestaurantService {
                 .filter(Objects::nonNull)
                 .map(c -> RestaurantDoc.CuisineTag.builder()
                         .code(c.code())
-                        .name(c.name())
+                        .name(wrap(c.name()))
                         .region(c.region())
                         .build())
                 .toList();
@@ -512,7 +492,7 @@ public class PartnerRestaurantService {
                 .filter(Objects::nonNull)
                 .map(x -> RestaurantDoc.SuitableFor.builder()
                         .code(x.code())
-                        .label(x.name())
+                        .label(wrap(x.name()))
                         .build())
                 .toList();
     }
@@ -523,7 +503,7 @@ public class PartnerRestaurantService {
                 .filter(Objects::nonNull)
                 .map(x -> RestaurantDoc.AmbienceTag.builder()
                         .code(x.code())
-                        .label(x.name())
+                        .label(wrap(x.name()))
                         .build())
                 .toList();
     }
@@ -533,8 +513,8 @@ public class PartnerRestaurantService {
         return items.stream()
                 .filter(Objects::nonNull)
                 .map(d -> RestaurantDoc.SignatureDish.builder()
-                        .name(d.name())
-                        .description(d.description())
+                        .name(wrap(d.name()))
+                        .description(wrap(d.description()))
                         .estimatedPrice(d.estimatedPrice())
                         .highlight(d.highlight() == null ? Boolean.TRUE : d.highlight())
                         .build())
@@ -557,16 +537,16 @@ public class PartnerRestaurantService {
         if (p == null) return null;
         return RestaurantDoc.ParkingInfo.builder()
                 .hasCarParking(Boolean.TRUE.equals(p.hasCarParking()))
-                .carParkingLocation(p.carParkingLocation())
+                .carParkingLocation(wrap(p.carParkingLocation()))
                 .carParkingFeeType(parseEnum(p.carParkingFeeType(), RestaurantDoc.ParkingFeeType.class,
                         "parking.carParkingFeeType"))
                 .carParkingFeeAmount(p.carParkingFeeAmount())
                 .hasMotorbikeParking(Boolean.TRUE.equals(p.hasMotorbikeParking()))
-                .motorbikeParkingLocation(p.motorbikeParkingLocation())
+                .motorbikeParkingLocation(wrap(p.motorbikeParkingLocation()))
                 .motorbikeParkingFeeType(parseEnum(p.motorbikeParkingFeeType(), RestaurantDoc.ParkingFeeType.class,
                         "parking.motorbikeParkingFeeType"))
                 .motorbikeParkingFeeAmount(p.motorbikeParkingFeeAmount())
-                .notes(p.notes())
+                .notes(wrap(p.notes()))
                 .build();
     }
 
@@ -576,7 +556,7 @@ public class PartnerRestaurantService {
                 .filter(Objects::nonNull)
                 .map(s -> RestaurantDoc.MenuSection.builder()
                         .code(s.code())
-                        .name(s.name())
+                        .name(wrap(s.name()))
                         .items(mapMenuItems(s.items()))
                         .build())
                 .toList();
@@ -587,11 +567,11 @@ public class PartnerRestaurantService {
         return items.stream()
                 .filter(Objects::nonNull)
                 .map(i -> RestaurantDoc.MenuItem.builder()
-                        .name(i.name())
-                        .description(i.description())
+                        .name(wrap(i.name()))
+                        .description(wrap(i.description()))
                         .priceFrom(i.priceFrom())
                         .priceTo(i.priceTo())
-                        .unit(i.unit())
+                        .unit(wrap(i.unit()))
                         .combo(Boolean.TRUE.equals(i.combo()))
                         .buffetItem(Boolean.TRUE.equals(i.buffetItem()))
                         .tags(i.tags())
@@ -615,7 +595,7 @@ public class PartnerRestaurantService {
                             .toDate(b.toDate())
                             .lunarMonth(b.lunarMonth())
                             .lunarDay(b.lunarDay())
-                            .description(b.description())
+                            .description(wrap(b.description()))
                             .build())
                     .toList();
         }
@@ -628,7 +608,7 @@ public class PartnerRestaurantService {
                             .drinkType(f.drinkType())
                             .feeAmount(f.feeAmount())
                             .currencyCode(f.currencyCode() == null ? "VND" : f.currencyCode())
-                            .note(f.note())
+                            .note(wrap(f.note()))
                             .build())
                     .toList();
         }
@@ -638,11 +618,11 @@ public class PartnerRestaurantService {
                 .depositMinGuests(p.depositMinGuests())
                 .depositAmount(p.depositAmount())
                 .depositCurrencyCode(p.depositCurrencyCode() == null ? "VND" : p.depositCurrencyCode())
-                .depositNotes(p.depositNotes())
+                .depositNotes(wrap(p.depositNotes()))
                 .hasPromotion(Boolean.TRUE.equals(p.hasPromotion()))
-                .promotionSummary(p.promotionSummary())
+                .promotionSummary(wrap(p.promotionSummary()))
                 .promotionMaxDiscountPercent(p.promotionMaxDiscountPercent())
-                .promotionNote(p.promotionNote())
+                .promotionNote(wrap(p.promotionNote()))
                 .blackoutRules(blackoutRules)
                 .minBookingLeadTimeMinutes(p.minBookingLeadTimeMinutes())
                 .maxHoldTimeMinutes(p.maxHoldTimeMinutes())
@@ -650,13 +630,13 @@ public class PartnerRestaurantService {
                 .vatInvoiceAvailable(Boolean.TRUE.equals(p.vatInvoiceAvailable()))
                 .vatPercent(p.vatPercent())
                 .directInvoiceAvailable(Boolean.TRUE.equals(p.directInvoiceAvailable()))
-                .invoiceNotes(p.invoiceNotes())
+                .invoiceNotes(wrap(p.invoiceNotes()))
                 .serviceChargePercent(p.serviceChargePercent())
-                .serviceChargeNotes(p.serviceChargeNotes())
+                .serviceChargeNotes(wrap(p.serviceChargeNotes()))
                 .allowOutsideFood(Boolean.TRUE.equals(p.allowOutsideFood()))
                 .allowOutsideDrink(Boolean.TRUE.equals(p.allowOutsideDrink()))
-                .outsideFoodPolicy(p.outsideFoodPolicy())
-                .outsideDrinkPolicy(p.outsideDrinkPolicy())
+                .outsideFoodPolicy(wrap(p.outsideFoodPolicy()))
+                .outsideDrinkPolicy(wrap(p.outsideDrinkPolicy()))
                 .outsideDrinkFees(outsideDrinkFees)
                 .build();
     }
@@ -670,12 +650,12 @@ public class PartnerRestaurantService {
                             .type(parseEnum(b.type(), RestaurantDoc.ContentBlock.BlockType.class, "content.type"))
                             .section(parseEnum(b.section(), RestaurantDoc.ContentBlock.ContentSection.class,
                                     "content.section"))
-                            .text(b.text());
+                            .text(wrap(b.text()));
 
                     if (b.image() != null) {
                         cb.image(RestaurantDoc.Image.builder()
                                 .url(b.image().url())
-                                .caption(b.image().caption())
+                                .caption(wrap(b.image().caption()))
                                 .cover(Boolean.TRUE.equals(b.image().cover()))
                                 .sortOrder(b.image().sortOrder() == null ? 0 : b.image().sortOrder())
                                 .build());
@@ -694,10 +674,6 @@ public class PartnerRestaurantService {
                 .toList();
     }
 
-    // ===
-    // ENUM / TIME helpers
-    // ===
-
     private static LocalTime parseTimeOrNull(String s) {
         if (s == null || s.isBlank()) return null;
         return LocalTime.parse(s.trim());
@@ -712,16 +688,11 @@ public class PartnerRestaurantService {
         }
     }
 
-    /**
-     * Auto-derive priceLevel & priceBucket từ maxPricePerPerson nếu chưa được set.
-     * Tránh để 2 enum này stale khi partner đổi min/max price.
-     */
     private void recomputePriceAggregates(RestaurantDoc doc) {
         BigDecimal max = doc.getMaxPricePerPerson();
         if (max == null) max = doc.getMinPricePerPerson();
         if (max == null) return;
 
-        // priceBucket
         if (doc.getPriceBucket() == null) {
             RestaurantDoc.PriceBucket bucket;
             if (max.compareTo(new BigDecimal("150000")) < 0)        bucket = RestaurantDoc.PriceBucket.UNDER_150K;
@@ -732,7 +703,6 @@ public class PartnerRestaurantService {
             doc.setPriceBucket(bucket);
         }
 
-        // priceLevel
         if (doc.getPriceLevel() == null) {
             RestaurantDoc.PriceLevel level;
             if (max.compareTo(new BigDecimal("150000")) < 0)        level = RestaurantDoc.PriceLevel.CHEAP;
@@ -776,7 +746,6 @@ public class PartnerRestaurantService {
         }
     }
 
-    // slug utils (tối giản)
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
@@ -817,17 +786,6 @@ public class PartnerRestaurantService {
         }
     }
 
-    // NOTE: giữ lại vì bạn đang có, không dùng cũng không sao
-    private String genUniqueSlug(String name) {
-        String base = slugify(name);
-        String slug = base;
-        int i = 1;
-        while (repo.existsBySlug(slug)) {
-            slug = base + "-" + i++;
-        }
-        return slug;
-    }
-
     private String genUniqueSlugForCreate(String name) {
         String base = slugify(name);
         String slug = base;
@@ -846,5 +804,10 @@ public class PartnerRestaurantService {
             slug = base + "-" + i++;
         }
         return slug;
+    }
+
+    // Đưa String (theo locale partner đang nhập) thành Map song ngữ: tự dịch sang locale còn lại.
+    private Map<String, String> wrap(String value) {
+        return localizedTranslator.resolveFromString(value, null);
     }
 }

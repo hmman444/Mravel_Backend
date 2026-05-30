@@ -7,6 +7,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import com.mravel.catalog.model.doc.RestaurantDoc.AmbienceTag;
 import com.mravel.catalog.model.doc.RestaurantDoc.BlackoutDateRule;
@@ -19,6 +20,7 @@ import com.mravel.catalog.model.doc.RestaurantDoc.OpeningHour;
 import com.mravel.catalog.model.doc.RestaurantDoc.ReviewKeywordStat;
 import com.mravel.catalog.model.doc.RestaurantDoc.SignatureDish;
 import com.mravel.catalog.model.doc.RestaurantDoc.SuitableFor;
+import com.mravel.catalog.utils.restaurant.Localized;
 
 public final class RestaurantSeedUtils {
 
@@ -29,8 +31,11 @@ public final class RestaurantSeedUtils {
     // CONTENT BLOCK HELPERS
     //
 
-    // Không có section (dùng cho seed đơn giản)
     public static ContentBlock heading(String text) {
+        return heading(Localized.vi(text));
+    }
+
+    public static ContentBlock heading(Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.HEADING)
                 .text(text)
@@ -38,6 +43,10 @@ public final class RestaurantSeedUtils {
     }
 
     public static ContentBlock paragraph(String text) {
+        return paragraph(Localized.vi(text));
+    }
+
+    public static ContentBlock paragraph(Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.PARAGRAPH)
                 .text(text)
@@ -45,6 +54,10 @@ public final class RestaurantSeedUtils {
     }
 
     public static ContentBlock quote(String text) {
+        return quote(Localized.vi(text));
+    }
+
+    public static ContentBlock quote(Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.QUOTE)
                 .text(text)
@@ -64,8 +77,11 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // Có section (OVERVIEW / STORY / OTHER)
     public static ContentBlock heading(ContentSection section, String text) {
+        return heading(section, Localized.vi(text));
+    }
+
+    public static ContentBlock heading(ContentSection section, Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.HEADING)
                 .section(section)
@@ -74,6 +90,10 @@ public final class RestaurantSeedUtils {
     }
 
     public static ContentBlock paragraph(ContentSection section, String text) {
+        return paragraph(section, Localized.vi(text));
+    }
+
+    public static ContentBlock paragraph(ContentSection section, Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.PARAGRAPH)
                 .section(section)
@@ -82,6 +102,10 @@ public final class RestaurantSeedUtils {
     }
 
     public static ContentBlock quote(ContentSection section, String text) {
+        return quote(section, Localized.vi(text));
+    }
+
+    public static ContentBlock quote(ContentSection section, Map<String, String> text) {
         return ContentBlock.builder()
                 .type(BlockType.QUOTE)
                 .section(section)
@@ -102,6 +126,10 @@ public final class RestaurantSeedUtils {
     //
 
     public static Image img(String url, String caption, boolean cover, Integer sortOrder) {
+        return img(url, Localized.vi(caption), cover, sortOrder);
+    }
+
+    public static Image img(String url, Map<String, String> caption, boolean cover, Integer sortOrder) {
         return Image.builder()
                 .url(url)
                 .caption(caption)
@@ -121,7 +149,6 @@ public final class RestaurantSeedUtils {
     // SEED HELPERS
     //
 
-    // Opening hours
     public static OpeningHour openingHour(
             DayOfWeek day,
             int openHour,
@@ -137,24 +164,38 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // SuitableFor
     public static SuitableFor suitable(String code, String label) {
+        return suitable(code, Localized.vi(label));
+    }
+
+    public static SuitableFor suitable(String code, Map<String, String> label) {
         return SuitableFor.builder()
                 .code(code)
                 .label(label)
                 .build();
     }
 
-    // Ambience
     public static AmbienceTag ambience(String code, String label) {
+        return ambience(code, Localized.vi(label));
+    }
+
+    public static AmbienceTag ambience(String code, Map<String, String> label) {
         return AmbienceTag.builder()
                 .code(code)
                 .label(label)
                 .build();
     }
 
-    // Signature dishes
     public static SignatureDish signatureDish(String name) {
+        return SignatureDish.builder()
+                .name(Localized.vi(name))
+                .description(null)
+                .estimatedPrice(null)
+                .highlight(true)
+                .build();
+    }
+
+    public static SignatureDish signatureDishL(Map<String, String> name) {
         return SignatureDish.builder()
                 .name(name)
                 .description(null)
@@ -164,6 +205,11 @@ public final class RestaurantSeedUtils {
     }
 
     public static SignatureDish signatureDish(String name, String description, BigDecimal estimatedPrice) {
+        return signatureDish(Localized.vi(name), Localized.vi(description), estimatedPrice);
+    }
+
+    public static SignatureDish signatureDish(Map<String, String> name, Map<String, String> description,
+            BigDecimal estimatedPrice) {
         return SignatureDish.builder()
                 .name(name)
                 .description(description)
@@ -172,8 +218,11 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // Blackout rule dương lịch
     public static BlackoutDateRule blackoutGregorian(int month, int day, String desc) {
+        return blackoutGregorian(month, day, Localized.vi(desc));
+    }
+
+    public static BlackoutDateRule blackoutGregorian(int month, int day, Map<String, String> desc) {
         return BlackoutDateRule.builder()
                 .dateType(BlackoutDateType.GREGORIAN_DATE)
                 .month(month)
@@ -182,8 +231,11 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // Review keyword
     public static ReviewKeywordStat keyword(String code, String label, Integer count) {
+        return keyword(code, Localized.vi(label), count);
+    }
+
+    public static ReviewKeywordStat keyword(String code, Map<String, String> label, Integer count) {
         return ReviewKeywordStat.builder()
                 .code(code)
                 .label(label)
@@ -191,7 +243,6 @@ public final class RestaurantSeedUtils {
                 .build();
     }
 
-    // RestaurantSeedUtils.java
     public static ContentBlock imageBlock(ContentSection section, Image img) {
         return ContentBlock.builder()
                 .type(ContentBlock.BlockType.IMAGE)

@@ -9,6 +9,8 @@ import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.enums.AmenityScope;
 import com.mravel.catalog.search.dto.HotelSearchResult;
+import com.mravel.common.i18n.LocaleContext;
+import com.mravel.common.i18n.LocaleUtil;
 
 public class HotelMapper {
 
@@ -74,16 +76,12 @@ public class HotelMapper {
         }
 
         // DETAIL
-        /**
-         * Resolve amenityCodes -> AmenityDTO bằng catalogMap (đã query từ DB).
-         *
-         * - catalogMap: key = amenityCode (UPPERCASE), value = AmenityCatalogDoc
-         * - Hotel-level: lấy từ h.getAmenityCodes()
-         * - Room-level: lấy từ rt.getAmenityCodes()
-         */
+
         public static HotelDetailDTO toDetail(HotelDoc h,
                         Map<String, AmenityCatalogDoc> hotelCatalogMap,
                         Map<String, AmenityCatalogDoc> roomCatalogMap) {
+                String locale = LocaleContext.get();
+
                 Double lat = null, lon = null;
                 if (h.getLocation() != null && h.getLocation().length == 2) {
                         lon = h.getLocation()[0];
@@ -110,7 +108,6 @@ public class HotelMapper {
                                                 .filter(Objects::nonNull)
                                                 .toList();
 
-                // amenities lấy từ amenityCodes + catalogMap
                 List<AmenityDTO> amenities = resolveAmenities(h.getAmenityCodes(), hotelCatalogMap);
 
                 List<NearbyPlaceDTO> nearbyPlaces = h.getNearbyPlaces() == null
@@ -127,17 +124,18 @@ public class HotelMapper {
                                 ? List.of()
                                 : h.getFaqs().stream()
                                                 .filter(Objects::nonNull)
-                                                .map(f -> new FaqDTO(f.getQuestion(), f.getAnswer()))
+                                                .map(f -> new FaqDTO(
+                                                                LocaleUtil.pick(f.getQuestion(), locale),
+                                                                LocaleUtil.pick(f.getAnswer(), locale)))
                                                 .toList();
 
                 ReviewStatsDTO reviewStats = h.getReviewStats() == null ? null : toReviewStats(h.getReviewStats());
 
-                // roomType mapper cần catalogMap để resolve amenityCodes
                 List<RoomTypeDTO> roomTypes = h.getRoomTypes() == null
                                 ? List.of()
                                 : h.getRoomTypes().stream()
                                                 .filter(Objects::nonNull)
-                                                .map(rt -> toRoomType(rt, roomCatalogMap)) // <-- ROOM map
+                                                .map(rt -> toRoomType(rt, roomCatalogMap))
                                                 .toList();
 
                 PublisherDTO publisher = h.getPublisher() == null ? null : toPublisher(h.getPublisher());
@@ -155,18 +153,18 @@ public class HotelMapper {
 
                 return new HotelDetailDTO(
                                 h.getId(),
-                                h.getName(),
+                                LocaleUtil.pick(h.getName(), locale),
                                 h.getSlug(),
                                 h.getActive(),
                                 h.getStarRating(),
                                 h.getHotelType() == null ? null : h.getHotelType().name(),
-                                h.getShortDescription(),
-                                h.getDescription(),
+                                LocaleUtil.pick(h.getShortDescription(), locale),
+                                LocaleUtil.pick(h.getDescription(), locale),
                                 h.getDestinationSlug(),
-                                h.getCityName(),
-                                h.getDistrictName(),
-                                h.getWardName(),
-                                h.getAddressLine(),
+                                LocaleUtil.pick(h.getCityName(), locale),
+                                LocaleUtil.pick(h.getDistrictName(), locale),
+                                LocaleUtil.pick(h.getWardName(), locale),
+                                LocaleUtil.pick(h.getAddressLine(), locale),
                                 lat,
                                 lon,
                                 h.getPhone(),
@@ -176,7 +174,7 @@ public class HotelMapper {
                                 h.getDefaultCheckOutTime(),
                                 h.getAvgRating(),
                                 h.getReviewsCount(),
-                                h.getRatingLabel(),
+                                LocaleUtil.pick(h.getRatingLabel(), locale),
                                 h.getMinNightlyPrice(),
                                 h.getCurrencyCode(),
                                 h.getReferenceNightlyPrice(),
@@ -218,9 +216,10 @@ public class HotelMapper {
         }
 
         private static AmenityDTO toAmenityFromCatalog(AmenityCatalogDoc a) {
+                String locale = LocaleContext.get();
                 return new AmenityDTO(
                                 a.getCode(),
-                                a.getName(),
+                                LocaleUtil.pick(a.getName(), locale),
                                 a.getGroup(),
                                 a.getSection(),
                                 a.getIcon());
@@ -229,9 +228,10 @@ public class HotelMapper {
         // SUB MAPPERS
 
         public static ImageDTO toImage(HotelDoc.Image img) {
+                String locale = LocaleContext.get();
                 return new ImageDTO(
                                 img.getUrl(),
-                                img.getCaption(),
+                                LocaleUtil.pick(img.getCaption(), locale),
                                 Boolean.TRUE.equals(img.getCover()),
                                 img.getSortOrder());
         }
@@ -239,6 +239,7 @@ public class HotelMapper {
         public static ContentBlockDTO toContentBlock(HotelDoc.ContentBlock b) {
                 if (b == null)
                         return null;
+                String locale = LocaleContext.get();
 
                 ImageDTO image = b.getImage() == null ? null : toImage(b.getImage());
 
@@ -259,7 +260,7 @@ public class HotelMapper {
 
                 return new ContentBlockDTO(
                                 type,
-                                b.getText(),
+                                LocaleUtil.pick(b.getText(), locale),
                                 image,
                                 gallery,
                                 mapLat,
@@ -267,14 +268,16 @@ public class HotelMapper {
         }
 
         public static NearbyPlaceDTO toNearbyPlace(HotelDoc.NearbyPlace np) {
+                String locale = LocaleContext.get();
                 return new NearbyPlaceDTO(
                                 np.getPlaceSlug(),
-                                np.getName(),
-                                np.getCategory(),
+                                LocaleUtil.pick(np.getName(), locale),
+                                LocaleUtil.pick(np.getCategory(), locale),
                                 np.getDistanceMeters());
         }
 
         public static HotelPolicyDTO toPolicy(HotelDoc.HotelPolicy p) {
+                String locale = LocaleContext.get();
                 List<PolicyItemDTO> items = p.getItems() == null
                                 ? List.of()
                                 : p.getItems().stream()
@@ -282,8 +285,8 @@ public class HotelMapper {
                                                 .map(item -> new PolicyItemDTO(
                                                                 item.getSection() == null ? null
                                                                                 : item.getSection().name(),
-                                                                item.getTitle(),
-                                                                item.getContent()))
+                                                                LocaleUtil.pick(item.getTitle(), locale),
+                                                                LocaleUtil.pick(item.getContent(), locale)))
                                                 .toList();
 
                 return new HotelPolicyDTO(
@@ -293,22 +296,27 @@ public class HotelMapper {
         }
 
         public static GeneralInfoDTO toGeneralInfo(HotelDoc.GeneralInfo g) {
+                String locale = LocaleContext.get();
                 return new GeneralInfoDTO(
-                                g.getMainFacilitiesSummary(),
+                                LocaleUtil.pick(g.getMainFacilitiesSummary(), locale),
                                 g.getDistanceToCityCenterKm(),
-                                g.getPopularAreaSummary(),
+                                LocaleUtil.pick(g.getPopularAreaSummary(), locale),
                                 g.getTotalRooms(),
                                 g.getTotalFloors(),
-                                g.getOtherHighlightFacilities(),
-                                g.getInterestingPlacesSummary());
+                                LocaleUtil.pick(g.getOtherHighlightFacilities(), locale),
+                                LocaleUtil.pick(g.getInterestingPlacesSummary(), locale));
         }
 
         public static ReviewStatsDTO toReviewStats(HotelDoc.ReviewStats rs) {
+                String locale = LocaleContext.get();
                 List<ReviewKeywordDTO> keywords = rs.getKeywords() == null
                                 ? List.of()
                                 : rs.getKeywords().stream()
                                                 .filter(Objects::nonNull)
-                                                .map(k -> new ReviewKeywordDTO(k.getCode(), k.getLabel(), k.getCount()))
+                                                .map(k -> new ReviewKeywordDTO(
+                                                                k.getCode(),
+                                                                LocaleUtil.pick(k.getLabel(), locale),
+                                                                k.getCount()))
                                                 .toList();
 
                 return new ReviewStatsDTO(
@@ -337,6 +345,8 @@ public class HotelMapper {
         }
 
         public static RoomTypeDTO toRoomType(HotelDoc.RoomType rt, Map<String, AmenityCatalogDoc> roomCatalogMap) {
+                String locale = LocaleContext.get();
+
                 List<ImageDTO> images = rt.getImages() == null
                                 ? List.of()
                                 : rt.getImages().stream()
@@ -344,7 +354,6 @@ public class HotelMapper {
                                                 .map(HotelMapper::toImage)
                                                 .toList();
 
-                // RoomType cũng resolve từ amenityCodes
                 List<AmenityDTO> amenities = resolveAmenities(rt.getAmenityCodes(), roomCatalogMap);
 
                 List<RatePlanDTO> ratePlans = rt.getRatePlans() == null
@@ -356,9 +365,9 @@ public class HotelMapper {
 
                 return new RoomTypeDTO(
                                 rt.getId(),
-                                rt.getName(),
-                                rt.getShortDescription(),
-                                rt.getDescription(),
+                                LocaleUtil.pick(rt.getName(), locale),
+                                LocaleUtil.pick(rt.getShortDescription(), locale),
+                                LocaleUtil.pick(rt.getDescription(), locale),
                                 rt.getAreaSqm(),
                                 rt.getBedType() == null ? null : rt.getBedType().name(),
                                 rt.getBedsCount(),
@@ -372,13 +381,14 @@ public class HotelMapper {
         }
 
         public static RatePlanDTO toRatePlan(HotelDoc.RatePlan rp) {
+                String locale = LocaleContext.get();
                 return new RatePlanDTO(
                                 rp.getId(),
-                                rp.getName(),
+                                LocaleUtil.pick(rp.getName(), locale),
                                 rp.getBoardType() == null ? null : rp.getBoardType().name(),
                                 rp.getPaymentType() == null ? null : rp.getPaymentType().name(),
                                 rp.getRefundable(),
-                                rp.getCancellationPolicy(),
+                                LocaleUtil.pick(rp.getCancellationPolicy(), locale),
                                 rp.getPricePerNight(),
                                 rp.getReferencePricePerNight(),
                                 rp.getDiscountPercent(),
@@ -386,7 +396,7 @@ public class HotelMapper {
                                 rp.getServiceFeePercent(),
                                 rp.getPriceIncludesTax(),
                                 rp.getPriceIncludesServiceFee(),
-                                rp.getPromoLabel(),
+                                LocaleUtil.pick(rp.getPromoLabel(), locale),
                                 rp.getShowLowAvailability());
         }
 
@@ -415,7 +425,6 @@ public class HotelMapper {
                                 lastActionAt);
         }
 
-        // OPTIONAL: build catalogMap helper
         public static Map<String, AmenityCatalogDoc> toCatalogMap(List<AmenityCatalogDoc> items) {
                 if (items == null)
                         return Map.of();
@@ -426,7 +435,7 @@ public class HotelMapper {
                                 .collect(Collectors.toMap(
                                                 a -> a.getCode().toUpperCase(Locale.ROOT),
                                                 Function.identity(),
-                                                (a, b) -> a, // nếu trùng code (không nên), lấy cái đầu
+                                                (a, b) -> a,
                                                 LinkedHashMap::new));
         }
 }

@@ -12,6 +12,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Objects;
@@ -277,6 +279,20 @@ public class CatalogClient {
         return exchangeAbsolute(url, method, body, bearerToken);
     }
 
+    /** Lấy Accept-Language của request HTTP hiện tại (nếu có) để forward xuống catalog. */
+    private String currentAcceptLanguage() {
+        try {
+            ServletRequestAttributes attrs =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null) {
+                return attrs.getRequest().getHeader(HttpHeaders.ACCEPT_LANGUAGE);
+            }
+        } catch (Exception ignored) {
+            // không có request context (vd background) -> bỏ qua, catalog dùng default vi
+        }
+        return null;
+    }
+
     private ResponseEntity<ApiResponse<?>> exchangeAbsolute(String url, HttpMethod method, Object body,
             String bearerToken) {
         final String safeUrl = Objects.requireNonNull(url, "url must not be null");
@@ -288,6 +304,12 @@ public class CatalogClient {
         headers.setBearerAuth(safeToken);
         headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
         headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Forward Accept-Language của request hiện tại xuống catalog (để flatten đúng locale).
+        String acceptLanguage = currentAcceptLanguage();
+        if (acceptLanguage != null && !acceptLanguage.isBlank()) {
+            headers.set(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage);
+        }
 
         HttpEntity<Object> entity = new HttpEntity<>(body, headers);
 

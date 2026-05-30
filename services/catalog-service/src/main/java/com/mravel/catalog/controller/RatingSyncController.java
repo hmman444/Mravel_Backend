@@ -6,6 +6,7 @@ import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.repository.HotelDocRepository;
 import com.mravel.catalog.repository.PlaceDocRepository;
 import com.mravel.catalog.repository.RestaurantDocRepository;
+import com.mravel.common.i18n.LocaleConstants;
 import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.common.response.ApiResponse;
 import lombok.Getter;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -42,7 +44,7 @@ public class RatingSyncController {
                 stats.setKeywords(req.getTopAspects().stream()
                         .map(a -> HotelDoc.ReviewKeywordStat.builder()
                                 .code(a.getCode())
-                                .label(a.getLabel())
+                                .label(a.getLabel() == null ? null : Map.of(LocaleConstants.VI, a.getLabel()))
                                 .count(a.getCount())
                                 .build())
                         .toList());
@@ -69,7 +71,7 @@ public class RatingSyncController {
                 stats.setKeywords(req.getTopAspects().stream()
                         .map(a -> RestaurantDoc.ReviewKeywordStat.builder()
                                 .code(a.getCode())
-                                .label(a.getLabel())
+                                .label(a.getLabel() == null ? null : Map.of(LocaleConstants.VI, a.getLabel()))
                                 .count(a.getCount())
                                 .build())
                         .toList());
@@ -93,7 +95,7 @@ public class RatingSyncController {
                 doc.setReviewKeywords(req.getTopAspects().stream()
                         .map(a -> PlaceDoc.ReviewKeywordStat.builder()
                                 .code(a.getCode())
-                                .label(a.getLabel())
+                                .label(a.getLabel() == null ? null : Map.of(LocaleConstants.VI, a.getLabel()))
                                 .count(a.getCount())
                                 .build())
                         .toList());
