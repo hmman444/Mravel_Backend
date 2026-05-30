@@ -137,6 +137,36 @@ async def test_edit_service_maps_ops_to_calls_and_scales_cost():
 
 
 @pytest.mark.asyncio
+async def test_edit_card_body_fills_rich_fields():
+    """An edit-created card carries the full detail (address/route/distance/transport/
+    recommendation), matching the catalog/approval path — not just a title + time."""
+    plan = _RecordingPlan()
+    ops = parse_operations([{
+        "op": "create_card", "list_id": 10, "text": "Ăn sáng Bánh canh Nam Phổ",
+        "start_time": "7:30", "end_time": "8:15", "activity_type": "FOOD",
+        "estimated_cost_vnd": 150000, "unit_price_vnd": 75000, "quantity": 2,
+        "location_name": "Bánh canh Nam Phổ", "address": "74 Trưng Nữ Vương, Đà Nẵng",
+        "note": "hoặc Bún Mắm Hạnh - 36 Tăng Bạt Hổ", "route_hint": "Home → Quán ăn",
+        "distance_text": "500m", "transport_mode": "xe máy", "reason": "gần khách sạn",
+        "recommendation": {"kind": "RESTAURANT", "slug": "banh-canh-nam-pho",
+                           "name": "Bánh canh Nam Phổ", "cover_image_url": "http://x/y.jpg"},
+    }])
+    await EditService(plan).apply(5, ops, "t")
+    body = plan.calls[0][3]
+    ad = json.loads(body["activityDataJson"])
+    assert ad["locationName"] == "Bánh canh Nam Phổ"
+    assert ad["address"].startswith("74 Trưng")
+    assert ad["routeHint"] == "Home → Quán ăn"
+    assert ad["distanceText"] == "500m"
+    assert ad["transportMode"] == "xe máy"
+    assert ad["reason"] == "gần khách sạn"
+    assert ad["recommendation"]["slug"] == "banh-canh-nam-pho"
+    assert ad["recommendation"]["coverImageUrl"] == "http://x/y.jpg"
+    assert "📍" in body["description"] and "🗺️" in body["description"]
+    assert body["startTime"] == "07:30" and body["endTime"] == "08:15"
+
+
+@pytest.mark.asyncio
 async def test_edit_service_collects_failures():
     class _Boom(_RecordingPlan):
         async def delete_card(self, *a, **k):

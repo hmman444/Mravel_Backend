@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     llm_fallback_models: str = ""
     llm_app_name: str = "Mravel AI Plan Agent"
     llm_app_url: str = ""
+    # Max output tokens for the agent turn. Dense multi-day itineraries (a single
+    # finalize_draft / propose_plan_edits call with 8-12 rich activities × several
+    # days) need a large budget; 2048 truncated the JSON and dropped activities.
+    llm_max_tokens: int = 8000
 
     # Web search fallback for prices / venues missing from the catalog.
     # Empty api key → disabled (agent falls back to heuristic pricing).

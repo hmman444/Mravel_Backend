@@ -49,6 +49,14 @@ class EditOperation(BaseModel):
     participant_count: Optional[int] = None
     address: Optional[str] = None
     note: Optional[str] = None
+    # Rich card fields (mirror the Excel itinerary columns + the approval path) so an
+    # edit-created card is as detailed as the catalog/approval ones.
+    location_name: Optional[str] = None  # "Bánh canh Nam Phổ"
+    reason: Optional[str] = None  # 1 line why it fits
+    route_hint: Optional[str] = None  # "Home → Quán ăn", "Đà Nẵng → Hội An"
+    distance_text: Optional[str] = None  # "500m", "~2km", "30km"
+    transport_mode: Optional[str] = None  # "đi bộ", "xe máy", "taxi", "xe khách"
+    recommendation: Optional[Dict[str, Any]] = None  # copied from a catalog search result
 
     # List / plan fields
     title: Optional[str] = None
@@ -266,8 +274,17 @@ def propose_tool_schema() -> Dict[str, Any]:
                 "unit_price_vnd": {"type": "integer", "description": "Per-person price."},
                 "quantity": {"type": "integer", "description": "Number of people/units."},
                 "participant_count": {"type": "integer"},
-                "address": {"type": "string"},
-                "note": {"type": "string"},
+                "address": {"type": "string", "description": "Exact street address, e.g. '74 Trưng Nữ Vương, Đà Nẵng'."},
+                "note": {"type": "string", "description": "Tip / what to order / alternative venue / opening-hours quirk."},
+                "location_name": {"type": "string", "description": "Venue/place name, e.g. 'Bánh canh Nam Phổ'."},
+                "reason": {"type": "string", "description": "1 short line why this fits the user."},
+                "route_hint": {"type": "string", "description": "Transit segment, e.g. 'Home → Quán ăn' or 'Đà Nẵng → Hội An'."},
+                "distance_text": {"type": "string", "description": "'500m', '~2km', '30km'."},
+                "transport_mode": {"type": "string", "description": "'đi bộ', 'xe máy', 'taxi', 'xe khách', 'máy bay'."},
+                "recommendation": {
+                    "type": "object",
+                    "description": "Copy from a catalog search result (kind/slug/id/name/lat/lng/coverImageUrl) for STAY/FOOD/SIGHTSEEING cards.",
+                },
                 "title": {"type": "string", "description": "List title (rename_list/add_day) or plan title."},
                 "start_date": {"type": "string", "description": "YYYY-MM-DD (update_plan)."},
                 "end_date": {"type": "string"},
