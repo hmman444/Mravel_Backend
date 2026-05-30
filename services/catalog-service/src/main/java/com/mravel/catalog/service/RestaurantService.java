@@ -29,6 +29,7 @@ import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.repository.AmenityCatalogRepository;
 import com.mravel.catalog.repository.RestaurantDocRepository;
 import com.mravel.catalog.search.RestaurantSearchService;
+import com.mravel.catalog.search.es.IndexingService;
 import com.mravel.catalog.search.dto.RestaurantSearchResult;
 
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class RestaurantService {
     private final MongoTemplate mongoTemplate;
     private final AmenityCatalogRepository amenityCatalogRepo;
     private final AmenityCatalogService amenityCatalogService;
+    private final IndexingService indexingService;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -89,6 +91,7 @@ public class RestaurantService {
                 Query.query(Criteria.where("_id").is(restaurantId)),
                 new Update().addToSet("amenityCodes").each(normalized.toArray()),
                 "restaurants");
+        restaurantRepo.findById(restaurantId).ifPresent(indexingService::syncRestaurant);
     }
 
     public void detachRestaurantAmenities(String restaurantId, List<String> codes) {
@@ -98,6 +101,7 @@ public class RestaurantService {
                 Query.query(Criteria.where("_id").is(restaurantId)),
                 new Update().pullAll("amenityCodes", normalized.toArray()),
                 "restaurants");
+        restaurantRepo.findById(restaurantId).ifPresent(indexingService::syncRestaurant);
     }
 
     private static LocalDate parseDate(String s) {
