@@ -5,6 +5,11 @@ spring:
   application:
     name: plan-service
 
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI:http://elasticsearch:9200}
+    connection-timeout: 5s
+    socket-timeout: 30s
+
   datasource:
     url: jdbc:mysql://mysql:3306/mravel_plan?useSSL=false&serverTimezone=UTC
     username: ${MYSQL_USER:root}

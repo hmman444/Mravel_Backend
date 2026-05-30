@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,7 @@ public class PlanIndexConsumer {
     private final PlanRepository planRepository;
     private final PlanEsRepository planEsRepository;
 
+    @Transactional(readOnly = true)
     @KafkaListener(topics = KafkaTopics.PLAN_INDEX_EVENTS, groupId = "plan-service.es-indexer", containerFactory = "kafkaListenerContainerFactory")
     public void handleIndexEvent(PlanIndexEvent event) {
         if (event == null || event.getPlanId() == null)
