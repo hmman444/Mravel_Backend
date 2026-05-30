@@ -70,13 +70,15 @@ def get_agent_orchestrator(
     plan_client: PlanClient = Depends(get_plan_client),
     web_search: WebSearchClient = Depends(get_web_search_client),
 ) -> AgentOrchestrator:
+    settings = get_settings()
     return AgentOrchestrator(
         llm,
         catalog,
         composer,
         plan_client=plan_client,
         web_search=web_search,
-        web_base_url=get_settings().public_web_base_url,
+        web_base_url=settings.public_web_base_url,
+        max_tokens=settings.llm_max_tokens,
     )
 
 

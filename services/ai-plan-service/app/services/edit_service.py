@@ -59,18 +59,54 @@ def _card_body(op: EditOperation, *, for_create: bool) -> Dict[str, Any]:
     activity_data = {
         k: v
         for k, v in {
+            "reason": op.reason,
+            "locationName": op.location_name,
             "address": op.address,
             "note": op.note,
+            "routeHint": op.route_hint,
+            "distanceText": op.distance_text,
+            "transportMode": op.transport_mode,
             "ticketPrice": op.unit_price_vnd,
             "ticketCount": op.quantity,
         }.items()
         if v
     }
+    if isinstance(op.recommendation, dict) and op.recommendation:
+        # Pass the catalog reference through (best-effort; the model copies it from a
+        # search result) so FOOD/SIGHTSEEING/STAY cards keep a bookable link + image.
+        rec = op.recommendation
+        activity_data["recommendation"] = {
+            "kind": rec.get("kind") or rec.get("catalog_kind"),
+            "id": rec.get("id") or rec.get("catalog_id"),
+            "slug": rec.get("slug") or rec.get("catalog_slug"),
+            "name": rec.get("name"),
+            "latitude": rec.get("latitude"),
+            "longitude": rec.get("longitude"),
+            "coverImageUrl": rec.get("coverImageUrl") or rec.get("cover_image_url"),
+            "avgRating": rec.get("avgRating") or rec.get("avg_rating"),
+        }
+
     body: Dict[str, Any] = {}
     if op.text:
         body["text"] = op.text
-    if op.description is not None:
-        body["description"] = op.description
+    # Build a rich description (address/note/route) so the card reads well even before
+    # the frontend renders activityDataJson — mirrors the approval path.
+    if op.description is not None or op.address or op.note or op.route_hint:
+        parts = []
+        if op.description:
+            parts.append(op.description)
+        if op.address:
+            parts.append(f"📍 {op.address}")
+        if op.note:
+            parts.append(f"💡 {op.note}")
+        if op.route_hint:
+            line = f"🗺️ {op.route_hint}"
+            if op.distance_text:
+                line += f" ({op.distance_text})"
+            if op.transport_mode:
+                line += f" — {op.transport_mode}"
+            parts.append(line)
+        body["description"] = "\n".join(parts)
     st = _norm_time(op.start_time)
     et = _norm_time(op.end_time)
     if st:

@@ -239,6 +239,36 @@ cards with `card_id`, their times and costs). The user is looking at this exact 
 - To find replacements or correct prices, use search_hotels/search_restaurants/
   search_places (catalog first), web_search (for live prices), and route_legs (timing).
 
+# Building / filling a whole itinerary — BE DENSE (this is critical)
+When the user asks to plan or fill a full trip ("lên kế hoạch Đà Nẵng 4 ngày 3 đêm",
+"điền hoạt động cho cả chuyến"), do it in ONE `propose_plan_edits` call that covers
+EVERY day — never 1-2 activities per day.
+- FIRST `update_plan` (title + start_date/end_date + budget) if not set. If the board
+  already has the day lists, fill them; if days are missing, this turn `add_day` the
+  missing ones (you can add cards to the existing days now and to the new days after the
+  user applies — say so).
+- For EACH day, emit a DENSE, sequential chain of `create_card` ops into that day's real
+  `list_id`. Minimum **8** activities/day; 10-12 for a packed pace. Follow this chain
+  (like a real Vietnamese trip spreadsheet):
+    vệ sinh/chuẩn bị → ăn sáng (quán cụ thể) → cafe → di chuyển → tham quan → ăn trưa
+    → về nghỉ trưa → tham quan/khu vui chơi → ăn tối (quán cụ thể) → về nghỉ
+  Day 1 starts with arrival + nhận phòng (~14:00) + thuê xe; the last day ends with
+  trả phòng + di chuyển về. Insert TRANSPORT cards for long hops (route_hint + transport_mode).
+- Chain start_time → end_time sequentially across the day (06:30 → … → ~21:00); never overlap.
+- Ground real venues with the catalog (search_places(destination=...), search_restaurants,
+  search_hotels) and live prices with web_search BEFORE composing. Every STAY/FOOD/
+  SIGHTSEEING card should carry a `recommendation` copied from a catalog result.
+
+# Fill EVERY field on each card (match the level of a detailed trip spreadsheet)
+For each create_card/update_card, fill all that apply:
+  text (hành động + tên: "Ăn sáng Bánh canh Nam Phổ") · description (1 câu: ăn/xem gì) ·
+  start_time, end_time · activity_type (STAY|FOOD|SIGHTSEEING|TRANSPORT|ENTERTAIN|SHOPPING|
+  EVENT|CINEMA|OTHER) · estimated_cost_vnd (per-person × số người; lodging = giá/đêm × số đêm)
+  · unit_price_vnd + quantity · location_name · address (số nhà + đường cụ thể) · note
+  (mẹo / món nên gọi / quán thay thế "hoặc …" / giờ mở cửa) · route_hint ("Home → Quán ăn")
+  · distance_text ("500m", "~2km", "30km") · transport_mode ("đi bộ"/"xe máy"/"taxi"/
+  "xe khách") · recommendation (từ catalog). A card with only a title + time is NOT enough.
+
 # Freshness — time-sensitive facts
 - The current date is in the context primer ("Hôm nay là …"); treat it as ground truth.
 - For any price (vé, thuê xe, vé xe/máy bay), giờ mở cửa, or "còn mở cửa không", call
@@ -310,11 +340,13 @@ class AgentOrchestrator:
         plan_client: Optional[PlanClient] = None,
         web_search: Optional[Any] = None,
         web_base_url: str = "",
+        max_tokens: int = 8000,
     ) -> None:
         self._llm = llm
         self._catalog = catalog
         self._composer = composer
         self._plan_client = plan_client
+        self._max_tokens = max_tokens
         self._dispatcher = ToolDispatcher(
             catalog, plan_client=plan_client, web_search=web_search, web_base_url=web_base_url
         )
@@ -444,7 +476,9 @@ class AgentOrchestrator:
 
         for iteration in range(MAX_ITERATIONS):
             yield {"event": "thinking", "iteration": iteration + 1}
-            turn = await self._llm.chat_with_tools(_SYSTEM_PROMPT, messages, tools)
+            turn = await self._llm.chat_with_tools(
+                _SYSTEM_PROMPT, messages, tools, max_tokens=self._max_tokens
+            )
 
             if turn.stop_reason == "error":
                 raise RuntimeError(turn.error or "LLM error")
@@ -611,7 +645,9 @@ class AgentOrchestrator:
 
         for iteration in range(MAX_ITERATIONS):
             yield {"event": "thinking", "iteration": iteration + 1}
-            turn = await self._llm.chat_with_tools(_EDIT_SYSTEM_PROMPT, messages, tools)
+            turn = await self._llm.chat_with_tools(
+                _EDIT_SYSTEM_PROMPT, messages, tools, max_tokens=self._max_tokens
+            )
 
             if turn.stop_reason == "error":
                 msg = turn.error or "AI gặp lỗi tạm thời."
