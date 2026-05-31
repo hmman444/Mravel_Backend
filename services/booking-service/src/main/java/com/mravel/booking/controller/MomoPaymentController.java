@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.Objects;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,9 @@ public class MomoPaymentController {
     private final MomoPaymentService momoPaymentService;
     private final HotelBookingService hotelBookingService;
     private final RestaurantBookingService restaurantBookingService;
+    @Value("${mravel.frontend.base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
     private final HotelBookingRepository hotelBookingRepository;
     private final RestaurantBookingRepository restaurantBookingRepository;
 
@@ -106,8 +110,7 @@ public class MomoPaymentController {
             }
         }
 
-        // String feUrl = "http://localhost:5173/my-bookings";
-        String feUrl = "http://localhost:3000/my-bookings";
+        String feUrl = frontendBaseUrl + "/my-bookings";
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(Objects.requireNonNull(URI.create(feUrl)))
                 .build();

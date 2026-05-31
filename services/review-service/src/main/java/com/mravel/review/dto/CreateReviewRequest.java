@@ -19,6 +19,10 @@ public class CreateReviewRequest {
     @NotNull
     private TargetType targetType;
 
+    // Gợi ý để khớp dịch vụ với card trong plan (slug + tên); dùng cho gate "đã trải nghiệm".
+    private String targetSlug;
+    private String targetName;
+
     @NotNull
     @Min(1)
     @Max(5)

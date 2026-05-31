@@ -2,6 +2,7 @@ package com.mravel.review.service;
 
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.review.client.CatalogClient;
+import com.mravel.review.client.PlanClient;
 import com.mravel.review.client.UserProfileClient;
 import com.mravel.review.dto.*;
 import com.mravel.review.model.Review;
@@ -32,6 +33,7 @@ public class ReviewService {
     private final ReviewAspectDefinitionRepository aspectDefinitionRepository;
     private final UserProfileClient userProfileClient;
     private final CatalogClient catalogClient;
+    private final PlanClient planClient;
 
     @Transactional
     public ReviewResponse createReview(Long userId, CreateReviewRequest request) {
@@ -39,6 +41,12 @@ public class ReviewService {
                 .ifPresent(existing -> {
                     throw new IllegalStateException("Bạn đã đánh giá rồi. Hãy chỉnh sửa đánh giá hiện tại.");
                 });
+
+        // Chặn đánh giá ảo: chỉ cho đánh giá dịch vụ đã trải nghiệm trong một lịch trình đã qua.
+        if (!planClient.isExperienced(request.getTargetType().name(), request.getTargetId(),
+                request.getTargetSlug(), request.getTargetName())) {
+            throw new IllegalStateException("Bạn chưa trải nghiệm dịch vụ này nên chưa thể đánh giá.");
+        }
 
         Review review = Review.builder()
                 .userId(userId)
@@ -142,6 +150,14 @@ public class ReviewService {
         return reviewRepository.findByUserIdAndTargetTypeAndTargetId(userId, targetType, targetId)
                 .map(this::toResponse)
                 .orElse(null);
+    }
+
+    /** Có được phép viết đánh giá không: đã có đánh giá (cho sửa) hoặc đã trải nghiệm dịch vụ. */
+    public boolean canReview(Long userId, TargetType targetType, String targetId, String slug, String name) {
+        boolean already = reviewRepository
+                .findByUserIdAndTargetTypeAndTargetId(userId, targetType, targetId).isPresent();
+        if (already) return true;
+        return planClient.isExperienced(targetType.name(), targetId, slug, name);
     }
 
     private void saveAspects(Review review, List<AspectCommentInput> inputs) {
