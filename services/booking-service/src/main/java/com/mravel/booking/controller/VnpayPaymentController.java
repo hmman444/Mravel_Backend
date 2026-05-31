@@ -3,6 +3,7 @@ package com.mravel.booking.controller;
 
 import com.mravel.booking.service.VnpayPaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,9 @@ import java.util.Objects;
 public class VnpayPaymentController {
 
   private final VnpayPaymentService vnpayPaymentService;
+
+  @Value("${mravel.frontend.base-url:http://localhost:5173}")
+  private String frontendBaseUrl;
 
   /**
    * VNPay server-call-server (IPN). Trả JSON RspCode/Message.
@@ -42,8 +46,7 @@ public class VnpayPaymentController {
     }
 
     return ResponseEntity.status(HttpStatus.FOUND)
-        // .location(Objects.requireNonNull(URI.create("http://localhost:5173/my-bookings")))
-        .location(Objects.requireNonNull(URI.create("http://localhost:3000/my-bookings")))
+        .location(Objects.requireNonNull(URI.create(frontendBaseUrl + "/my-bookings")))
         .build();
   }
 

@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -83,5 +84,16 @@ public class ReviewController {
             @RequestParam TargetType category) {
         List<ReviewAspectDefinitionDTO> aspects = reviewAspectService.getDefinitions(category);
         return ResponseEntity.ok(ApiResponse.success("OK", aspects));
+    }
+
+    @GetMapping("/can-review")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> canReview(
+            @RequestParam TargetType targetType,
+            @RequestParam String targetId,
+            @RequestParam(required = false) String slug,
+            @RequestParam(required = false) String name) {
+        Long userId = currentUserService.getId();
+        boolean eligible = reviewService.canReview(userId, targetType, targetId, slug, name);
+        return ResponseEntity.ok(ApiResponse.success("OK", Map.of("eligible", eligible)));
     }
 }
