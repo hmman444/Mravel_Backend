@@ -9,9 +9,11 @@ public final class NotificationTypes {
     public static final String FRIEND_REQUEST = "FRIEND_REQUEST";
     public static final String FRIEND_ACCEPTED = "FRIEND_ACCEPTED";
     public static final String PLAN_INVITE = "PLAN_INVITE";
+    public static final String PLAN_MEMBER_JOINED = "PLAN_MEMBER_JOINED";
     public static final String COMMENT = "COMMENT";
     public static final String REPLY_COMMENT = "REPLY_COMMENT";
     public static final String REACT = "REACT";
+    public static final String COMMENT_REACT = "COMMENT_REACT";
 
     // Booking (customer-facing)
     public static final String BOOKING_CONFIRMED = "BOOKING_CONFIRMED";
@@ -35,6 +37,13 @@ public final class NotificationTypes {
     public static final String PARTNER_APPROVED = "PARTNER_APPROVED";
     public static final String PARTNER_REJECTED = "PARTNER_REJECTED";
 
+    // Partner content (reviews on their properties)
+    public static final String REVIEW_NEW_FOR_PARTNER = "REVIEW_NEW_FOR_PARTNER";
+
+    // Admin operations
+    public static final String ADMIN_NEW_PARTNER = "ADMIN_NEW_PARTNER";
+    public static final String ADMIN_NEW_REVIEW = "ADMIN_NEW_REVIEW";
+
     // Category constants
     public static final String CATEGORY_SOCIAL = "SOCIAL";
     public static final String CATEGORY_BOOKING = "BOOKING";
@@ -47,8 +56,8 @@ public final class NotificationTypes {
         if (type == null)
             return null;
         return switch (type) {
-            case FRIEND_REQUEST, FRIEND_ACCEPTED, PLAN_INVITE,
-                    COMMENT, REPLY_COMMENT, REACT ->
+            case FRIEND_REQUEST, FRIEND_ACCEPTED, PLAN_INVITE, PLAN_MEMBER_JOINED,
+                    COMMENT, REPLY_COMMENT, REACT, COMMENT_REACT ->
                 CATEGORY_SOCIAL;
             case BOOKING_CONFIRMED, BOOKING_CANCELLED,
                     BOOKING_CANCELLED_BY_PARTNER, BOOKING_EXPIRED,
@@ -58,7 +67,8 @@ public final class NotificationTypes {
             case ACCOUNT_LOCKED, ACCOUNT_UNLOCKED,
                     PASSWORD_CHANGED, LOGIN_ALERT ->
                 CATEGORY_ACCOUNT;
-            case PARTNER_APPROVED, PARTNER_REJECTED -> CATEGORY_PARTNER;
+            case PARTNER_APPROVED, PARTNER_REJECTED, REVIEW_NEW_FOR_PARTNER -> CATEGORY_PARTNER;
+            case ADMIN_NEW_PARTNER, ADMIN_NEW_REVIEW -> CATEGORY_ADMIN;
             default -> null;
         };
     }

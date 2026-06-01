@@ -50,6 +50,7 @@ public class PlanBoardService {
     private final ObjectMapper objectMapper;
     private final FriendClient friendClient;
     private final PlanCardPaymentRepository cardPaymentRepository;
+    private final PlanNotificationService planNotificationService;
     // helper loaders
 
     private void validateMemberIds(Long planId, Collection<Long> userIds) {
@@ -1339,6 +1340,9 @@ public class PlanBoardService {
         memberRepository.save(member);
 
         inv.setUsed(true);
+
+        // Notify the plan owner that a new member joined via their invite.
+        planNotificationService.notifyPlanMemberJoined(userId, inv.getPlan().getAuthorId(), planId);
 
         return planId;
     }

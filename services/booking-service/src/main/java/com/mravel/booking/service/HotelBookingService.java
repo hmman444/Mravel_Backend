@@ -2,6 +2,7 @@
 package com.mravel.booking.service;
 
 import com.mravel.booking.client.CatalogInventoryClient;
+import com.mravel.booking.client.CatalogOwnerClient;
 import com.mravel.booking.client.CatalogInventoryDtos.DeductInventoryRequest;
 import com.mravel.booking.client.CatalogInventoryDtos.RollbackInventoryRequest;
 import com.mravel.booking.client.CatalogInventoryDtos.RoomRequestDTO;
@@ -48,6 +49,7 @@ public class HotelBookingService {
     private final CatalogInventoryClient catalogInventoryClient;
     private final PaymentAttemptService paymentAttemptService;
     private final NotificationClient notificationClient;
+    private final CatalogOwnerClient catalogOwnerClient;
 
     @Transactional
     public HotelBookingCreatedDTO createHotelBooking(CreateHotelBookingRequest req, String guestSid) {
@@ -244,16 +246,41 @@ public class HotelBookingService {
 
         HotelBooking confirmed = hotelBookingRepository.save(booking);
 
+        // Resolve the hotel owner once: used both for the guest thumbnail and to
+        // notify the partner of the new booking. Fail-silent (returns null on error).
+        CatalogOwnerClient.OwnerInfo owner = catalogOwnerClient.getHotelOwner(confirmed.getHotelId());
+        String thumb = (owner != null) ? owner.thumbnailUrl() : null;
+
         if (confirmed.getUserId() != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("bookingCode", confirmed.getCode());
+            data.put("bookingType", "HOTEL");
+            data.put("hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "");
+            data.put("deepLink", "/my-bookings");
+            if (thumb != null) data.put("thumbnailUrl", thumb);
             notificationClient.createNotification(
                     confirmed.getUserId(), null,
                     NotificationTypes.BOOKING_CONFIRMED,
                     "Đặt phòng thành công",
                     "Booking " + confirmed.getCode() + " (" + confirmed.getHotelName() + ") đã được xác nhận",
-                    Map.of("bookingCode", confirmed.getCode(),
-                            "bookingType", "HOTEL",
-                            "hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "",
-                            "deepLink", "/my-bookings"));
+                    data);
+        }
+
+        // Notify the hotel owner (partner) of the new confirmed booking.
+        if (owner != null && owner.partnerId() != null) {
+            Map<String, Object> pdata = new HashMap<>();
+            pdata.put("bookingCode", confirmed.getCode());
+            pdata.put("bookingType", "HOTEL");
+            pdata.put("hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "");
+            pdata.put("deepLink", "/partner/bookings");
+            if (thumb != null) pdata.put("thumbnailUrl", thumb);
+            notificationClient.createNotification(
+                    owner.partnerId(), confirmed.getUserId(),
+                    NotificationTypes.BOOKING_NEW_FOR_PARTNER,
+                    "Đơn đặt phòng mới",
+                    "Bạn có đơn đặt phòng mới " + confirmed.getCode()
+                            + (confirmed.getHotelName() != null ? " tại " + confirmed.getHotelName() : ""),
+                    pdata);
         }
 
         return confirmed;
@@ -350,15 +377,39 @@ public class HotelBookingService {
 
         HotelBooking cancelled = hotelBookingRepository.save(booking);
 
+        CatalogOwnerClient.OwnerInfo owner = catalogOwnerClient.getHotelOwner(cancelled.getHotelId());
+        String thumb = (owner != null) ? owner.thumbnailUrl() : null;
+
         if (cancelled.getUserId() != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("bookingCode", cancelled.getCode());
+            data.put("bookingType", "HOTEL");
+            data.put("deepLink", "/my-bookings");
+            if (thumb != null) data.put("thumbnailUrl", thumb);
             notificationClient.createNotification(
                     cancelled.getUserId(), null,
                     NotificationTypes.BOOKING_CANCELLED,
                     "Đơn đặt phòng đã hủy",
                     "Booking " + cancelled.getCode() + " (" + cancelled.getHotelName() + ") đã được hủy thành công",
-                    Map.of("bookingCode", cancelled.getCode(),
-                            "bookingType", "HOTEL",
-                            "deepLink", "/my-bookings"));
+                    data);
+        }
+
+        // Notify the partner only for bookings they were told about (already confirmed/paid).
+        if ((oldStatus == BookingStatus.CONFIRMED || oldStatus == BookingStatus.PAID)
+                && owner != null && owner.partnerId() != null) {
+            Map<String, Object> pdata = new HashMap<>();
+            pdata.put("bookingCode", cancelled.getCode());
+            pdata.put("bookingType", "HOTEL");
+            pdata.put("hotelName", cancelled.getHotelName() != null ? cancelled.getHotelName() : "");
+            pdata.put("deepLink", "/partner/bookings");
+            if (thumb != null) pdata.put("thumbnailUrl", thumb);
+            notificationClient.createNotification(
+                    owner.partnerId(), cancelled.getUserId(),
+                    NotificationTypes.BOOKING_CANCELLED_FOR_PARTNER,
+                    "Đơn đặt phòng bị hủy",
+                    "Khách đã hủy đơn đặt phòng " + cancelled.getCode()
+                            + (cancelled.getHotelName() != null ? " tại " + cancelled.getHotelName() : ""),
+                    pdata);
         }
 
         return cancelled;

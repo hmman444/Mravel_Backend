@@ -6,7 +6,9 @@ import com.mravel.user.service.AuthTokenClient;
 import com.mravel.user.service.FriendService;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -23,12 +25,15 @@ public class FriendController {
         Map<String, Object> result = authTokenClient.validateToken(authorizationHeader);
         Boolean valid = (Boolean) result.get("valid");
         if (valid == null || !valid) {
-            throw new RuntimeException("Token không hợp lệ");
+            // Trả 401 (không phải 500) để FE kích hoạt luồng refresh token và retry
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT expired");
         }
-        Integer idInt = (Integer) result.get("id"); // tùy bạn lưu gì trong token
-        if (idInt == null)
-            throw new RuntimeException("Không lấy được userId từ token");
-        return idInt.longValue();
+        // id có thể được deserialize thành Integer hoặc Long tùy độ lớn -> ép qua Number cho an toàn
+        Object idRaw = result.get("id");
+        if (!(idRaw instanceof Number)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Không lấy được userId từ token");
+        }
+        return ((Number) idRaw).longValue();
     }
 
     @PostMapping("/requests")

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.mravel.common.notification.NotificationTypes;
 import com.mravel.plan.client.NotificationClient;
 
 import lombok.RequiredArgsConstructor;
@@ -99,9 +100,24 @@ public class PlanNotificationService {
         safeCreate(
                 recipientId,
                 actorId,
-                "COMMENT_REACT",
+                NotificationTypes.COMMENT_REACT,
                 "Thích bình luận",
                 "đã thích bình luận của bạn",
+                data);
+    }
+
+    public void notifyPlanMemberJoined(Long actorId, Long recipientId, Long planId) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("actorId", actorId);
+        data.put("planId", planId);
+        data.put("deepLink", "/plans/" + planId);
+
+        safeCreate(
+                recipientId,
+                actorId,
+                NotificationTypes.PLAN_MEMBER_JOINED,
+                "Thành viên mới",
+                "đã tham gia kế hoạch của bạn",
                 data);
     }
 

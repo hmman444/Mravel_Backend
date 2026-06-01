@@ -1,6 +1,7 @@
 // src/main/java/com/mravel/booking/service/RestaurantBookingService.java
 package com.mravel.booking.service;
 
+import com.mravel.booking.client.CatalogOwnerClient;
 import com.mravel.booking.client.CatalogRestaurantInventoryClient;
 import com.mravel.booking.client.NotificationClient;
 import com.mravel.booking.dto.RestaurantBookingDtos.*;
@@ -13,6 +14,7 @@ import com.mravel.common.notification.NotificationTypes;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.scheduling.annotation.Scheduled;
+import java.util.HashMap;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ public class RestaurantBookingService {
     private final CatalogRestaurantInventoryClient invClient;
     private final PaymentAttemptService paymentAttemptService;
     private final NotificationClient notificationClient;
+    private final CatalogOwnerClient catalogOwnerClient;
 
     @Transactional
     public RestaurantBookingCreatedDTO create(CreateRestaurantBookingRequest req, String guestSessionId) {
@@ -209,16 +212,39 @@ public class RestaurantBookingService {
             b.setPendingPaymentOrderId(null);
             repo.save(b);
 
+            CatalogOwnerClient.OwnerInfo owner = catalogOwnerClient.getRestaurantOwner(b.getRestaurantId());
+            String thumb = (owner != null) ? owner.thumbnailUrl() : null;
+
             if (b.getUserId() != null) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("bookingCode", b.getCode());
+                data.put("bookingType", "RESTAURANT");
+                data.put("restaurantName", b.getRestaurantName() != null ? b.getRestaurantName() : "");
+                data.put("deepLink", "/my-bookings");
+                if (thumb != null) data.put("thumbnailUrl", thumb);
                 notificationClient.createNotification(
                         b.getUserId(), null,
                         NotificationTypes.BOOKING_CONFIRMED,
                         "Đặt bàn thành công",
                         "Booking " + b.getCode() + " (" + b.getRestaurantName() + ") đã được xác nhận",
-                        Map.of("bookingCode", b.getCode(),
-                                "bookingType", "RESTAURANT",
-                                "restaurantName", b.getRestaurantName() != null ? b.getRestaurantName() : "",
-                                "deepLink", "/my-bookings"));
+                        data);
+            }
+
+            // Notify the restaurant owner (partner) of the new confirmed booking.
+            if (owner != null && owner.partnerId() != null) {
+                Map<String, Object> pdata = new HashMap<>();
+                pdata.put("bookingCode", b.getCode());
+                pdata.put("bookingType", "RESTAURANT");
+                pdata.put("restaurantName", b.getRestaurantName() != null ? b.getRestaurantName() : "");
+                pdata.put("deepLink", "/partner/bookings");
+                if (thumb != null) pdata.put("thumbnailUrl", thumb);
+                notificationClient.createNotification(
+                        owner.partnerId(), b.getUserId(),
+                        NotificationTypes.BOOKING_NEW_FOR_PARTNER,
+                        "Đơn đặt bàn mới",
+                        "Bạn có đơn đặt bàn mới " + b.getCode()
+                                + (b.getRestaurantName() != null ? " tại " + b.getRestaurantName() : ""),
+                        pdata);
             }
 
         } catch (Exception ex) {
@@ -370,6 +396,8 @@ public class RestaurantBookingService {
             throw new IllegalStateException("Booking thiếu createdAt");
         long minutesFromCreate = Duration.between(b.getCreatedAt(), Instant.now()).toMinutes();
 
+        BookingBase.BookingStatus oldStatus = b.getStatus();
+
         b.setCancelReason(reason);
         b.setCancelledAt(Instant.now());
 
@@ -412,15 +440,39 @@ public class RestaurantBookingService {
 
         RestaurantBooking cancelled = repo.save(b);
 
+        CatalogOwnerClient.OwnerInfo owner = catalogOwnerClient.getRestaurantOwner(cancelled.getRestaurantId());
+        String thumb = (owner != null) ? owner.thumbnailUrl() : null;
+
         if (cancelled.getUserId() != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("bookingCode", cancelled.getCode());
+            data.put("bookingType", "RESTAURANT");
+            data.put("deepLink", "/booking/my/" + cancelled.getCode());
+            if (thumb != null) data.put("thumbnailUrl", thumb);
             notificationClient.createNotification(
                     cancelled.getUserId(), null,
                     NotificationTypes.BOOKING_CANCELLED,
                     "Đơn đặt bàn đã hủy",
                     "Booking " + cancelled.getCode() + " (" + cancelled.getRestaurantName() + ") đã được hủy thành công",
-                    Map.of("bookingCode", cancelled.getCode(),
-                            "bookingType", "RESTAURANT",
-                            "deepLink", "/booking/my/" + cancelled.getCode()));
+                    data);
+        }
+
+        // Notify the partner only for bookings they were told about (already confirmed/paid).
+        if ((oldStatus == BookingBase.BookingStatus.CONFIRMED || oldStatus == BookingBase.BookingStatus.PAID)
+                && owner != null && owner.partnerId() != null) {
+            Map<String, Object> pdata = new HashMap<>();
+            pdata.put("bookingCode", cancelled.getCode());
+            pdata.put("bookingType", "RESTAURANT");
+            pdata.put("restaurantName", cancelled.getRestaurantName() != null ? cancelled.getRestaurantName() : "");
+            pdata.put("deepLink", "/partner/bookings");
+            if (thumb != null) pdata.put("thumbnailUrl", thumb);
+            notificationClient.createNotification(
+                    owner.partnerId(), cancelled.getUserId(),
+                    NotificationTypes.BOOKING_CANCELLED_FOR_PARTNER,
+                    "Đơn đặt bàn bị hủy",
+                    "Khách đã hủy đơn đặt bàn " + cancelled.getCode()
+                            + (cancelled.getRestaurantName() != null ? " tại " + cancelled.getRestaurantName() : ""),
+                    pdata);
         }
 
         return cancelled;
