@@ -31,12 +31,23 @@ public class MessageService {
     private final ChatEventProducer eventProducer;
     private final ConversationService conversationService;
     private final UserClient userClient;
+    private final BlockGuard blockGuard;
 
     // ─── Send ─────────────────────────────────────────────────────────────────
 
     @Transactional
     public MessageResponse sendMessage(Long conversationId, Long userId, SendMessageRequest req) {
         conversationService.requireActiveMember(conversationId, userId);
+
+        // Chặn (DM riêng tư): không cho gửi giữa cặp đã chặn nhau
+        Conversation conv = conversationRepo.findById(conversationId).orElse(null);
+        if (conv != null && conv.getType() == Conversation.ConversationType.PRIVATE) {
+            for (Long other : memberRepo.findActiveUserIdsByConversationId(conversationId)) {
+                if (!other.equals(userId) && blockGuard.isBlocked(userId, other)) {
+                    throw new IllegalArgumentException("Không thể nhắn tin do quan hệ đã bị chặn");
+                }
+            }
+        }
 
         Message.MessageType type = resolveType(req.getMessageType());
         validateMessageRequest(type, req);

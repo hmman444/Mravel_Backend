@@ -75,11 +75,15 @@ public class PlanController {
                                 .size(size)
                                 .build();
 
-                // Resolve visibility context
+                // Resolve visibility context (friendIds + blockedIds trong 1 lần gọi, đã cache)
                 List<Long> memberPlanIds = planService.getMemberPlanIds(viewerId);
-                List<Long> friendIds     = planService.getFriendIds(authorizationHeader);
+                com.mravel.plan.dto.VisibilityContext ctx = planService.getVisibilityContext(viewerId);
+                List<Long> friendIds = ctx.friendIds();
+                List<Long> blockedIds = ctx.blockedIds();
+                List<Long> hiddenPlanIds = planService.getHiddenPlanIds(viewerId);
 
-                SearchHits<PlanDocument> hits = planSearchService.search(filter, viewerId, friendIds, memberPlanIds);
+                SearchHits<PlanDocument> hits = planSearchService.search(
+                                filter, viewerId, friendIds, memberPlanIds, blockedIds, hiddenPlanIds);
 
                 List<SearchHit<PlanDocument>> hitList = hits.getSearchHits();
 
@@ -224,7 +228,7 @@ public class PlanController {
 
         @PostMapping("/{id}/views")
         public ResponseEntity<ApiResponse<?>> increaseView(@PathVariable Long id) {
-                planService.increaseView(id);
+                planService.increaseView(id, currentUser.getId());
                 return ResponseEntity.ok(
                                 ApiResponse.success("Tăng lượt xem thành công", null));
         }
@@ -267,6 +271,37 @@ public class PlanController {
                                 .build();
 
                 return ResponseEntity.ok(ApiResponse.success("Lấy plan user khác thành công", resp));
+        }
+
+        // ===== Ẩn bài riêng (per-user hide) =====
+
+        @PostMapping("/{id}/hide")
+        public ResponseEntity<ApiResponse<Void>> hidePlan(@PathVariable Long id) {
+                planService.hidePlan(id, currentUser.getId());
+                return ResponseEntity.ok(ApiResponse.success("Đã ẩn bài viết", null));
+        }
+
+        @DeleteMapping("/{id}/hidden")
+        public ResponseEntity<ApiResponse<Void>> unhidePlan(@PathVariable Long id) {
+                planService.unhidePlan(id, currentUser.getId());
+                return ResponseEntity.ok(ApiResponse.success("Đã bỏ ẩn bài viết", null));
+        }
+
+        @GetMapping("/hidden")
+        public ResponseEntity<ApiResponse<List<PlanFeedItem>>> listHidden() {
+                return ResponseEntity.ok(
+                                ApiResponse.success("Danh sách bài đã ẩn", planService.listHiddenPlans(currentUser.getId())));
+        }
+
+        // ===== Báo cáo bài viết (user) =====
+
+        @PostMapping("/{id}/report")
+        public ResponseEntity<ApiResponse<Void>> reportPlan(
+                        @PathVariable Long id,
+                        @RequestParam String reason,
+                        @RequestParam(required = false) String detail) {
+                planService.reportPlan(id, currentUser.getId(), reason, detail);
+                return ResponseEntity.ok(ApiResponse.success("Đã gửi báo cáo", null));
         }
 
         @GetMapping("/recent")

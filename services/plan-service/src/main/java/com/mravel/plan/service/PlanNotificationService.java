@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.mravel.common.notification.NotificationTypes;
 import com.mravel.plan.client.NotificationClient;
+import com.mravel.plan.client.FriendClient;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PlanNotificationService {
 
     private final NotificationClient notificationClient;
+    private final FriendClient friendClient;
 
     private void safeCreate(Long recipientId,
             Long actorId,
@@ -28,6 +30,9 @@ public class PlanNotificationService {
             return;
         if (recipientId.equals(actorId))
             return; // do not self-notify
+        // Chặn (2 chiều): không thông báo giữa cặp đã chặn nhau
+        if (friendClient.isBlocked(actorId, recipientId))
+            return;
         try {
             notificationClient.createNotification(recipientId, actorId, type, title, message, data);
         } catch (Exception e) {

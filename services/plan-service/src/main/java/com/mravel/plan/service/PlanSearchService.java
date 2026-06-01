@@ -49,12 +49,55 @@ public class PlanSearchService {
             PlanFilterRequest filter,
             Long viewerId,
             List<Long> friendIds,
-            List<Long> memberPlanIds) {
+            List<Long> memberPlanIds,
+            List<Long> blockedIds,
+            List<Long> hiddenPlanIds) {
 
         BoolQuery.Builder root = new BoolQuery.Builder();
 
         // 1. Visibility gate — always applied ─
         root.must(visibilityQuery(viewerId, friendIds, memberPlanIds));
+
+        // 1b. Block filter — ẩn bài của người bị chặn, TRỪ plan mình là thành viên/chủ
+        if (blockedIds != null && !blockedIds.isEmpty()) {
+            List<FieldValue> blockedFv = blockedIds.stream()
+                    .filter(id -> id != null && id > 0)
+                    .map(FieldValue::of)
+                    .toList();
+            if (!blockedFv.isEmpty()) {
+                List<String> memberIdStr = (memberPlanIds == null) ? List.of()
+                        : memberPlanIds.stream().filter(id -> id != null && id > 0)
+                                .map(String::valueOf).toList();
+                root.must(Query.of(q -> q.bool(b -> {
+                    // tác giả KHÔNG nằm trong danh sách bị chặn
+                    b.should(Query.of(s -> s.bool(nb -> nb.mustNot(
+                            Query.of(mn -> mn.terms(t -> t.field("authorId")
+                                    .terms(tv -> tv.value(blockedFv))))))));
+                    // hoặc plan mình là thành viên (giữ plan cộng tác chung)
+                    if (!memberIdStr.isEmpty()) {
+                        b.should(Query.of(s -> s.terms(t -> t.field("id")
+                                .terms(tv -> tv.value(memberIdStr.stream().map(FieldValue::of).toList())))));
+                    }
+                    // hoặc plan của chính viewer
+                    if (viewerId != null) {
+                        b.should(Query.of(s -> s.term(t -> t.field("authorId").value(viewerId))));
+                    }
+                    return b.minimumShouldMatch("1");
+                })));
+            }
+        }
+
+        // 1c. Hidden filter — ẩn riêng theo viewer (tuyệt đối)
+        if (hiddenPlanIds != null && !hiddenPlanIds.isEmpty()) {
+            List<FieldValue> hiddenFv = hiddenPlanIds.stream()
+                    .filter(id -> id != null && id > 0)
+                    .map(id -> FieldValue.of(String.valueOf(id)))
+                    .toList();
+            if (!hiddenFv.isEmpty()) {
+                root.mustNot(Query.of(q -> q.terms(t -> t.field("id")
+                        .terms(tv -> tv.value(hiddenFv)))));
+            }
+        }
 
         // 2. Full-text search
         String q = filter.getQ();

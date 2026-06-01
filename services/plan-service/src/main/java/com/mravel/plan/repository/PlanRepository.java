@@ -8,6 +8,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -47,16 +48,25 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
 
    @Query("""
          SELECT p FROM Plan p
-         WHERE
+         WHERE (
              p.visibility = com.mravel.plan.model.Visibility.PUBLIC
           OR p.authorId = :viewerId
           OR p.id IN :memberPlanIds
           OR (p.visibility = com.mravel.plan.model.Visibility.FRIENDS AND p.authorId IN :friendIds)
+         )
+         AND p.id NOT IN :hiddenPlanIds
+         AND (
+             p.authorId NOT IN :blockedIds
+          OR p.id IN :memberPlanIds
+          OR p.authorId = :viewerId
+         )
          """)
    Page<Plan> findFeedForUser(
          @Param("viewerId") Long viewerId,
          @Param("memberPlanIds") List<Long> memberPlanIds,
          @Param("friendIds") List<Long> friendIds,
+         @Param("blockedIds") List<Long> blockedIds,
+         @Param("hiddenPlanIds") List<Long> hiddenPlanIds,
          Pageable pageable);
 
    @Query("""
@@ -73,11 +83,45 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
                  or lower(p.title) like lower(concat('%', :q, '%'))
                  or lower(p.description) like lower(concat('%', :q, '%'))
                )
+               and p.id not in :hiddenPlanIds
+               and (
+                 p.authorId not in :blockedIds
+                 or p.id in :memberPlanIds
+                 or p.authorId = :viewerId
+               )
          """)
    Page<Plan> searchFeedForUser(
          @Param("viewerId") Long viewerId,
          @Param("memberPlanIds") List<Long> memberPlanIds,
          @Param("friendIds") List<Long> friendIds,
+         @Param("blockedIds") List<Long> blockedIds,
+         @Param("hiddenPlanIds") List<Long> hiddenPlanIds,
          @Param("q") String q,
          Pageable pageable);
+
+   // ===== Analytics (admin) =====
+
+   long countByCreatedAtAfter(java.time.Instant t);
+
+   @Query("select coalesce(sum(p.views), 0) from Plan p")
+   long sumAllViews();
+
+   @Query("select p.visibility, count(p) from Plan p group by p.visibility")
+   List<Object[]> groupByVisibility();
+
+   @Query("select p.status, count(p) from Plan p group by p.status")
+   List<Object[]> groupByStatus();
+
+   @Query(value = "SELECT DATE(created_at) AS d, COUNT(*) AS c FROM plans " +
+         "WHERE created_at >= :from GROUP BY DATE(created_at) ORDER BY d", nativeQuery = true)
+   List<Object[]> newPlansByDay(@Param("from") java.time.Instant from);
+
+   List<Plan> findTop10ByVisibilityOrderByViewsDesc(Visibility visibility);
+
+   long countByAdminLockedTrue();
+
+   /** Tăng lượt xem nguyên tử (atomic), an toàn với truy cập đồng thời. */
+   @Modifying
+   @Query("update Plan p set p.views = coalesce(p.views, 0) + 1 where p.id = :id")
+   void incrementViews(@Param("id") Long id);
 }

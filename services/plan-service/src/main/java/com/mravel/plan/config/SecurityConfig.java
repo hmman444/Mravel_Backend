@@ -26,6 +26,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/plans/user/**").permitAll()
                         .requestMatchers("/api/plans/me").authenticated()
 
+                        // Endpoint kiểm duyệt cho admin (admin-service forward JWT role=ADMIN)
+                        .requestMatchers("/api/plans/internal/admin/**").hasRole("ADMIN")
+
                         .anyRequest().authenticated())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

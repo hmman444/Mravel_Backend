@@ -26,12 +26,20 @@ public class PlanMapper {
          * comments).
          */
         public PlanFeedItem toFeedItem(Plan p) {
-                return toFeedItemInternal(p, null, null);
+                return toFeedItemInternal(p, null, null, Set.of());
         }
 
         /** Overload with viewer ID so comments include the viewer's own reaction. */
         public PlanFeedItem toFeedItem(Plan p, Long viewerId) {
-                return toFeedItemInternal(p, null, viewerId);
+                return toFeedItemInternal(p, null, viewerId, Set.of());
+        }
+
+        /**
+         * Overload có danh sách bị chặn (blockedIds) để ẩn comment/reaction của
+         * người bị chặn khỏi viewer.
+         */
+        public PlanFeedItem toFeedItem(Plan p, Long viewerId, Set<Long> blockedIds) {
+                return toFeedItemInternal(p, null, viewerId, blockedIds == null ? Set.of() : blockedIds);
         }
 
         public List<PlanFeedItem> toFeedItems(List<Plan> plans) {
@@ -57,27 +65,33 @@ public class PlanMapper {
                                                 }));
 
                 return plans.stream()
-                                .map(p -> toFeedItemInternal(p, authorProfileCache, viewerId))
+                                .map(p -> toFeedItemInternal(p, authorProfileCache, viewerId, Set.of()))
                                 .collect(Collectors.toList());
         }
 
         private PlanFeedItem toFeedItemInternal(Plan p,
                         Map<Long, UserProfileResponse> authorProfileCache,
-                        Long viewerId) {
+                        Long viewerId,
+                        Set<Long> blockedIds) {
 
+                final Set<Long> blocked = (blockedIds == null) ? Set.of() : blockedIds;
                 Map<Long, UserProfileResponse> localUserCache = new HashMap<>();
 
-                // Reactions summary for the plan itself
-                Map<String, Long> reactionSummary = p.getReactions() == null
-                                ? Map.of()
-                                : p.getReactions().stream()
-                                                .collect(Collectors.groupingBy(
-                                                                PlanReaction::getType,
-                                                                Collectors.counting()));
-
-                List<PlanFeedItem.ReactionUser> reactionUsers = p.getReactions() == null
+                // Reactions hiển thị: loại reaction của người bị chặn (đồng bộ cả summary + danh sách)
+                List<PlanReaction> visibleReactions = p.getReactions() == null
                                 ? List.of()
                                 : p.getReactions().stream()
+                                                .filter(r -> !blocked.contains(r.getUserId()))
+                                                .collect(Collectors.toList());
+
+                Map<String, Long> reactionSummary = visibleReactions.stream()
+                                .collect(Collectors.groupingBy(
+                                                PlanReaction::getType,
+                                                Collectors.counting()));
+
+                List<PlanFeedItem.ReactionUser> reactionUsers = visibleReactions.isEmpty()
+                                ? List.of()
+                                : visibleReactions.stream()
                                                 .map(r -> {
                                                         UserProfileResponse profile = resolveUserProfile(
                                                                         r.getUserId(),
@@ -113,8 +127,10 @@ public class PlanMapper {
                                 ? List.of()
                                 : p.getComments().stream()
                                                 .filter(c -> c.getParent() == null)
+                                                .filter(c -> !blocked.contains(c.getUserId()))
                                                 .sorted(Comparator.comparing(PlanComment::getCreatedAt))
-                                                .map(c -> mapComment(c, authorProfileCache, localUserCache, viewerId))
+                                                .map(c -> mapComment(c, authorProfileCache, localUserCache, viewerId,
+                                                                blocked))
                                                 .collect(Collectors.toList());
 
                 return PlanFeedItem.builder()
@@ -151,7 +167,10 @@ public class PlanMapper {
         private PlanFeedItem.Comment mapComment(PlanComment c,
                         Map<Long, UserProfileResponse> authorProfileCache,
                         Map<Long, UserProfileResponse> localUserCache,
-                        Long viewerId) {
+                        Long viewerId,
+                        Set<Long> blockedIds) {
+
+                final Set<Long> blocked = (blockedIds == null) ? Set.of() : blockedIds;
 
                 UserProfileResponse profile = resolveUserProfile(
                                 c.getUserId(), authorProfileCache, localUserCache);
@@ -166,9 +185,12 @@ public class PlanMapper {
                 // plan_comment_reactions table.
                 // This avoids empty lazy collections causing missing reactionUsers in feed
                 // responses.
-                List<PlanCommentReaction> commentReactions = c.getId() == null
-                                ? List.of()
-                                : commentReactionRepository.findByComment_Id(c.getId());
+                List<PlanCommentReaction> commentReactions = (c.getId() == null
+                                ? List.<PlanCommentReaction>of()
+                                : commentReactionRepository.findByComment_Id(c.getId()))
+                                .stream()
+                                .filter(r -> !blocked.contains(r.getUserId()))
+                                .collect(Collectors.toList());
 
                 Map<String, Long> reactionSummary = commentReactions.stream()
                                 .collect(Collectors.groupingBy(PlanCommentReaction::getType, Collectors.counting()));
@@ -199,9 +221,10 @@ public class PlanMapper {
                 List<PlanFeedItem.Comment> replyDtos = c.getReplies() == null
                                 ? List.of()
                                 : c.getReplies().stream()
+                                                .filter(child -> !blocked.contains(child.getUserId()))
                                                 .sorted(Comparator.comparing(PlanComment::getCreatedAt))
                                                 .map(child -> mapComment(child, authorProfileCache, localUserCache,
-                                                                viewerId))
+                                                                viewerId, blocked))
                                                 .collect(Collectors.toList());
 
                 return PlanFeedItem.Comment.builder()

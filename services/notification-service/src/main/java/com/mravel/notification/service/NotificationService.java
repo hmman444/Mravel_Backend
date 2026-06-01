@@ -29,9 +29,17 @@ public class NotificationService {
     private final ObjectMapper objectMapper;
     private final NotificationEventProducer producer;
     private final UserClient userClient;
+    private final BlockGuard blockGuard;
 
     @Transactional
     public NotificationResponse create(CreateNotificationRequest req) {
+        // Chặn (2 chiều): không tạo/đẩy thông báo giữa cặp đã chặn nhau
+        if (req.getActorId() != null && req.getRecipientId() != null
+                && blockGuard.isBlocked(req.getActorId(), req.getRecipientId())) {
+            log.info("Suppressed notification between blocked users {} -> {}",
+                    req.getActorId(), req.getRecipientId());
+            return null;
+        }
         try {
             String dataJson = req.getData() != null ? objectMapper.writeValueAsString(req.getData()) : null;
 
