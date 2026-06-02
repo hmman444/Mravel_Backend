@@ -38,6 +38,20 @@ public class PlanAdminClient {
         return exchange(url, HttpMethod.GET, null, bearer);
     }
 
+    /** Số report plan đang PENDING (cho action-queue). Fail-soft: 0 nếu lỗi. */
+    public long pendingReports(String bearer) {
+        try {
+            ResponseEntity<ApiResponse<?>> resp = stats(7, bearer);
+            ApiResponse<?> body = resp.getBody();
+            if (body == null || !body.isSuccess() || body.getData() == null)
+                return 0L;
+            com.fasterxml.jackson.databind.JsonNode node = objectMapper.valueToTree(body.getData());
+            return node.path("overview").path("pendingReports").asLong(0L);
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
     public ResponseEntity<ApiResponse<?>> listReports(String status, int page, int size, String bearer) {
         UriComponentsBuilder b = UriComponentsBuilder
                 .fromHttpUrl(requireBaseUrl() + ADMIN_BASE + "/reports")

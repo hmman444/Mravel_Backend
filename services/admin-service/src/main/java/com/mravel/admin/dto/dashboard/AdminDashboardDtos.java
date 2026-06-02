@@ -14,13 +14,12 @@ public class AdminDashboardDtos {
             List<RevenuePoint> revenueSeries, // đơn vị: triệu VND (y chang MOCK)
             List<BookingStatusItem> bookingStatus,
             List<TopServiceItem> topServices,
-            List<TopPartnerItem> topPartners,
-            SystemHealth systemHealth) {
+            List<TopPartnerItem> topPartners) {
     }
 
     public record Overview(
             long totalUsers,
-            long activeUsers7d,
+            Long activeUsers7d, // null = N/A (User entity chưa có mốc thời gian đăng nhập)
             long partners,
             long servicesActive,
             long servicesPendingApproval,
@@ -50,14 +49,5 @@ public class AdminDashboardDtos {
     }
 
     public record TopPartnerItem(String name, long services, long revenueM) {
-    }
-
-    public record SystemHealth(
-            double uptimePct,
-            long apiP95ms,
-            double errorRatePct,
-            long kafkaLag,
-            long failedJobs,
-            String lastIncident) {
     }
 }

@@ -269,6 +269,40 @@ public class CatalogClient {
         return exchangeAbsolute(url, HttpMethod.POST, null, bearerToken);
     }
 
+    // ===== Admin dashboard =====
+    public com.mravel.admin.dto.dashboard.DownstreamDtos.CatalogSummary dashboardSummary(String bearerToken) {
+        try {
+            ResponseEntity<ApiResponse<?>> resp = exchange(
+                    "/api/catalog/admin/dashboard/summary", HttpMethod.GET, null, bearerToken);
+            ApiResponse<?> body = resp.getBody();
+            if (body == null || !body.isSuccess() || body.getData() == null)
+                return null;
+            return objectMapper.convertValue(body.getData(),
+                    com.mravel.admin.dto.dashboard.DownstreamDtos.CatalogSummary.class);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public java.util.List<com.mravel.admin.dto.dashboard.DownstreamDtos.PartnerRef> resolvePartners(
+            java.util.List<String> hotelIds, java.util.List<String> restaurantIds, String bearerToken) {
+        try {
+            java.util.Map<String, Object> reqBody = new java.util.HashMap<>();
+            reqBody.put("hotelIds", hotelIds == null ? java.util.List.of() : hotelIds);
+            reqBody.put("restaurantIds", restaurantIds == null ? java.util.List.of() : restaurantIds);
+            ResponseEntity<ApiResponse<?>> resp = exchange(
+                    "/api/catalog/admin/dashboard/partner-resolve", HttpMethod.POST, reqBody, bearerToken);
+            ApiResponse<?> body = resp.getBody();
+            if (body == null || !body.isSuccess() || body.getData() == null)
+                return java.util.List.of();
+            return objectMapper.convertValue(body.getData(),
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<com.mravel.admin.dto.dashboard.DownstreamDtos.PartnerRef>>() {
+                    });
+        } catch (Exception ex) {
+            return java.util.List.of();
+        }
+    }
+
     private Optional<String> opt(String v) {
         return (v == null || v.isBlank()) ? Optional.empty() : Optional.of(v);
     }

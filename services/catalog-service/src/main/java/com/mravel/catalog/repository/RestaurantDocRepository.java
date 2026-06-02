@@ -39,4 +39,9 @@ public interface RestaurantDocRepository extends MongoRepository<RestaurantDoc, 
     Optional<RestaurantDoc> findBySlugAndActiveTrueAndModeration_Status(String slug,
             RestaurantDoc.RestaurantStatus status);
 
+    // ===== Admin dashboard counts (loại bản ghi đã xoá mềm) =====
+    long countByModeration_StatusAndDeletedAtIsNull(RestaurantDoc.RestaurantStatus status);
+
+    long countByActiveTrueAndModeration_StatusAndDeletedAtIsNull(RestaurantDoc.RestaurantStatus status);
+
 }
