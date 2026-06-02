@@ -51,13 +51,13 @@ public class NotificationRenderHelper {
                 Long planId = asLong(data.get("planId"));
                 yield planId != null ? "/plans/" + planId : null;
             }
-            case "COMMENT", "REPLY_COMMENT" -> {
+            case "COMMENT", "REPLY_COMMENT", "COMMENT_REACT" -> {
                 Long planId = asLong(data.get("planId"));
                 Long commentId = asLong(data.get("commentId"));
                 if (planId != null && commentId != null) yield "/plans/" + planId + "?commentId=" + commentId;
                 yield planId != null ? "/plans/" + planId : null;
             }
-            case "REACT" -> {
+            case "REACT", "PLAN_MEMBER_JOINED" -> {
                 Long planId = asLong(data.get("planId"));
                 yield planId != null ? "/plans/" + planId : null;
             }
@@ -73,6 +73,9 @@ public class NotificationRenderHelper {
                  "PASSWORD_CHANGED", "LOGIN_ALERT" -> "/account/profile";
             // Partner lifecycle → partner dashboard
             case "PARTNER_APPROVED", "PARTNER_REJECTED" -> "/partner/dashboard";
+            // Admin operations (fallbacks; producers normally supply a precise deepLink)
+            case "ADMIN_NEW_PARTNER" -> "/admin/partners";
+            case "ADMIN_NEW_REVIEW" -> "/admin/services";
             default -> null;
         };
     }
@@ -81,10 +84,19 @@ public class NotificationRenderHelper {
 
     public static String image(String type, String actorAvatar, String dataJson) {
         if (type == null) return null;
+
+        // Producer-supplied thumbnail (hotel/restaurant cover, property photo, …) wins.
+        Map<String, Object> data = parse(dataJson);
+        String fromData = asString(data.get("image"));
+        if (fromData == null || fromData.isBlank()) fromData = asString(data.get("thumbnailUrl"));
+        if (fromData != null && !fromData.isBlank()) return fromData;
+
         return switch (type) {
-            // Social: show actor avatar (like Facebook)
+            // Human-actor notifications: show the actor avatar (like Facebook)
             case "FRIEND_REQUEST", "FRIEND_ACCEPTED",
-                 "PLAN_INVITE", "COMMENT", "REPLY_COMMENT", "REACT" -> actorAvatar;
+                 "PLAN_INVITE", "PLAN_MEMBER_JOINED",
+                 "COMMENT", "REPLY_COMMENT", "REACT", "COMMENT_REACT",
+                 "ADMIN_NEW_PARTNER", "REVIEW_NEW_FOR_PARTNER", "ADMIN_NEW_REVIEW" -> actorAvatar;
             // System events carry no image; frontend uses a type-specific icon instead
             default -> null;
         };

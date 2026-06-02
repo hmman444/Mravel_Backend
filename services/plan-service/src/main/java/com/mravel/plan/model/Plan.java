@@ -2,6 +2,7 @@ package com.mravel.plan.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
@@ -95,5 +96,22 @@ public class Plan {
     @Column(name = "board_revision", nullable = false)
     @Builder.Default
     private Long boardRevision = 0L;
+
+    // ===== Kiểm duyệt (admin takedown) =====
+    // adminLocked = true: bài đã bị admin GỠ -> ép PRIVATE và KHÓA VĨNH VIỄN.
+    // Không có endpoint mở khóa (bất khả hồi theo yêu cầu).
+    @Column(name = "admin_locked", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private Boolean adminLocked = false;
+
+    @Column(name = "takedown_by")
+    private Long takedownBy;
+
+    @Column(name = "takedown_at")
+    private Instant takedownAt;
+
+    @Column(name = "takedown_reason", length = 500)
+    private String takedownReason;
 
 }

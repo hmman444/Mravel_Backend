@@ -8,18 +8,25 @@ import com.mravel.auth.model.OutboxEvent;
 import com.mravel.auth.model.RefreshToken;
 import com.mravel.auth.model.Role;
 import com.mravel.auth.model.User;
+import com.mravel.auth.client.NotificationClient;
 import com.mravel.auth.repository.OutboxRepository;
 import com.mravel.auth.repository.UserRepository;
 import com.mravel.auth.service.social.FacebookAuthService;
 import com.mravel.auth.service.social.GoogleAuthService;
 import com.mravel.common.event.UserRegisteredEvent;
+import com.mravel.common.notification.NotificationTypes;
 import com.mravel.notification.NotificationService;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +37,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final NotificationClient notificationClient;
     private final RefreshTokenService refreshTokenService;
     private final GoogleAuthService googleAuthService;
     private final FacebookAuthService facebookAuthService;
@@ -259,6 +267,14 @@ public class AuthService {
         assertNotLocked(user);
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("deepLink", "/account/profile");
+        safeNotify(user.getId(), null,
+                NotificationTypes.PASSWORD_CHANGED,
+                "Mật khẩu đã được thay đổi",
+                "Mật khẩu tài khoản của bạn vừa được đặt lại thành công. Nếu không phải bạn, hãy liên hệ hỗ trợ ngay.",
+                data);
     }
 
     @Transactional
@@ -328,6 +344,9 @@ public class AuthService {
                 log.warn("DEV OTP for {} = {}", user.getEmail(), otp); // chỉ dùng local dev
                 throw new RuntimeException("Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
             }
+
+            // Notify all admins that a new partner has registered (moderation queue).
+            notifyAdminsNewPartner(user);
         });
     }
 
@@ -343,6 +362,15 @@ public class AuthService {
 
         user.setEnabled(true);
         userRepository.save(user);
+
+        // Account activated → notify the partner their account is ready.
+        Map<String, Object> data = new HashMap<>();
+        data.put("deepLink", "/partner/dashboard");
+        safeNotify(user.getId(), null,
+                NotificationTypes.PARTNER_APPROVED,
+                "Tài khoản đối tác đã kích hoạt",
+                "Chúc mừng! Tài khoản đối tác của bạn đã được kích hoạt. Bắt đầu đăng dịch vụ ngay.",
+                data);
     }
 
     public JwtResponse loginPartner(LoginRequest request) {
@@ -436,6 +464,43 @@ public class AuthService {
     private void assertNotLocked(User user) {
         if (user.getStatus() == AccountStatus.LOCKED) {
             throw new RuntimeException("Tài khoản đã bị khóa");
+        }
+    }
+
+    // ── Notification helpers (fail-silent) ──────────────────────────────────────
+
+    private void safeNotify(Long recipientId, Long actorId, String type,
+            String title, String message, Map<String, Object> data) {
+        if (recipientId == null)
+            return;
+        try {
+            notificationClient.createNotification(recipientId, actorId, type, title, message, data);
+        } catch (Exception e) {
+            log.warn("[AuthService] notify failed type={} recipient={}: {}", type, recipientId, e.getMessage());
+        }
+    }
+
+    /** Fan out an ADMIN_NEW_PARTNER notification to every admin account. */
+    private void notifyAdminsNewPartner(User partner) {
+        try {
+            List<User> admins = userRepository.adminSearch(
+                    List.of(Role.ADMIN), "", PageRequest.of(0, 200));
+            String who = (partner.getFullname() != null && !partner.getFullname().isBlank())
+                    ? partner.getFullname()
+                    : partner.getEmail();
+            for (User admin : admins) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("partnerId", partner.getId());
+                data.put("partnerEmail", partner.getEmail());
+                data.put("deepLink", "/admin/partners");
+                safeNotify(admin.getId(), partner.getId(),
+                        NotificationTypes.ADMIN_NEW_PARTNER,
+                        "Đối tác mới đăng ký",
+                        who + " vừa đăng ký trở thành đối tác và đang chờ duyệt.",
+                        data);
+            }
+        } catch (Exception e) {
+            log.warn("[AuthService] notifyAdminsNewPartner failed: {}", e.getMessage());
         }
     }
 }

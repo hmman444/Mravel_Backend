@@ -16,6 +16,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
+    long countByRole(Role role);
+
     @Query("""
                 select u from User u
                 where u.role in :roles

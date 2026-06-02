@@ -41,4 +41,7 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
               and f.status = 'ACCEPTED'
             """)
     List<Long> findFriendIdsOf(@Param("userId") Long userId);
+
+    // Dùng cho migration legacy Friendship.BLOCKED -> UserBlock
+    List<Friendship> findByStatus(FriendshipStatus status);
 }

@@ -50,6 +50,8 @@ public class PlanBoardService {
     private final ObjectMapper objectMapper;
     private final FriendClient friendClient;
     private final PlanCardPaymentRepository cardPaymentRepository;
+    private final PlanNotificationService planNotificationService;
+    private final PlanViewService planViewService;
     // helper loaders
 
     private void validateMemberIds(Long planId, Collection<Long> userIds) {
@@ -358,6 +360,14 @@ public class PlanBoardService {
 
         if (!permissionService.canView(planId, userId, isFriend)) {
             throw new ForbiddenException("You don't have permission to view this board.");
+        }
+
+        // Tính 1 lượt xem chuẩn khi truy cập plan (mỗi user 1 lần, không tính tác giả).
+        if (!Objects.equals(plan.getAuthorId(), userId)) {
+            try {
+                planViewService.recordView(planId, userId, plan.getAuthorId());
+            } catch (Exception ignored) {
+            }
         }
 
         PlanRole myRole = permissionService.getUserRole(planId, userId);
@@ -1325,6 +1335,11 @@ public class PlanBoardService {
             throw new BadRequestException("Invite expired");
         }
 
+        // Chặn: không cho tham gia (khôi phục đồng-thành-viên) qua token nếu đã chặn nhau với chủ plan
+        if (friendClient.isBlocked(userId, inv.getPlan().getAuthorId())) {
+            throw new ForbiddenException("Không thể tham gia do quan hệ đã bị chặn");
+        }
+
         boolean exists = memberRepository.existsByPlanIdAndUserId(planId, userId);
         if (exists) {
             inv.setUsed(true);
@@ -1339,6 +1354,9 @@ public class PlanBoardService {
         memberRepository.save(member);
 
         inv.setUsed(true);
+
+        // Notify the plan owner that a new member joined via their invite.
+        planNotificationService.notifyPlanMemberJoined(userId, inv.getPlan().getAuthorId(), planId);
 
         return planId;
     }
@@ -1436,6 +1454,13 @@ public class PlanBoardService {
 
     @Transactional
     public PlanRequestDto requestAccess(Long planId, Long userId, PlanRequestCreate req) {
+
+        // Chặn: không cho xin quyền truy cập plan của người đã chặn nhau
+        Plan blockChkPlan = planRepository.findById(planId)
+                .orElseThrow(() -> new NotFoundException("Plan not found"));
+        if (friendClient.isBlocked(userId, blockChkPlan.getAuthorId())) {
+            throw new ForbiddenException("This content is not available.");
+        }
 
         PlanMember member = memberRepository.findByPlanIdAndUserId(planId, userId).orElse(null);
 

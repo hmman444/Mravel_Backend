@@ -37,4 +37,9 @@ public interface HotelDocRepository extends MongoRepository<HotelDoc, String>, H
             Pageable pageable);
 
     Optional<HotelDoc> findBySlug(String slug);
+
+    // ===== Admin dashboard counts (loại bản ghi đã xoá mềm) =====
+    long countByModeration_StatusAndDeletedAtIsNull(HotelDoc.HotelStatus status);
+
+    long countByActiveTrueAndModeration_StatusAndDeletedAtIsNull(HotelDoc.HotelStatus status);
 }
