@@ -22,6 +22,15 @@ public class AuthValidateClient {
     private String validatePath;
 
     public Long requirePartnerId(String authorizationHeader) {
+        return requireRole(authorizationHeader, "PARTNER");
+    }
+
+    /** Validate token and require ADMIN role; returns the admin user id. */
+    public Long requireAdminId(String authorizationHeader) {
+        return requireRole(authorizationHeader, "ADMIN");
+    }
+
+    private Long requireRole(String authorizationHeader, String requiredRole) {
         URI uri = UriComponentsBuilder.fromHttpUrl(authBaseUrl)
                 .path(validatePath)
                 .build(true)
@@ -41,8 +50,8 @@ public class AuthValidateClient {
             if (body == null || !body.isValid())
                 throw new SecurityException("Invalid token");
 
-            if (body.getRole() == null || !"PARTNER".equalsIgnoreCase(body.getRole())) {
-                throw new SecurityException("Not partner");
+            if (body.getRole() == null || !requiredRole.equalsIgnoreCase(body.getRole())) {
+                throw new SecurityException("Not " + requiredRole.toLowerCase());
             }
 
             if (body.getId() == null)

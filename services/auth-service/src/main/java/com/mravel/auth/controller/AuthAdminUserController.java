@@ -40,6 +40,11 @@ public class AuthAdminUserController {
         return ResponseEntity.ok(ApiResponse.success("OK", adminUserService.list(roles, q, page, size)));
     }
 
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse<?>> stats() {
+        return ResponseEntity.ok(ApiResponse.success("OK", adminUserService.stats()));
+    }
+
     @PatchMapping("/{id}/lock")
     public ResponseEntity<ApiResponse<?>> lock(@PathVariable Long id) {
         adminUserService.lock(id);

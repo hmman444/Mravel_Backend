@@ -1,7 +1,10 @@
 package com.mravel.review.service;
 
+import com.mravel.common.notification.NotificationTypes;
 import com.mravel.common.response.UserProfileResponse;
+import com.mravel.review.client.AdminLookupClient;
 import com.mravel.review.client.CatalogClient;
+import com.mravel.review.client.NotificationClient;
 import com.mravel.review.client.PlanClient;
 import com.mravel.review.client.UserProfileClient;
 import com.mravel.review.dto.*;
@@ -34,6 +37,8 @@ public class ReviewService {
     private final UserProfileClient userProfileClient;
     private final CatalogClient catalogClient;
     private final PlanClient planClient;
+    private final NotificationClient notificationClient;
+    private final AdminLookupClient adminLookupClient;
 
     @Transactional
     public ReviewResponse createReview(Long userId, CreateReviewRequest request) {
@@ -62,7 +67,94 @@ public class ReviewService {
 
         syncRatingToCatalog(request.getTargetType(), request.getTargetId());
 
+        notifyNewReview(userId, review, request);
+
         return toResponse(review);
+    }
+
+    /**
+     * Notifies the property owner (partner) of a new review, and — for low ratings
+     * (≤ 2★) — the admins for moderation. Fail-silent: never breaks review creation.
+     */
+    private void notifyNewReview(Long reviewerId, Review review, CreateReviewRequest request) {
+        try {
+            TargetType type = review.getTargetType();
+            CatalogClient.OwnerInfo owner = catalogClient.getOwner(type, review.getTargetId());
+
+            String propertyName = (request.getTargetName() != null && !request.getTargetName().isBlank())
+                    ? request.getTargetName()
+                    : (owner != null ? owner.name() : null);
+            if (propertyName == null)
+                propertyName = "dịch vụ của bạn";
+
+            String slug = (request.getTargetSlug() != null && !request.getTargetSlug().isBlank())
+                    ? request.getTargetSlug()
+                    : (owner != null ? owner.slug() : null);
+            String publicLink = publicPropertyLink(type, slug);
+            String thumb = owner != null ? owner.thumbnailUrl() : null;
+            int rating = review.getRating() != null ? review.getRating() : 0;
+
+            // 1) Notify the partner who owns the property.
+            if (owner != null && owner.partnerId() != null && !owner.partnerId().equals(reviewerId)) {
+                Map<String, Object> data = new HashMap<>();
+                if (publicLink != null) data.put("deepLink", publicLink);
+                if (thumb != null) data.put("thumbnailUrl", thumb);
+                data.put("targetId", review.getTargetId());
+                data.put("rating", rating);
+                safeNotify(owner.partnerId(), reviewerId,
+                        NotificationTypes.REVIEW_NEW_FOR_PARTNER,
+                        "Đánh giá mới",
+                        "Có đánh giá " + rating + "★ mới cho " + propertyName + ".",
+                        data);
+            }
+
+            // 2) Notify admins about low-rated reviews (moderation signal).
+            if (rating > 0 && rating <= 2) {
+                String adminLink = adminPropertyLink(type, review.getTargetId());
+                for (Long adminId : adminLookupClient.getAdminIds()) {
+                    if (adminId == null || adminId.equals(reviewerId)) continue;
+                    Map<String, Object> data = new HashMap<>();
+                    if (adminLink != null) data.put("deepLink", adminLink);
+                    if (thumb != null) data.put("thumbnailUrl", thumb);
+                    data.put("targetId", review.getTargetId());
+                    data.put("rating", rating);
+                    safeNotify(adminId, reviewerId,
+                            NotificationTypes.ADMIN_NEW_REVIEW,
+                            "Đánh giá thấp cần kiểm duyệt",
+                            "Có đánh giá " + rating + "★ cho " + propertyName + " cần được xem xét.",
+                            data);
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("notifyNewReview failed for review {}: {}", review.getId(), ex.getMessage());
+        }
+    }
+
+    private void safeNotify(Long recipientId, Long actorId, String type,
+            String title, String message, Map<String, Object> data) {
+        try {
+            notificationClient.createNotification(recipientId, actorId, type, title, message, data);
+        } catch (Exception e) {
+            log.warn("notify failed type={} recipient={}: {}", type, recipientId, e.getMessage());
+        }
+    }
+
+    private static String publicPropertyLink(TargetType type, String slug) {
+        if (slug == null || slug.isBlank()) return null;
+        return switch (type) {
+            case HOTEL -> "/hotels/" + slug;
+            case RESTAURANT -> "/restaurants/" + slug;
+            case PLACE -> "/place/" + slug;
+        };
+    }
+
+    private static String adminPropertyLink(TargetType type, String targetId) {
+        if (targetId == null) return "/admin/services";
+        return switch (type) {
+            case HOTEL -> "/admin/services/hotels/" + targetId;
+            case RESTAURANT -> "/admin/services/restaurants/" + targetId;
+            case PLACE -> "/admin/places";
+        };
     }
 
     public Page<ReviewResponse> getReviews(TargetType targetType, String targetId, Pageable pageable) {

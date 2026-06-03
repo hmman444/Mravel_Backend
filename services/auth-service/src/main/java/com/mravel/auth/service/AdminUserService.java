@@ -6,6 +6,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import com.mravel.auth.dto.AdminUserRow;
+import com.mravel.auth.dto.AdminUserStats;
 import com.mravel.auth.model.AccountStatus;
 import com.mravel.auth.model.Role;
 import com.mravel.auth.model.User;
@@ -31,6 +32,14 @@ public class AdminUserService {
                 .enabled(u.isEnabled())
                 .status(u.getStatus())
                 .build()).toList();
+    }
+
+    public AdminUserStats stats() {
+        long total = repo.count();
+        long partners = repo.countByRole(Role.PARTNER);
+        long admins = repo.countByRole(Role.ADMIN);
+        long users = repo.countByRole(Role.USER);
+        return new AdminUserStats(total, partners, users, admins);
     }
 
     @Transactional

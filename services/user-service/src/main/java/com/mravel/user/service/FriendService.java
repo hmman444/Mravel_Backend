@@ -7,6 +7,7 @@ import com.mravel.user.model.Friendship;
 import com.mravel.user.model.FriendshipStatus;
 import com.mravel.user.model.UserProfile;
 import com.mravel.user.repository.FriendshipRepository;
+import com.mravel.user.repository.UserBlockRepository;
 import com.mravel.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class FriendService {
     private final FriendshipRepository friendshipRepository;
     private final NotificationClient notificationClient;
     private final UserRepository userRepository;
+    private final UserBlockRepository userBlockRepository;
 
     private Long[] normalizePair(Long a, Long b) {
         if (a < b)
@@ -34,6 +36,9 @@ public class FriendService {
     public void sendRequest(Long currentUserId, Long targetUserId) {
         if (Objects.equals(currentUserId, targetUserId)) {
             throw new RuntimeException("Không thể kết bạn với chính mình");
+        }
+        if (userBlockRepository.existsBetween(currentUserId, targetUserId)) {
+            throw new RuntimeException("Không thể gửi lời mời do quan hệ đã bị chặn");
         }
 
         Long[] pair = normalizePair(currentUserId, targetUserId);
@@ -142,6 +147,14 @@ public class FriendService {
             return RelationshipType.NONE;
         if (Objects.equals(viewerId, profileOwnerId))
             return RelationshipType.SELF;
+
+        // Chặn (vô hình hai chiều):
+        // - Người chặn thấy BLOCKED (để FE hiện nút "Bỏ chặn").
+        // - Người bị chặn thấy NONE (không tiết lộ rằng họ bị chặn — giống Facebook).
+        if (userBlockRepository.existsByBlockerIdAndBlockedId(viewerId, profileOwnerId))
+            return RelationshipType.BLOCKED;
+        if (userBlockRepository.existsByBlockerIdAndBlockedId(profileOwnerId, viewerId))
+            return RelationshipType.NONE;
 
         Long[] pair = normalizePair(viewerId, profileOwnerId);
         Optional<Friendship> opt = friendshipRepository.findByUser1IdAndUser2Id(pair[0], pair[1]);

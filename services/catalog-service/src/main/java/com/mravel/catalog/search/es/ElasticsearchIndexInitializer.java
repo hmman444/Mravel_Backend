@@ -45,8 +45,8 @@ public class ElasticsearchIndexInitializer implements ApplicationRunner {
     private boolean reindexOnStartupIfEmpty;
 
     /**
-     * T?o index + settings TRU?C khi Spring kh?i t?o c·c CommandLineRunner (seed).
-     * Tr·nh race: seed runner g?i indexingService.syncX() ? ES auto-create index
+     * T?o index + settings TRU?C khi Spring kh?i t?o c√°c CommandLineRunner (seed).
+     * Tr√°nh race: seed runner g?i indexingService.syncX() ? ES auto-create index
      * v?i default settings (thi?u vn_text analyzer) ? khi?n putMapping ? run() fail.
      */
     @PostConstruct
@@ -80,11 +80,11 @@ public class ElasticsearchIndexInitializer implements ApplicationRunner {
             ops.putMapping(ops.createMapping());
             log.info("[ES] Mapping updated: {}", indexName(clazz));
         } catch (Exception ex) {
-            // Mapping conflict: index d„ cÛ settings/mapping cu khÙng tuong thÌch.
-            // Ch? log c?nh b·o ó user c?n DELETE index th? cÙng d? recreate.
+            // Mapping conflict: index d√£ c√≥ settings/mapping cu kh√¥ng tuong th√≠ch.
+            // Ch? log c?nh b√°o ‚Äî user c?n DELETE index th? c√¥ng d? recreate.
             log.warn("[ES] putMapping failed for {} ({}). " +
-                    "CÛ kh? nang index d„ t?n t?i v?i settings cu thi?u analyzer 'vn_text'. " +
-                    "H„y DELETE index n‡y (curl -X DELETE http://localhost:9200/{}) r?i restart.",
+                    "C√≥ kh? nang index d√£ t?n t?i v?i settings cu thi?u analyzer 'vn_text'. " +
+                    "H√£y DELETE index n√†y (curl -X DELETE http://localhost:9200/{}) r?i restart.",
                     indexName(clazz), ex.getMessage(), indexName(clazz));
         }
     }

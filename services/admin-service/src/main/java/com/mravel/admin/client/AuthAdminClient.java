@@ -19,7 +19,7 @@ import java.util.Objects;
 public class AuthAdminClient {
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Value("${mravel.services.auth.base-url}")
     private String baseUrl;
@@ -35,6 +35,21 @@ public class AuthAdminClient {
                 .toUriString();
 
         return exchangeAbsolute(url, HttpMethod.GET, null, bearerToken);
+    }
+
+    /** Số liệu tổng hợp tài khoản cho dashboard. Fail-soft: null nếu lỗi. */
+    public com.mravel.admin.dto.dashboard.DownstreamDtos.UserStats userStats(String bearerToken) {
+        try {
+            ResponseEntity<ApiResponse<?>> resp = exchange(
+                    "/api/auth/users/stats", HttpMethod.GET, null, bearerToken);
+            ApiResponse<?> body = resp.getBody();
+            if (body == null || !body.isSuccess() || body.getData() == null)
+                return null;
+            return objectMapper.convertValue(body.getData(),
+                    com.mravel.admin.dto.dashboard.DownstreamDtos.UserStats.class);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     public ResponseEntity<ApiResponse<?>> lock(Long id, String bearerToken) {
@@ -55,7 +70,7 @@ public class AuthAdminClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        headers.setBearerAuth(Objects.requireNonNull(bearerToken));
+        headers.setBearerAuth(normalize(bearerToken));
 
         HttpEntity<Object> entity = new HttpEntity<>(body, headers);
 
@@ -84,5 +99,12 @@ public class AuthAdminClient {
             base = base.replaceAll("localhost(:\\d+)?", "gateway:8080");
         }
         return base;
+    }
+
+    private String normalize(String bearerOrToken) {
+        if (bearerOrToken == null)
+            return "";
+        String s = bearerOrToken.trim();
+        return s.regionMatches(true, 0, "Bearer ", 0, 7) ? s.substring(7).trim() : s;
     }
 }

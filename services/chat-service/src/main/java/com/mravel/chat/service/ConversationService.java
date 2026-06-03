@@ -31,6 +31,7 @@ public class ConversationService {
     private final MessageReadStatusRepository readStatusRepo;
     private final ChatEventProducer eventProducer;
     private final UserClient userClient;
+    private final BlockGuard blockGuard;
 
     // ─── Create ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,10 @@ public class ConversationService {
     public ConversationResponse findOrCreatePrivate(Long userId, Long recipientId) {
         if (userId.equals(recipientId)) {
             throw new IllegalArgumentException("Không thể tạo cuộc trò chuyện với chính mình");
+        }
+        // Chặn (2 chiều): không cho mở/khôi phục DM giữa cặp đã chặn nhau
+        if (blockGuard.isBlocked(userId, recipientId)) {
+            throw new IllegalArgumentException("Không thể nhắn tin do quan hệ đã bị chặn");
         }
         Optional<Long> existingId = conversationRepo.findPrivateConversationId(userId, recipientId);
         if (existingId.isPresent()) {
@@ -75,7 +80,8 @@ public class ConversationService {
                 .role(MemberRole.OWNER).joinedAt(Instant.now()).build());
 
         for (Long memberId : req.getMemberIds()) {
-            if (!memberId.equals(userId)) {
+            // Bỏ qua thành viên bị chặn với người tạo nhóm
+            if (!memberId.equals(userId) && !blockGuard.isBlocked(userId, memberId)) {
                 memberRepo.save(ConversationMember.builder()
                         .conversationId(conv.getId()).userId(memberId)
                         .role(MemberRole.MEMBER).joinedAt(Instant.now()).build());
@@ -168,6 +174,10 @@ public class ConversationService {
         requireAtLeastAdmin(caller);
 
         for (Long newUserId : newUserIds) {
+            // Không thêm thành viên bị chặn với người thực hiện
+            if (blockGuard.isBlocked(userId, newUserId)) {
+                continue;
+            }
             Optional<ConversationMember> existing = memberRepo.findByConversationIdAndUserId(conversationId, newUserId);
             if (existing.isPresent()) {
                 ConversationMember m = existing.get();

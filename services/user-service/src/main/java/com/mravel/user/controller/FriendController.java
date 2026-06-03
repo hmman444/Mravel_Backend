@@ -3,10 +3,13 @@ package com.mravel.user.controller;
 import com.mravel.user.dto.UserMiniResponse;
 import com.mravel.user.model.RelationshipType;
 import com.mravel.user.service.AuthTokenClient;
+import com.mravel.user.service.BlockService;
 import com.mravel.user.service.FriendService;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -17,18 +20,22 @@ import java.util.Map;
 public class FriendController {
 
     private final FriendService friendService;
+    private final BlockService blockService;
     private final AuthTokenClient authTokenClient;
 
     private Long getCurrentUserId(String authorizationHeader) {
         Map<String, Object> result = authTokenClient.validateToken(authorizationHeader);
         Boolean valid = (Boolean) result.get("valid");
         if (valid == null || !valid) {
-            throw new RuntimeException("Token không hợp lệ");
+            // Trả 401 (không phải 500) để FE kích hoạt luồng refresh token và retry
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT expired");
         }
-        Integer idInt = (Integer) result.get("id"); // tùy bạn lưu gì trong token
-        if (idInt == null)
-            throw new RuntimeException("Không lấy được userId từ token");
-        return idInt.longValue();
+        // id có thể được deserialize thành Integer hoặc Long tùy độ lớn -> ép qua Number cho an toàn
+        Object idRaw = result.get("id");
+        if (!(idRaw instanceof Number)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Không lấy được userId từ token");
+        }
+        return ((Number) idRaw).longValue();
     }
 
     @PostMapping("/requests")
@@ -92,6 +99,42 @@ public class FriendController {
         Long currentUserId = getCurrentUserId(authorizationHeader);
         List<UserMiniResponse> friends = friendService.getFriendList(currentUserId);
         return ApiResponse.success("Lấy danh sách bạn bè thành công", friends);
+    }
+
+    // ===== BLOCK (Facebook-style, vô hình hai chiều) =====
+
+    @PostMapping("/block/{targetId}")
+    public ApiResponse<Void> blockUser(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable Long targetId) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+        blockService.blockUser(currentUserId, targetId);
+        return ApiResponse.success("Đã chặn người dùng", null);
+    }
+
+    @DeleteMapping("/block/{targetId}")
+    public ApiResponse<Void> unblockUser(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable Long targetId) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+        blockService.unblockUser(currentUserId, targetId);
+        return ApiResponse.success("Đã bỏ chặn người dùng", null);
+    }
+
+    @GetMapping("/blocked")
+    public ApiResponse<List<UserMiniResponse>> listBlocked(
+            @RequestHeader("Authorization") String authorizationHeader) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+        return ApiResponse.success("Lấy danh sách đã chặn thành công",
+                blockService.listBlocked(currentUserId));
+    }
+
+    @GetMapping("/block-status")
+    public ApiResponse<Boolean> blockStatus(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestParam Long targetId) {
+        Long currentUserId = getCurrentUserId(authorizationHeader);
+        return ApiResponse.success("OK", blockService.isBlocked(currentUserId, targetId));
     }
 
 }

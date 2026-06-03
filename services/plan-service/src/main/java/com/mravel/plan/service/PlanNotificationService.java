@@ -5,7 +5,9 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.mravel.common.notification.NotificationTypes;
 import com.mravel.plan.client.NotificationClient;
+import com.mravel.plan.client.FriendClient;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PlanNotificationService {
 
     private final NotificationClient notificationClient;
+    private final FriendClient friendClient;
 
     private void safeCreate(Long recipientId,
             Long actorId,
@@ -27,6 +30,9 @@ public class PlanNotificationService {
             return;
         if (recipientId.equals(actorId))
             return; // do not self-notify
+        // Chặn (2 chiều): không thông báo giữa cặp đã chặn nhau
+        if (friendClient.isBlocked(actorId, recipientId))
+            return;
         try {
             notificationClient.createNotification(recipientId, actorId, type, title, message, data);
         } catch (Exception e) {
@@ -99,9 +105,24 @@ public class PlanNotificationService {
         safeCreate(
                 recipientId,
                 actorId,
-                "COMMENT_REACT",
+                NotificationTypes.COMMENT_REACT,
                 "Thích bình luận",
                 "đã thích bình luận của bạn",
+                data);
+    }
+
+    public void notifyPlanMemberJoined(Long actorId, Long recipientId, Long planId) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("actorId", actorId);
+        data.put("planId", planId);
+        data.put("deepLink", "/plans/" + planId);
+
+        safeCreate(
+                recipientId,
+                actorId,
+                NotificationTypes.PLAN_MEMBER_JOINED,
+                "Thành viên mới",
+                "đã tham gia kế hoạch của bạn",
                 data);
     }
 
