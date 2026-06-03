@@ -29,6 +29,16 @@ public class PartnerHotelController {
         return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<?>> getById(
+            @RequestHeader("Authorization") String bearer,
+            @PathVariable String id
+    ) {
+        Long partnerId = currentPartnerService.getCurrentPartnerIdOrThrow();
+        var resp = catalogClient.getHotelByIdForPartner(id, partnerId, bearer);
+        return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<?>> createHotel(
             @RequestHeader("Authorization") String bearer,
