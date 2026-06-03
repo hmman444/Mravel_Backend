@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import com.mravel.catalog.model.doc.RestaurantDoc;
 import com.mravel.catalog.model.doc.RestaurantDoc.AmbienceTag;
@@ -44,6 +45,7 @@ import static com.mravel.catalog.utils.restaurant.Localized.vi;
 import static com.mravel.catalog.utils.restaurant.Localized.of;
 
 @Configuration
+@Profile("seed")
 public class SeedHoiAnRestaurants {
 
     @Bean

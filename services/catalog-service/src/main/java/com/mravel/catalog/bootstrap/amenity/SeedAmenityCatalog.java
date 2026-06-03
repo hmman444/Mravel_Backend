@@ -7,6 +7,7 @@ import java.util.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.enums.AmenityGroup;
@@ -16,6 +17,7 @@ import com.mravel.catalog.repository.AmenityCatalogRepository;
 import com.mravel.common.i18n.LocaleConstants;
 
 @Configuration
+@Profile("seed")
 public class SeedAmenityCatalog {
 
         @Bean

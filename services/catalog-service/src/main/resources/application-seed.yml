@@ -1,0 +1,10 @@
+# Profile chạy seed dữ liệu (chạy 1 tiến trình tạm, KHÔNG mở web server -> không đụng port
+# catalog đang chạy). Sau khi các Seed*Runner upsert xong, SeedProfileShutdown sẽ tự tắt.
+# Cách chạy:
+#   mvn -pl services/catalog-service spring-boot:run -Dspring-boot.run.profiles=seed
+spring:
+  main:
+    web-application-type: none
+  kafka:
+    listener:
+      auto-startup: false
