@@ -381,27 +381,15 @@ public class UserController {
         return s;
     }
 
-    // trả minimal để list search (nhẹ payload)
+    // trả minimal cho list search (nhẹ payload, KHÔNG lộ PII: số điện thoại,
+    // email phụ, ngày sinh, địa chỉ). Chỉ giữ thông tin hiển thị cơ bản.
     private UserProfileResponse toMini(UserProfile u) {
         return UserProfileResponse.builder()
                 .id(u.getId())
                 .fullname(u.getFullname())
                 .avatar(u.getAvatar())
                 .email(u.getEmail())
-                .provider(u.getProvider())
-                .gender(u.getGender() != null ? u.getGender().name() : null)
-                .dateOfBirth(u.getDateOfBirth())
-                .city(u.getCity())
-                .country(u.getCountry())
-                .addressLine(u.getAddressLine())
-                .secondaryEmail(u.getSecondaryEmail())
-                .tertiaryEmail(u.getTertiaryEmail())
-                .phone1(u.getPhone1())
-                .phone2(u.getPhone2())
-                .phone3(u.getPhone3())
                 .membershipTier(u.getMembershipTier() != null ? u.getMembershipTier().name() : null)
-                .locale(u.getLocale())
-                .timeZone(u.getTimeZone())
                 .build();
     }
 }

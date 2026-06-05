@@ -17,8 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.RestaurantBookingService;
 import com.mravel.booking.service.MomoPaymentService;
-import com.mravel.common.response.ApiResponse;
-import com.mravel.booking.payment.momo.MomoConfirmRequest;
 import com.mravel.booking.payment.momo.MomoIpnRequest;
 import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.repository.RestaurantBookingRepository;
@@ -41,12 +39,6 @@ public class MomoPaymentController {
     public ResponseEntity<String> handleIpn(@RequestBody MomoIpnRequest body) {
         momoPaymentService.handleIpn(body);
         return ResponseEntity.ok("OK");
-    }
-
-    @PostMapping("/confirm")
-    public ResponseEntity<ApiResponse<Void>> confirmFromClient(@RequestBody MomoConfirmRequest body) {
-        momoPaymentService.handleClientConfirm(body);
-        return ResponseEntity.ok(ApiResponse.success("Xác nhận thanh toán thành công", null));
     }
 
     @GetMapping("/redirect")

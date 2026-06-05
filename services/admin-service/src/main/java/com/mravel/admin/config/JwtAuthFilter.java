@@ -82,10 +82,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // if (!"ADMIN".equalsIgnoreCase(body.getRole())) {
-            // response.setStatus(HttpStatus.FORBIDDEN.value());
-            // return;
-            // }
+            if (!"ADMIN".equalsIgnoreCase(body.getRole())) {
+                response.setStatus(HttpStatus.FORBIDDEN.value());
+                return;
+            }
             var auth = new UsernamePasswordAuthenticationToken(
                     new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole()),
                     null,

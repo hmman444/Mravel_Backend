@@ -250,14 +250,6 @@ public class AuthService {
         return notificationService.testSmtpConnection();
     }
 
-    /**
-     * Send a test OTP email (used by debug/test endpoint)
-     */
-    public void sendTestOtp(String email) {
-        String otp = "000000";
-        notificationService.sendOtpEmail(email, otp);
-    }
-
     public void resetPassword(ResetPasswordRequest request) {
         if (!otpService.validateOtp(request.getEmail(), request.getOtpCode())) {
             throw new RuntimeException("OTP không hợp lệ hoặc đã hết hạn");

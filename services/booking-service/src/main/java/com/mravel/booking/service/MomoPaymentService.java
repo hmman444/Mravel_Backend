@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 
 import com.mravel.booking.model.BookingBase;
 import com.mravel.booking.model.Payment;
-import com.mravel.booking.payment.momo.MomoConfirmRequest;
 import com.mravel.booking.payment.momo.MomoIpnRequest;
 import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.repository.PaymentRepository;
@@ -49,30 +48,6 @@ public class MomoPaymentService {
 
         Long amountLong = body.getAmount(); // DTO bạn đang là Long/long
         BigDecimal paidAmount = (amountLong == null) ? null : BigDecimal.valueOf(amountLong);
-
-        resolveAndMarkPaid(orderId, paidAmount, amountLong);
-    }
-
-    /**
-     * 2) Confirm từ FE / Postman
-     * - logic giống IPN
-     */
-    public void handleClientConfirm(MomoConfirmRequest body) {
-        if (body == null)
-            return;
-
-        Integer resultCode = body.getResultCode();
-        if (resultCode != null && resultCode != 0) {
-            return; // thất bại -> bỏ qua
-        }
-
-        String orderId = trim(body.getOrderId());
-        if (orderId == null) {
-            throw new IllegalArgumentException("Confirm thiếu orderId");
-        }
-
-        BigDecimal paidAmount = body.getAmount(); // DTO bạn đang BigDecimal
-        Long amountLong = (paidAmount == null) ? null : paidAmount.longValue();
 
         resolveAndMarkPaid(orderId, paidAmount, amountLong);
     }

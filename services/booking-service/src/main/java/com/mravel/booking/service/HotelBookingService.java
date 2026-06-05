@@ -222,6 +222,16 @@ public class HotelBookingService {
             return booking;
         }
 
+        // Chống xác nhận sai số tiền: số tiền cổng báo phải khớp số tiền phải trả.
+        if (paidAmount != null && paidAmount.signum() > 0 && booking.getAmountPayable() != null) {
+            long paidVnd = paidAmount.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+            long expectedVnd = booking.getAmountPayable().setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+            if (Math.abs(paidVnd - expectedVnd) > 1) {
+                throw new IllegalArgumentException(
+                        "Số tiền thanh toán không khớp: đã trả " + paidVnd + " VND, cần " + expectedVnd + " VND");
+            }
+        }
+
         // COMMIT tồn kho: HOLD -> BOOKED
         if (Boolean.TRUE.equals(booking.getInventoryDeducted())) {
             List<RoomRequestDTO> roomRequests = buildRoomRequestsFromBooking(booking);

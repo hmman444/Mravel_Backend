@@ -12,6 +12,7 @@ import com.mravel.booking.repository.RestaurantBookingRepository;
 import com.mravel.common.notification.NotificationTypes;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RestaurantBookingService {
 
     private static final int PENDING_EXPIRE_MINUTES = 30;
@@ -181,6 +183,15 @@ public class RestaurantBookingService {
         if (b.getPaymentStatus() == BookingBase.PaymentStatus.SUCCESS)
             return;
 
+        // Chống xác nhận sai số tiền: số tiền cổng báo phải khớp số tiền phải trả.
+        if (amount != null && b.getAmountPayable() != null) {
+            long expectedVnd = b.getAmountPayable().setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+            if (Math.abs(amount - expectedVnd) > 1) {
+                throw new IllegalArgumentException(
+                        "Số tiền thanh toán không khớp: đã trả " + amount + " VND, cần " + expectedVnd + " VND");
+            }
+        }
+
         BigDecimal paid = (amount == null)
                 ? (b.getAmountPayable() != null ? b.getAmountPayable() : BigDecimal.ZERO)
                 : BigDecimal.valueOf(amount);
@@ -248,17 +259,10 @@ public class RestaurantBookingService {
             }
 
         } catch (Exception ex) {
-            // payment OK nhưng commit fail => giữ lại trạng thái để admin xử lý (tối thiểu
-            // đừng crash lặng lẽ)
-            b.setAmountPaid(paid);
-            b.setPaidAt(Instant.now());
-            b.setPaymentStatus(BookingBase.PaymentStatus.SUCCESS);
-            b.setStatus(BookingBase.BookingStatus.PAID);
-            b.setPendingPaymentUrl(null);
-            b.setPendingPaymentOrderId(null);
-            repo.save(b);
-
-            throw ex; // hoặc log + không throw nếu bạn muốn redirect vẫn “êm”
+            // Commit tồn kho (giữ bàn) thất bại -> KHÔNG đánh dấu PAID/CONFIRMED.
+            // Ném lại để @Transactional rollback, booking giữ nguyên PENDING_PAYMENT.
+            log.error("[RestaurantBooking] commit inventory failed for {}: {}", bookingCode, ex.getMessage());
+            throw ex;
         }
     }
 
