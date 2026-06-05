@@ -33,12 +33,17 @@ public class NotificationService {
 
     @Transactional
     public NotificationResponse create(CreateNotificationRequest req) {
+        if (req.getRecipientId() == null) {
+            throw new IllegalArgumentException("recipientId is required");
+        }
         // Chặn (2 chiều): không tạo/đẩy thông báo giữa cặp đã chặn nhau
         if (req.getActorId() != null && req.getRecipientId() != null
                 && blockGuard.isBlocked(req.getActorId(), req.getRecipientId())) {
             log.info("Suppressed notification between blocked users {} -> {}",
                     req.getActorId(), req.getRecipientId());
-            return null;
+            // Suppression is an expected no-op, not a successful creation. Surface it as a
+            // business signal so the controller does not report {success:true, data:null}.
+            throw new IllegalArgumentException("Notification suppressed: users are blocked");
         }
         try {
             String dataJson = req.getData() != null ? objectMapper.writeValueAsString(req.getData()) : null;

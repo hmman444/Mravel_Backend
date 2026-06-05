@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PlanActivityType(str, Enum):
@@ -34,6 +34,19 @@ class Constraints(BaseModel):
     budget_total_vnd: Optional[int] = None
     interests: List[str] = Field(default_factory=list)
     pace: Optional[str] = None  # "relaxed" | "balanced" | "packed"
+
+    @model_validator(mode="after")
+    def _normalize_date_range(self) -> "Constraints":
+        # An inverted range (end_date < start_date) yields a negative duration and an
+        # empty itinerary. Rather than crash the planning turn (the agent feeds dates
+        # incrementally), normalise by swapping so end_date >= start_date always holds.
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
+            self.start_date, self.end_date = self.end_date, self.start_date
+        return self
 
     def is_minimally_complete(self) -> bool:
         return bool(self.destination) and self.start_date is not None and self.end_date is not None

@@ -580,6 +580,7 @@ async def regenerate(
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=narrative)
     session.messages.append(assistant_msg)
     store.save(session)
+    missing = _missing_constraint_fields(session.constraints)
     return ApiResponse.ok(
         "Draft regenerated",
         SendMessageResponse(
@@ -587,7 +588,8 @@ async def regenerate(
             constraints=session.constraints,
             draft=session.draft,
             assistant_message=assistant_msg,
-            needs_more_info=False,
+            needs_more_info=bool(missing) and session.draft is None,
+            missing_fields=missing,
         ),
     )
 
@@ -668,13 +670,15 @@ async def apply_edits(
         logger.warning("apply-edits upstream error session=%s: %s", session_id, exc)
         raise UpstreamError(f"Không áp dụng được thay đổi: {exc}") from exc
 
-    session.pending_edits = []  # consumed
     summary = f"Đã áp dụng {result['applied']}/{result['total']} thay đổi vào kế hoạch."
     failed = [r for r in result["results"] if not r.get("ok")]
     if failed:
         summary += f" {len(failed)} thay đổi lỗi — bạn xem lại nhé."
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=summary)
     session.messages.append(assistant_msg)
+    # Clear pending edits only after the apply succeeded and all post-processing is
+    # done — so a failure on any step above doesn't silently drop the proposed edits.
+    session.pending_edits = []  # consumed
     store.save(session)
 
     return ApiResponse.ok(

@@ -530,7 +530,14 @@ class ToolDispatcher:
 
     async def run(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         if tool_name == "search_hotels":
-            location = location_slug(str(arguments.get("location", "")))
+            raw_location = str(arguments.get("location", "")).strip()
+            if not raw_location:
+                return {
+                    "items": [],
+                    "count": 0,
+                    "error": "Thiếu 'location' — cần một địa điểm để tìm khách sạn.",
+                }
+            location = location_slug(raw_location)
             limit = min(int(arguments.get("max_results") or 5), _MAX_ITEMS_PER_TOOL)
             filters: Dict[str, Any] = {}
             # Field names must match catalog HotelSearchRequest (maxPrice / starRating[]),
@@ -645,8 +652,13 @@ def apply_set_constraints(arguments: Dict[str, Any], prior: Constraints) -> Cons
 
     destination = prior.destination
     raw_dest = arguments.get("destination")
-    if isinstance(raw_dest, str) and raw_dest.strip():
-        destination = raw_dest.strip()
+    if isinstance(raw_dest, str):
+        candidate = raw_dest.strip()
+        # Conservative sanity check (no geocoding): a real place name has at least
+        # two alphanumeric characters. Reject empty/whitespace-only or purely
+        # symbolic garbage ("???", "---") so it can't corrupt the constraints.
+        if len(candidate) >= 2 and sum(c.isalnum() for c in candidate) >= 2:
+            destination = candidate
 
     travelers = prior.travelers
     if arguments.get("travelers") is not None:

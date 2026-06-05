@@ -66,10 +66,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     .build(true)
                     .toUri();
 
-            // Helpful debug log
-            // (use debug level in production to avoid leaking tokens)
-            System.out.println("[JwtAuthFilter] calling auth validate at: " + uri.toString());
-
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(Objects.requireNonNull(header.substring(7), "token must not be null"));
 

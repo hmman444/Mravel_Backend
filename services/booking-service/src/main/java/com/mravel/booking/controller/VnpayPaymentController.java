@@ -1,6 +1,7 @@
 // src/main/java/com/mravel/booking/controller/VnpayPaymentController.java
 package com.mravel.booking.controller;
 
+import com.mravel.booking.dto.PaymentReturnResult;
 import com.mravel.booking.service.VnpayPaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,6 +9,8 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -40,14 +43,28 @@ public class VnpayPaymentController {
 
   @GetMapping("/return")
   public ResponseEntity<Void> vnpReturn(@RequestParam Map<String, String> params) {
+    String target;
     try {
-      vnpayPaymentService.handleReturn(params);
-    } catch (Exception ignore) {
+      PaymentReturnResult result = vnpayPaymentService.handleReturn(params);
+      target = buildReturnUrl(result.bookingCode(), result.success() ? "success" : "failed");
+    } catch (Exception ex) {
+      target = buildReturnUrl(null, "error");
     }
 
     return ResponseEntity.status(HttpStatus.FOUND)
-        .location(Objects.requireNonNull(URI.create(frontendBaseUrl + "/my-bookings")))
+        .location(Objects.requireNonNull(URI.create(target)))
         .build();
+  }
+
+  /** Build URL điều hướng người dùng về trang kết quả thanh toán của frontend. */
+  private String buildReturnUrl(String bookingCode, String status) {
+    StringBuilder sb = new StringBuilder(frontendBaseUrl)
+        .append("/booking/payment-return?gateway=vnpay&status=")
+        .append(status);
+    if (bookingCode != null && !bookingCode.isBlank()) {
+      sb.append("&code=").append(URLEncoder.encode(bookingCode, StandardCharsets.UTF_8));
+    }
+    return sb.toString();
   }
 
   private static Map<String, String> rsp(String code, String message) {

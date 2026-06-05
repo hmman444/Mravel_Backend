@@ -59,7 +59,11 @@ public class RestaurantService {
                         .filter(r -> isOpenAt(r, visitDate, visitTime))
                         .map(RestaurantMapper::toSummary)
                         .toList();
-                return new PageImpl<>(filtered, pageable, filtered.size());
+                // The open-at check is a best-effort view applied on top of the already-paged
+                // search results, so keep the underlying total to keep pagination consistent
+                // (using filtered.size() would collapse totalElements/totalPages to the current
+                // page's surviving rows and break page navigation).
+                return new PageImpl<>(filtered, pageable, page.getTotalElements());
             }
         }
 

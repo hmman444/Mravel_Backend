@@ -7,6 +7,7 @@ import com.mravel.catalog.repository.HotelDocRepository;
 import com.mravel.catalog.repository.RestaurantDocRepository;
 import com.mravel.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,26 +38,30 @@ public class CatalogOwnerInternalController {
 
     @GetMapping("/hotels/{id}/owner")
     public ResponseEntity<ApiResponse<OwnerInfo>> hotelOwner(@PathVariable String id) {
-        OwnerInfo info = hotelRepo.findById(id)
+        return hotelRepo.findById(id)
                 .map(h -> new OwnerInfo(
                         h.getPublisher() != null ? h.getPublisher().getPartnerId() : null,
                         pickName(h.getName()),
                         h.getSlug(),
                         hotelCover(h.getImages())))
-                .orElse(null);
-        return ResponseEntity.ok(ApiResponse.success("OK", info));
+                .map(info -> ResponseEntity.ok(ApiResponse.success("OK", info)))
+                .orElseGet(() -> ResponseEntity
+                        .status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.<OwnerInfo>error("Hotel not found")));
     }
 
     @GetMapping("/restaurants/{id}/owner")
     public ResponseEntity<ApiResponse<OwnerInfo>> restaurantOwner(@PathVariable String id) {
-        OwnerInfo info = restaurantRepo.findById(id)
+        return restaurantRepo.findById(id)
                 .map(r -> new OwnerInfo(
                         r.getPublisher() != null ? r.getPublisher().getPartnerId() : null,
                         pickName(r.getName()),
                         r.getSlug(),
                         restaurantCover(r.getImages())))
-                .orElse(null);
-        return ResponseEntity.ok(ApiResponse.success("OK", info));
+                .map(info -> ResponseEntity.ok(ApiResponse.success("OK", info)))
+                .orElseGet(() -> ResponseEntity
+                        .status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.<OwnerInfo>error("Restaurant not found")));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

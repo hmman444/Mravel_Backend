@@ -310,7 +310,7 @@ public class ElasticsearchHotelSearchService implements HotelSearchService {
         }
         if (r.maxPrice() != null) {
             int mx = r.maxPrice();
-            filters.add(Query.of(q -> q.range(rq -> rq.field("minNightlyPrice").lt(JsonData.of(mx)))));
+            filters.add(Query.of(q -> q.range(rq -> rq.field("minNightlyPrice").lte(JsonData.of(mx)))));
         }
         if (r.minRating() != null) {
             double mr = r.minRating();

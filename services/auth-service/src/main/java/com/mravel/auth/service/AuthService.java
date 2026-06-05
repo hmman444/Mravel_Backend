@@ -445,8 +445,10 @@ public class AuthService {
                     return newUser;
                 });
         assertNotLocked(user);
+        // Email đã tồn tại với vai trò khác (ví dụ USER) → KHÔNG tạo/đổi sang PARTNER,
+        // báo lỗi rõ ràng để không tạo tài khoản đối tác trùng/xung đột.
         if (user.getRole() != Role.PARTNER) {
-            throw new RuntimeException("Email này đã tồn tại nhưng không phải tài khoản đối tác");
+            throw new IllegalArgumentException("Email này đã tồn tại nhưng không phải tài khoản đối tác");
         }
 
         refreshTokenService.deleteByEmail(user.getEmail());

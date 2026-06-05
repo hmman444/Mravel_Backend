@@ -225,7 +225,7 @@ public class ReviewService {
                 .toList();
 
         return ReviewSummaryResponse.builder()
-                .averageRating(Math.round(avg * 10.0) / 10.0)
+                .averageRating(avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0)
                 .totalReviews(total)
                 .ratingDistribution(distribution)
                 .popularAspects(popularAspects)

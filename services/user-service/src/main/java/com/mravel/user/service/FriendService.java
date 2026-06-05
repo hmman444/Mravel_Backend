@@ -56,11 +56,9 @@ public class FriendService {
                     existing.setUpdatedAt(LocalDateTime.now());
                     friendshipRepository.save(existing);
 
-                    notifyFriendAccepted(currentUserId, targetUserId);
-
                     Long requesterId = existing.getRequestedById(); // người gửi trước
 
-                    // notify lưu DB (notification-service)
+                    // notify lưu DB (notification-service) — chỉ gửi MỘT lần cho người gửi trước
                     notifyFriendAccepted(currentUserId, requesterId);
                     return;
                 } else {
