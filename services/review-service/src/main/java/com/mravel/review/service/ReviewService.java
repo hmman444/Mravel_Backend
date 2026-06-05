@@ -163,6 +163,42 @@ public class ReviewService {
         return page.map(this::toResponse);
     }
 
+    /**
+     * Admin: liệt kê đánh giá tiêu cực (rating ≤ maxRating). targetId tuỳ chọn.
+     * Mỗi đánh giá được bổ sung tên/slug cơ sở (cache theo targetId để tránh gọi lặp catalog).
+     */
+    public Page<ReviewResponse> getNegativeReviews(TargetType targetType, String targetId,
+            int maxRating, Pageable pageable) {
+        Page<Review> page = reviewRepository.findNegativeReviews(targetType, targetId, maxRating, pageable);
+        Map<String, CatalogClient.OwnerInfo> ownerCache = new HashMap<>();
+        return page.map(review -> {
+            ReviewResponse resp = toResponse(review);
+            enrichTarget(resp, review, ownerCache);
+            return resp;
+        });
+    }
+
+    /** Admin: tổng số đánh giá tiêu cực của một loại cơ sở (cho thẻ thống kê). */
+    public long countNegative(TargetType targetType, int maxRating) {
+        return reviewRepository.countNegativeByType(targetType, maxRating);
+    }
+
+    /** Bổ sung tên/slug cơ sở vào response (chỉ cho admin). Fail-silent. */
+    private void enrichTarget(ReviewResponse resp, Review review,
+            Map<String, CatalogClient.OwnerInfo> cache) {
+        try {
+            String key = review.getTargetType() + ":" + review.getTargetId();
+            CatalogClient.OwnerInfo owner = cache.computeIfAbsent(key,
+                    k -> catalogClient.getOwner(review.getTargetType(), review.getTargetId()));
+            if (owner != null) {
+                resp.setTargetName(owner.name());
+                resp.setTargetSlug(owner.slug());
+            }
+        } catch (Exception ex) {
+            log.warn("enrichTarget failed for review {}: {}", review.getId(), ex.getMessage());
+        }
+    }
+
     public ReviewSummaryResponse getSummary(TargetType targetType, String targetId) {
         Double avg = reviewRepository.avgRatingByTarget(targetType, targetId);
         long total = reviewRepository.countByTargetTypeAndTargetId(targetType, targetId);

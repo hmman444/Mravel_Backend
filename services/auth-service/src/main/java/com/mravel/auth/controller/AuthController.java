@@ -84,6 +84,9 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(HttpServletRequest request) {
         String token = jwtUtils.resolveToken(request);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         String email = jwtUtils.extractEmail(token);
 
         // Gọi sang user-service để lấy profile
