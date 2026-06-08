@@ -11,6 +11,7 @@ import java.util.Objects;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import com.mravel.catalog.model.doc.HotelDoc;
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
@@ -48,6 +49,7 @@ import static com.mravel.catalog.utils.hotel.Localized.of;
 import static com.mravel.catalog.utils.hotel.Localized.vi;
 
 @Configuration
+@Profile("seed")
 public class SeedHoiAnHotelsNearChuaCau {
 
         @Bean
