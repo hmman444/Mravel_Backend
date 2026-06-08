@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.mravel.catalog.model.doc.AmenityCatalogDoc;
 import com.mravel.catalog.model.enums.AmenityGroup;
 import com.mravel.catalog.model.enums.AmenityScope;
@@ -16,6 +18,7 @@ import com.mravel.catalog.model.enums.AmenitySection;
 import com.mravel.catalog.repository.AmenityCatalogRepository;
 import com.mravel.common.i18n.LocaleConstants;
 
+@Slf4j
 @Configuration
 @Profile("seed")
 public class SeedAmenityCatalog {
@@ -23,7 +26,7 @@ public class SeedAmenityCatalog {
         @Bean
         CommandLineRunner seedAmenityCatalogRunner(AmenityCatalogRepository repo) {
                 return args -> {
-                        System.out.println(">>> [SeedAmenityCatalog] start");
+                        log.info(">>> [SeedAmenityCatalog] start");
 
                         Instant now = Instant.now();
                         List<AmenityCatalogDoc> seeds = new ArrayList<>();
@@ -492,8 +495,8 @@ public class SeedAmenityCatalog {
                                 upserted++;
                         }
 
-                        System.out.println(">>> [SeedAmenityCatalog] upserted: " + upserted);
-                        System.out.println(">>> [SeedAmenityCatalog] done");
+                        log.info(">>> [SeedAmenityCatalog] upserted: {}", upserted);
+                        log.info(">>> [SeedAmenityCatalog] done");
                 };
         }
 

@@ -66,10 +66,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     .build(true)
                     .toUri();
 
-            // Helpful debug log
-            // (use debug level in production to avoid leaking tokens)
-            System.out.println("[JwtAuthFilter] calling auth validate at: " + uri.toString());
-
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(Objects.requireNonNull(header.substring(7), "token must not be null"));
 
@@ -86,10 +82,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // if (!"ADMIN".equalsIgnoreCase(body.getRole())) {
-            // response.setStatus(HttpStatus.FORBIDDEN.value());
-            // return;
-            // }
+            if (!"ADMIN".equalsIgnoreCase(body.getRole())) {
+                response.setStatus(HttpStatus.FORBIDDEN.value());
+                return;
+            }
             var auth = new UsernamePasswordAuthenticationToken(
                     new JwtUserPrincipal(body.getId(), body.getEmail(), body.getRole()),
                     null,

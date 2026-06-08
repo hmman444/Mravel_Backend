@@ -58,6 +58,9 @@ public class JwtUtil {
     }
 
     public String extractEmail(String token) {
+        if (token == null) {
+            throw new IllegalArgumentException("Token không hợp lệ");
+        }
         return Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
@@ -67,6 +70,9 @@ public class JwtUtil {
     }
 
     public String extractRole(String token) {
+        if (token == null) {
+            throw new IllegalArgumentException("Token không hợp lệ");
+        }
         return (String) Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
@@ -76,6 +82,9 @@ public class JwtUtil {
     }
 
     public Long extractUserId(String token) {
+        if (token == null) {
+            throw new IllegalArgumentException("Token không hợp lệ");
+        }
         Object id = Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()

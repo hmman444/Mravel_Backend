@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -15,8 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import com.mravel.booking.service.HotelBookingService;
 import com.mravel.booking.service.RestaurantBookingService;
 import com.mravel.booking.service.MomoPaymentService;
-import com.mravel.common.response.ApiResponse;
-import com.mravel.booking.payment.momo.MomoConfirmRequest;
 import com.mravel.booking.payment.momo.MomoIpnRequest;
 import com.mravel.booking.repository.HotelBookingRepository;
 import com.mravel.booking.repository.RestaurantBookingRepository;
@@ -41,25 +41,17 @@ public class MomoPaymentController {
         return ResponseEntity.ok("OK");
     }
 
-    @PostMapping("/confirm")
-    public ResponseEntity<ApiResponse<Void>> confirmFromClient(@RequestBody MomoConfirmRequest body) {
-        momoPaymentService.handleClientConfirm(body);
-        return ResponseEntity.ok(ApiResponse.success("Xác nhận thanh toán thành công", null));
-    }
-
     @GetMapping("/redirect")
     public ResponseEntity<Void> handleRedirect(
             @RequestParam(required = false, name = "orderId") String orderId,
             @RequestParam(required = false, name = "bookingCode") String bookingCode,
             @RequestParam(required = false) Long amount,
             @RequestParam(required = false) Integer resultCode) {
-        System.out.println(">>> [MoMo REDIRECT] orderId=" + orderId
-                + ", bookingCode=" + bookingCode
-                + ", amount=" + amount
-                + ", resultCode=" + resultCode);
 
         String oid = (orderId != null && !orderId.isBlank()) ? orderId.trim()
                 : (bookingCode != null ? bookingCode.trim() : null);
+
+        String resolvedCode = null; // bookingCode thật để FE poll trạng thái
 
         if (oid != null && resultCode != null && resultCode == 0) {
 
@@ -73,6 +65,7 @@ public class MomoPaymentController {
                     restaurantBookingService.markRestaurantBookingPaidAndConfirm(
                             rb.getCode(), // bookingCode thật
                             amount);
+                    resolvedCode = rb.getCode();
                 } else {
                     // fallback: lỡ oid không phải RB nhưng bị nhầm
                     var hb = hotelBookingRepository.findByCode(oid)
@@ -83,6 +76,7 @@ public class MomoPaymentController {
                         hotelBookingService.markHotelBookingPaidAndConfirm(
                                 hb.getCode(),
                                 amount == null ? null : BigDecimal.valueOf(amount));
+                        resolvedCode = hb.getCode();
                     }
                 }
             } else {
@@ -95,6 +89,7 @@ public class MomoPaymentController {
                     hotelBookingService.markHotelBookingPaidAndConfirm(
                             hb.getCode(), // bookingCode thật
                             amount == null ? null : BigDecimal.valueOf(amount));
+                    resolvedCode = hb.getCode();
                 } else {
                     // fallback: lỡ oid là restaurant attemptId
                     var rb = restaurantBookingRepository.findByCode(oid)
@@ -105,14 +100,31 @@ public class MomoPaymentController {
                         restaurantBookingService.markRestaurantBookingPaidAndConfirm(
                                 rb.getCode(),
                                 amount);
+                        resolvedCode = rb.getCode();
                     }
                 }
             }
         }
 
-        String feUrl = frontendBaseUrl + "/my-bookings";
+        boolean success = resolvedCode != null;
+        // Nếu không resolve được mà oid trông giống bookingCode thì vẫn truyền để FE hiển thị
+        if (resolvedCode == null && oid != null && (oid.startsWith("BK-") || oid.startsWith("RB-"))) {
+            resolvedCode = oid;
+        }
+
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(Objects.requireNonNull(URI.create(feUrl)))
+                .location(Objects.requireNonNull(URI.create(buildReturnUrl(resolvedCode, success ? "success" : "failed"))))
                 .build();
+    }
+
+    /** Build URL điều hướng người dùng về trang kết quả thanh toán của frontend. */
+    private String buildReturnUrl(String bookingCode, String status) {
+        StringBuilder sb = new StringBuilder(frontendBaseUrl)
+                .append("/booking/payment-return?gateway=momo&status=")
+                .append(status);
+        if (bookingCode != null && !bookingCode.isBlank()) {
+            sb.append("&code=").append(URLEncoder.encode(bookingCode, StandardCharsets.UTF_8));
+        }
+        return sb.toString();
     }
 }

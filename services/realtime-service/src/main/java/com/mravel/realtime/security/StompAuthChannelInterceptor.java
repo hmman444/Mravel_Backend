@@ -102,10 +102,15 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                     throw new IllegalArgumentException("JWT token does not contain a resolvable user id");
                 }
 
-                if (accessor.getSessionAttributes() != null && userId != null) {
-                    accessor.getSessionAttributes().put("userId", userId);
-                    accessor.getSessionAttributes().put("accessToken", token);
+                Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+                if (sessionAttrs == null) {
+                    // Without a session attribute map the userId would be lost and every
+                    // later SUBSCRIBE would be rejected. Initialize one so auth survives.
+                    sessionAttrs = new ConcurrentHashMap<>();
+                    accessor.setSessionAttributes(sessionAttrs);
                 }
+                sessionAttrs.put("userId", userId);
+                sessionAttrs.put("accessToken", token);
                 log.debug("WS CONNECT accepted userId={} sessionId={}", userId, accessor.getSessionId());
 
             } catch (JwtException e) {

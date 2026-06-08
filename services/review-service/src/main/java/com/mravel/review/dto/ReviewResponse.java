@@ -18,6 +18,10 @@ public class ReviewResponse {
     private String userAvatar;
     private String targetId;
     private TargetType targetType;
+    /** Tên cơ sở (khách sạn/quán ăn) — chỉ điền cho luồng admin, public để null. */
+    private String targetName;
+    /** Slug cơ sở — chỉ điền cho luồng admin, dùng để mở trang công khai. */
+    private String targetSlug;
     private Integer rating;
     private String content;
     private List<AspectCommentResponse> aspects;

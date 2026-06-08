@@ -18,6 +18,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlanBoardService {
+
+    @Value("${mravel.frontend.base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
 
     private final PlanPermissionService permissionService;
     private final PlanRepository planRepository;
@@ -468,6 +472,14 @@ public class PlanBoardService {
         if (dto == null)
             return;
 
+        // Chi phí không được âm (controller không dùng @Valid nên check thủ công ở đây).
+        if (dto.getEstimatedCost() != null && dto.getEstimatedCost() < 0) {
+            throw new IllegalArgumentException("Chi phí dự kiến không được âm.");
+        }
+        if (dto.getActualCost() != null && dto.getActualCost() < 0) {
+            throw new IllegalArgumentException("Chi phí thực tế không được âm.");
+        }
+
         // currency
         if (dto.getCurrencyCode() != null && !dto.getCurrencyCode().isBlank()) {
             card.setCurrencyCode(dto.getCurrencyCode());
@@ -567,6 +579,30 @@ public class PlanBoardService {
                             .userId(d.getUserId())
                             .amount(d.getAmount())
                             .build()));
+
+            // Validate: tổng các phần chia EXACT phải bằng tổng chi phí của card.
+            // Total được suy ra giống recalculateCardCosts/recalculateSplitDetails:
+            // actualManual -> actualCost; ngược lại -> estimatedCost + sum(extra.actualAmount).
+            long total;
+            if (Boolean.TRUE.equals(card.getActualManual())) {
+                total = card.getActualCost() != null ? card.getActualCost() : 0L;
+            } else {
+                long est = card.getEstimatedCost() != null ? card.getEstimatedCost() : 0L;
+                long extra = card.getExtraCosts().stream()
+                        .mapToLong(e -> e.getActualAmount() != null ? e.getActualAmount() : 0L)
+                        .sum();
+                total = est + extra;
+            }
+
+            if (total > 0) {
+                long sumDetails = card.getSplitDetails().stream()
+                        .mapToLong(d -> d.getAmount() != null ? d.getAmount() : 0L)
+                        .sum();
+                if (sumDetails != total) {
+                    throw new IllegalArgumentException(
+                            "Tổng số tiền chia (" + sumDetails + ") không khớp với tổng chi phí (" + total + ").");
+                }
+            }
         }
     }
 
@@ -1300,15 +1336,10 @@ public class PlanBoardService {
 
             inviteTokenRepo.save(tokenEntity);
 
-            // mailService.sendInviteEmail(
-            // email,
-            // plan.getTitle(),
-            // "http://localhost:5173/plans/join?token=" + token);
-
             mailService.sendInviteEmail(
                     email,
                     plan.getTitle(),
-                    "http://localhost:3000/plans/join?token=" + token);
+                    frontendBaseUrl + "/plans/join?token=" + token);
 
             result.add(InviteDto.builder()
                     .id(tokenEntity.getId())
@@ -1566,7 +1597,9 @@ public class PlanBoardService {
             if (action.getRole() != null) {
                 try {
                     assignedRole = PlanRole.valueOf(action.getRole().toUpperCase());
-                } catch (Exception ignored) {
+                } catch (Exception ex) {
+                    log.warn("Invalid role '{}' in request action for planId={}, reqId={}; defaulting to VIEWER",
+                            action.getRole(), planId, reqId);
                 }
             }
 

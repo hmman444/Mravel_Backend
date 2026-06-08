@@ -84,6 +84,9 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUser(HttpServletRequest request) {
         String token = jwtUtils.resolveToken(request);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         String email = jwtUtils.extractEmail(token);
 
         // Gọi sang user-service để lấy profile
@@ -170,24 +173,4 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập đối tác mạng xã hội thành công", jwt));
     }
 
-    /**
-     * Debug endpoint: test SMTP connection and optionally send a test OTP to the provided email.
-     * Usage: GET /api/auth/internal/test-smtp or /api/auth/internal/test-smtp?email=you@domain
-     */
-    @GetMapping("/internal/test-smtp")
-    public ResponseEntity<ApiResponse<?>> testSmtp(@RequestParam(required = false) String email) {
-        boolean ok = authService.testSmtpConnection();
-        if (!ok) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("SMTP connection failed. Check MAIL_USERNAME and MAIL_PASSWORD (use Gmail App Password WITHOUT spaces)."));
-        }
-
-        if (email != null && !email.isBlank()) {
-            authService.sendTestOtp(email);
-            return ResponseEntity.ok(ApiResponse.success("SMTP OK. Test OTP sent (check inbox/spam).", null));
-        } else {
-            return ResponseEntity.ok(ApiResponse.success("SMTP OK. Provide ?email=you@domain to send a test OTP.", null));
-        }
-    }
 }

@@ -1,10 +1,12 @@
 package com.mravel.plan.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MailService {
@@ -22,7 +24,7 @@ public class MailService {
 
             mailSender.send(msg);
         } catch (Exception ex) {
-            System.err.println("[MAIL ERROR] Cannot send invite email: " + ex.getMessage());
+            log.error("[MAIL] Cannot send invite email: {}", ex.getMessage());
         }
     }
 
@@ -41,7 +43,7 @@ public class MailService {
 
             mailSender.send(msg);
         } catch (Exception ex) {
-            System.err.println("[MAIL ERROR] Cannot send request email: " + ex.getMessage());
+            log.error("[MAIL] Cannot send request email: {}", ex.getMessage());
         }
     }
 

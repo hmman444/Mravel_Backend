@@ -20,6 +20,11 @@ public class ChatEventProducer {
     public void publish(ChatMessageEvent event) {
         String key = String.valueOf(event.getConversationId());
         log.debug("[ChatKafka] publish eventType={} convId={}", event.getEventType(), event.getConversationId());
-        kafkaTemplate.send(topic, key, event);
+        kafkaTemplate.send(topic, key, event).whenComplete((res, ex) -> {
+            if (ex != null) {
+                log.error("[ChatKafka] publish failed topic={} key={} eventType={}: {}",
+                        topic, key, event.getEventType(), ex.getMessage(), ex);
+            }
+        });
     }
 }
