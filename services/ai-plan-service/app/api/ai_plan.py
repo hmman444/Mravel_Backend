@@ -155,10 +155,11 @@ def _missing_constraint_fields(constraints) -> list[str]:
     missing: list[str] = []
     if not constraints.destination:
         missing.append("destination")
-    if not constraints.start_date:
-        missing.append("start_date")
-    if not constraints.end_date:
-        missing.append("end_date")
+    # Timing is satisfied by EITHER a trip length (num_days, anchored to today) OR an
+    # explicit date range — we no longer require calendar dates.
+    has_dates = constraints.start_date is not None and constraints.end_date is not None
+    if not constraints.num_days and not has_dates:
+        missing.append("num_days")
     return missing
 
 

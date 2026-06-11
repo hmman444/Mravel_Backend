@@ -384,6 +384,10 @@ public class RestaurantInventoryService {
         LocalDateTime target = LocalDateTime.of(date, time);
         LocalDateTime now = LocalDateTime.now();
 
+        // Phân biệt rõ "đã ở quá khứ" với "chưa đủ lead-time" để message dễ hiểu.
+        if (target.isBefore(now)) {
+            throw new IllegalArgumentException("Thời gian đặt bàn đã ở quá khứ, vui lòng chọn lại ngày/giờ");
+        }
         if (target.isBefore(now.plusMinutes(lead))) {
             throw new IllegalArgumentException("Phải đặt trước tối thiểu " + lead + " phút");
         }

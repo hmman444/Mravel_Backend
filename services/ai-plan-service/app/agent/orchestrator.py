@@ -63,7 +63,29 @@ _SYSTEM_PROMPT = """You are Mravel's AI travel planner for Vietnamese users.
   máy, vé xe khách) and ANY time-sensitive fact. Catalog FIRST, web second. Always
   put the CURRENT year (from primer) in the query and cite the returned url.
 - `view_my_plans()` — only when user references prior trips
+- `search_plans(query?, destinations?, budget_max_vnd?, days_min?, days_max?)` — search
+  EXISTING itineraries the user can access (own + public/friends'/shared), like the /plans
+  search bar. Use it when they want to FIND or REFERENCE ready-made plans, not venues.
 - `finalize_draft(...)` — terminal: writes a draft for the user to approve
+
+# Finding existing plans (search_plans) — NOT the same as building a draft
+When the user asks to FIND / look up existing itineraries — "tìm lịch trình đi Đà Nẵng
+3 ngày 2 đêm với kinh phí 10 triệu", "có plan Đà Lạt nào không", "gợi ý lịch trình có sẵn" —
+call `search_plans` (NOT search_places/search_hotels — those return venues, not whole plans).
+Translate their ask into filters, but search a bit BROADLY so near-matches surface for you
+to judge — an over-tight filter returns nothing to analyse:
+  - place → `query` and/or `destinations` (the main signal).
+  - "dưới 10 triệu" → `budget_max_vnd` = 10000000 (budget is a real constraint, keep it).
+  - số ngày → widen by ±1: for "3 ngày" use days_min=2, days_max=4 (so a 4-day plan still
+    shows and you can flag it as slightly longer). Skip the days filter entirely if unsure.
+Then:
+  - Reply with each plan as a Markdown link using its `mravel_url`, e.g.
+    "- [Lịch trình 4 ngày tại Đà Nẵng cho 2 người](/plans/123) — 4 ngày, ~800k, của Đỗ Luân"
+  - Give a one-line description per plan (days, budget, destinations, author).
+  - Then ANALYSE which fits best for what they asked (matching days/budget/destination/vibe),
+    and note mismatches honestly (e.g. "cái này 4 ngày, hơi dài hơn yêu cầu 3 ngày của bạn").
+  - If `search_plans` returns 0 items, say there's no matching plan yet and offer to build a
+    new draft for them. Do NOT confuse this with `finalize_draft` — searching just lists links.
 
 # Source of truth — search order
 1. ALWAYS try the catalog tools first (search_hotels / search_restaurants /
@@ -119,13 +141,24 @@ catalog lookups, NOT small talk. You do NOT need a finished draft to answer them
 
 # State tracking — READ THIS
 - "Known constraints so far" in the context primer is your authoritative memory.
-- NEVER ask for a fact that is already filled there (destination, dates, travelers,
+- NEVER ask for a fact that is already filled there (destination, trip length, travelers,
   budget, pace). Re-asking known facts is the #1 thing to avoid.
 - The moment the user gives a new fact, call `set_constraints` with ONLY that fact
   (omit unknown fields). You may call it together with other tools in the same turn.
-- Only the destination, start_date and end_date are required to build an itinerary.
+- Only the destination + trip length (số ngày) are required to build an itinerary.
   Budget / interests / pace are nice-to-have — if the user is vague ("đầy đủ cho tôi",
   "tùy bạn"), pick sensible defaults and proceed; do NOT keep interrogating.
+
+# TIMING — ask "đi mấy ngày", NEVER "từ ngày nào đến ngày nào"
+- To learn the duration, ask how many DAYS the trip is, e.g. "Bạn dự định đi mấy ngày?
+  (ví dụ 3-4 ngày)". Record it via `set_constraints(num_days=…)`. If they answer a range
+  ("3-4 ngày"), pick one sensible number. Do NOT ask for calendar start/end dates.
+- The user does NOT need to give a calendar date. If they don't mention specific dates,
+  DEFAULT the trip to start TODAY (the date in the primer) — set start_date = today and
+  end_date = today + (num_days − 1) when you `finalize_draft`. Never block planning on a
+  missing date and never ask "đi từ ngày nào".
+- ONLY record start_date/end_date when the user themselves names actual dates ("đi 12/6",
+  "từ 12 đến 15/6", "cuối tuần này"). Otherwise leave them to the today-anchored default.
 
 Tools return at most 8 items each. Call them as many times as you need —
 search restaurants once for breakfast (bánh canh / phở), again for cafe,
@@ -817,12 +850,15 @@ def _format_primer(
         f"không') PHẢI tra qua web_search với năm {today.year}, KHÔNG lấy từ trí nhớ.",
         "Known constraints so far:",
         f"- destination: {constraints.destination or 'unknown'}",
-        f"- start_date: {constraints.start_date or 'unknown'}",
-        f"- end_date: {constraints.end_date or 'unknown'}",
+        f"- num_days (trip length): {constraints.num_days or 'unknown'}",
+        f"- start_date: {constraints.start_date or 'unknown (defaults to today if user gives no date)'}",
+        f"- end_date: {constraints.end_date or 'unknown (defaults to today + num_days - 1)'}",
         f"- travelers: {constraints.travelers}",
         f"- budget_total_vnd: {constraints.budget_total_vnd or 'unknown'}",
         f"- interests: {', '.join(constraints.interests) if constraints.interests else 'unknown'}",
         f"- pace: {constraints.pace or 'unknown'}",
+        "Timing rule: ask how many DAYS (num_days), not calendar dates. If no date is given, "
+        f"anchor the trip to start TODAY ({today.isoformat()}).",
     ]
     if prior_draft:
         lines.append("")
@@ -875,8 +911,13 @@ def _default_narrative(draft: PlanDraft) -> str:
 def _clarification_text(constraints: Constraints) -> str:
     if not constraints.destination:
         return "Bạn muốn đi đâu nhỉ? Mình có thể gợi ý vài điểm theo sở thích nếu bạn chưa chốt."
-    if not constraints.start_date or not constraints.end_date:
-        return f"Mình đã ghi nhận điểm đến {constraints.destination}. Bạn dự định đi từ ngày nào đến ngày nào?"
+    has_dates = constraints.start_date is not None and constraints.end_date is not None
+    if not constraints.num_days and not has_dates:
+        return (
+            f"Mình đã ghi nhận điểm đến {constraints.destination}. "
+            "Bạn dự định đi mấy ngày? (ví dụ 3-4 ngày) — nếu không nói ngày cụ thể, "
+            "mình mặc định tính từ hôm nay nhé."
+        )
     return "Bạn cho mình thêm một chút thông tin để mình tìm được lựa chọn phù hợp nhé."
 
 
@@ -888,6 +929,7 @@ _CANNED_FALLBACK_MARKERS = (
     "bạn cho mình thêm một chút thông tin",
     "bạn muốn đi đâu nhỉ",
     "đi từ ngày nào đến ngày nào",
+    "bạn dự định đi mấy ngày",
 )
 
 

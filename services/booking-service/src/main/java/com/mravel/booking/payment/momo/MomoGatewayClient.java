@@ -121,6 +121,12 @@ public class MomoGatewayClient {
             String momoBody = ex.getResponseBodyAsString();
             log.error("[MoMo] error status={}, body={}", ex.getStatusCode(), momoBody);
             throw new IllegalStateException("MoMo declined: " + momoBody, ex);
+        } catch (org.springframework.web.client.RestClientException ex) {
+            // Không kết nối được sandbox MoMo (timeout / DNS / offline) -> message rõ ràng
+            // thay vì lỗi 500 "Đã xảy ra lỗi hệ thống".
+            log.error("[MoMo] connection error: {}", ex.getMessage());
+            throw new IllegalStateException(
+                    "Không kết nối được cổng thanh toán MoMo, vui lòng thử lại sau.", ex);
         }
     }
 

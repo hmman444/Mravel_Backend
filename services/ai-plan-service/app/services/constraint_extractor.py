@@ -90,10 +90,17 @@ def _normalize(data: Dict[str, Any], prior: Constraints) -> Constraints:
     except (TypeError, ValueError):
         budget = prior.budget_total_vnd
 
+    num_days_raw = data.get("num_days", prior.num_days)
+    try:
+        num_days = max(1, int(num_days_raw)) if num_days_raw is not None else None
+    except (TypeError, ValueError):
+        num_days = prior.num_days
+
     return Constraints(
         destination=data.get("destination") or prior.destination,
         start_date=_date(data.get("start_date")) or prior.start_date,
         end_date=_date(data.get("end_date")) or prior.end_date,
+        num_days=num_days,
         travelers=travelers,
         budget_total_vnd=budget,
         interests=[str(i) for i in interests],

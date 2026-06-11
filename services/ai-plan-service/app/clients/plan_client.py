@@ -83,6 +83,61 @@ class PlanClient:
             if owns_client:
                 await client.aclose()
 
+    async def search_plans(
+        self,
+        bearer_token: str,
+        *,
+        q: Optional[str] = None,
+        destinations: Optional[list] = None,
+        budget_min: Optional[int] = None,
+        budget_max: Optional[int] = None,
+        days_min: Optional[int] = None,
+        days_max: Optional[int] = None,
+        size: int = 8,
+    ) -> Dict[str, Any]:
+        """Read-only: search the plans the caller can access (own + public/friends'/
+        shared), mirroring the /plans search bar. plan-service scopes visibility to the
+        bearer's user id, so a viewer never sees plans they can't access. Returns the
+        PlanSearchResponse `data` ({query, plans:{items,...}, users}).
+        """
+        params: Dict[str, Any] = {"size": size, "sortBy": "RELEVANCE", "userLimit": 0}
+        if q:
+            params["q"] = q
+        if budget_min is not None:
+            params["budgetMin"] = budget_min
+        if budget_max is not None:
+            params["budgetMax"] = budget_max
+        if days_min is not None:
+            params["daysMin"] = days_min
+        if days_max is not None:
+            params["daysMax"] = days_max
+        if destinations:
+            params["destinations"] = destinations  # repeated query param (List<String>)
+
+        headers = {
+            "Authorization": f"Bearer {bearer_token}",
+            "Content-Type": "application/json",
+        }
+        owns_client = self._client is None
+        client = self._client or httpx.AsyncClient(timeout=self._timeout)
+        try:
+            response = await client.get(
+                f"{self._base_url}/api/plans/search", headers=headers, params=params
+            )
+            if response.status_code in (401, 403):
+                raise UpstreamError(f"plan-service rejected token ({response.status_code})")
+            if response.status_code >= 500:
+                raise UpstreamError(f"plan-service {response.status_code} on /api/plans/search")
+            payload = response.json()
+            if not payload.get("success", True):
+                raise UpstreamError(payload.get("message", "plan-service /search failed"))
+            return payload.get("data") or {}
+        except httpx.HTTPError as exc:
+            raise UpstreamError(f"plan-service unreachable: {exc}") from exc
+        finally:
+            if owns_client:
+                await client.aclose()
+
     async def get_board(self, bearer_token: str, plan_id: int) -> Dict[str, Any]:
         """Read the full board (BoardResponse). plan-service seeds one DAY list per
         day in the plan's date range at create time, so this is how we discover the

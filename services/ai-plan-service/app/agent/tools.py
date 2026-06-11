@@ -34,11 +34,13 @@ def tool_definitions() -> List[ToolDefinition]:
             name="set_constraints",
             description=(
                 "Record or update the trip facts you have learned from the conversation. "
-                "Call this EVERY time the user reveals or changes a fact (destination, dates, "
-                "number of travelers, budget, interests, pace) — even if you also ask a "
-                "follow-up question in the same turn. Only include fields you actually know; "
-                "omit unknown ones (do NOT guess or invent). This is the single source of truth "
-                "for the trip, so the system never re-asks something you already captured here."
+                "Call this EVERY time the user reveals or changes a fact (destination, trip "
+                "length, dates, number of travelers, budget, interests, pace) — even if you "
+                "also ask a follow-up question in the same turn. Only include fields you "
+                "actually know; omit unknown ones (do NOT guess or invent). This is the single "
+                "source of truth for the trip, so the system never re-asks something you "
+                "already captured here. For TIMING prefer `num_days` (how many days the user "
+                "wants) — only fill start_date/end_date when the user names actual calendar dates."
             ),
             input_schema={
                 "type": "object",
@@ -47,8 +49,23 @@ def tool_definitions() -> List[ToolDefinition]:
                         "type": "string",
                         "description": "City/area, e.g. 'Đà Nẵng'. Omit if unknown.",
                     },
-                    "start_date": {"type": "string", "description": "YYYY-MM-DD. Omit if unknown."},
-                    "end_date": {"type": "string", "description": "YYYY-MM-DD. Omit if unknown."},
+                    "num_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": (
+                            "Trip length in days, e.g. 3 for '3 ngày 2 đêm' or '3 ngày 3 đêm'. "
+                            "If the user gives a range ('3-4 ngày'), pick one sensible number. "
+                            "Use this instead of asking for calendar dates."
+                        ),
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. ONLY when the user names an explicit calendar date; omit otherwise.",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. ONLY when the user names an explicit calendar date; omit otherwise.",
+                    },
                     "travelers": {"type": "integer", "minimum": 1},
                     "budget_total_vnd": {"type": "integer", "minimum": 0},
                     "interests": {"type": "array", "items": {"type": "string"}},
@@ -197,6 +214,51 @@ def tool_definitions() -> List[ToolDefinition]:
                     "max_results": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
                 },
                 "required": [],
+            },
+        ),
+        ToolDefinition(
+            name="search_plans",
+            description=(
+                "Search EXISTING travel itineraries the current user can access — their own "
+                "plans PLUS public / friends' / shared community plans, exactly like the "
+                "/plans search bar. Use this when the user wants to FIND or REFERENCE ready-made "
+                "plans, e.g. 'tìm lịch trình đi Đà Nẵng 3 ngày 2 đêm với kinh phí 10 triệu', "
+                "'có plan nào đi Đà Lạt không'. This is DIFFERENT from search_places / "
+                "search_hotels (those find individual venues, not whole itineraries). "
+                "Returns each plan's title, destinations, số ngày (days), budget, author and a "
+                "`mravel_url` link. After calling, reply with the links + a short explanation of "
+                "each, then analyse which one best fits what the user asked for (matching days, "
+                "budget, destination, vibe)."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "Free-text keyword, e.g. 'Đà Nẵng biển', 'Đà Lạt chill'. Vietnamese "
+                            "WITH diacritics is fine. Leave empty to browse with only the filters."
+                        ),
+                    },
+                    "destinations": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional destination-name filter, e.g. ['Đà Nẵng'].",
+                    },
+                    "budget_min_vnd": {"type": "integer", "minimum": 0, "description": "Lower budget bound in VND."},
+                    "budget_max_vnd": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Upper budget cap in VND, e.g. 10000000 for 'kinh phí 10 triệu'.",
+                    },
+                    "days_min": {"type": "integer", "minimum": 1, "description": "Min trip length in days."},
+                    "days_max": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Max trip length in days, e.g. 3 for '3 ngày 2 đêm'.",
+                    },
+                    "max_results": {"type": "integer", "minimum": 1, "maximum": 20, "default": 8},
+                },
             },
         ),
         ToolDefinition(
@@ -368,6 +430,14 @@ def catalog_web_url(kind: str, slug: Optional[str], base_url: str = "") -> Optio
     return f"{(base_url or '').rstrip('/')}{path}/{slug}"
 
 
+def plan_web_url(plan_id: Any, base_url: str = "") -> Optional[str]:
+    """Build a clickable link to a plan's board page (frontend route `/plans/:planId`).
+    Relative when base_url is empty so the SPA resolves it against its own origin."""
+    if plan_id is None or str(plan_id).strip() == "":
+        return None
+    return f"{(base_url or '').rstrip('/')}/plans/{plan_id}"
+
+
 # Hard cap on items per tool response — keeps the model's context lean.
 _MAX_ITEMS_PER_TOOL = 8
 
@@ -458,6 +528,36 @@ def _summarise_place(item: Dict[str, Any], base_url: str = "") -> Dict[str, Any]
             "avg_rating": item.get("avgRating"),
             "province": item.get("provinceName"),
             "cover_image_url": item.get("coverImageUrl"),
+        }
+    )
+
+
+def _summarise_plan_search_item(item: Dict[str, Any], base_url: str = "") -> Dict[str, Any]:
+    """Trim a PlanFeedItem from /api/plans/search to what the model needs to present
+    the plan: title, link, length, budget, destinations, author."""
+    destinations = item.get("destinations") or []
+    if isinstance(destinations, list):
+        dest_names = [d.get("name") if isinstance(d, dict) else str(d) for d in destinations]
+        dest_names = [d for d in dest_names if d]
+    else:
+        dest_names = []
+    author = item.get("author") if isinstance(item.get("author"), dict) else {}
+    return _drop_none(
+        {
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "mravel_url": plan_web_url(item.get("id"), base_url),
+            "days": item.get("days"),
+            "start_date": item.get("startDate"),
+            "end_date": item.get("endDate"),
+            "destinations": dest_names or None,
+            "budget_total_vnd": item.get("budgetTotal"),
+            "budget_per_person_vnd": item.get("budgetPerPerson"),
+            "author": author.get("name"),
+            "views": item.get("views"),
+            "visibility": item.get("visibility"),
+            "description": item.get("description"),
+            "cover_image_url": item.get("thumbnail"),
         }
     )
 
@@ -629,6 +729,40 @@ class ToolDispatcher:
             items = data.get("items") if isinstance(data, dict) else None
             items = items or []
             return {"items": [_summarise_user_plan(i) for i in items], "count": len(items)}
+        if tool_name == "search_plans":
+            if not self._plan or not self._bearer:
+                return {"items": [], "count": 0, "note": "plan-service not available in this context"}
+            limit = min(int(arguments.get("max_results") or 8), _MAX_ITEMS_PER_TOOL)
+            raw_dests = arguments.get("destinations")
+            destinations = (
+                [str(d) for d in raw_dests if str(d).strip()]
+                if isinstance(raw_dests, list) and raw_dests
+                else None
+            )
+
+            def _int(value: Any) -> Optional[int]:
+                try:
+                    return int(value) if value is not None else None
+                except (TypeError, ValueError):
+                    return None
+
+            try:
+                data = await self._plan.search_plans(
+                    self._bearer,
+                    q=str(arguments.get("query") or "").strip() or None,
+                    destinations=destinations,
+                    budget_min=_int(arguments.get("budget_min_vnd")),
+                    budget_max=_int(arguments.get("budget_max_vnd")),
+                    days_min=_int(arguments.get("days_min")),
+                    days_max=_int(arguments.get("days_max")),
+                    size=limit,
+                )
+            except UpstreamError as exc:
+                return {"items": [], "count": 0, "error": str(exc)}
+            plans = (data.get("plans") or {}).get("items") if isinstance(data, dict) else None
+            plans = plans or []
+            items = [_summarise_plan_search_item(p, self._web_base_url) for p in plans[:_MAX_ITEMS_PER_TOOL]]
+            return {"items": items, "count": len(items)}
         return {"error": f"Unknown tool: {tool_name}"}
 
 
@@ -660,6 +794,13 @@ def apply_set_constraints(arguments: Dict[str, Any], prior: Constraints) -> Cons
         if len(candidate) >= 2 and sum(c.isalnum() for c in candidate) >= 2:
             destination = candidate
 
+    num_days = prior.num_days
+    if arguments.get("num_days") is not None:
+        try:
+            num_days = max(1, int(arguments["num_days"]))
+        except (TypeError, ValueError):
+            pass
+
     travelers = prior.travelers
     if arguments.get("travelers") is not None:
         try:
@@ -687,6 +828,7 @@ def apply_set_constraints(arguments: Dict[str, Any], prior: Constraints) -> Cons
         destination=destination,
         start_date=_date(arguments.get("start_date"), prior.start_date),
         end_date=_date(arguments.get("end_date"), prior.end_date),
+        num_days=num_days,
         travelers=travelers,
         budget_total_vnd=budget,
         interests=interests,
@@ -716,8 +858,11 @@ def parse_finalize_draft(arguments: Dict[str, Any], constraints: Constraints) ->
     destination = (arguments.get("destination") or constraints.destination or "").strip()
     if not destination:
         raise DraftValidationError("finalize_draft is missing a destination")
-    start_date = _date(arguments.get("start_date"), constraints.start_date)
-    end_date = _date(arguments.get("end_date"), constraints.end_date)
+    # When the user only gave a trip length (num_days), constraints have no calendar
+    # date — anchor to today. resolved_date_range also returns an explicit range as-is.
+    resolved_start, resolved_end = constraints.resolved_date_range()
+    start_date = _date(arguments.get("start_date"), resolved_start)
+    end_date = _date(arguments.get("end_date"), resolved_end)
     if end_date < start_date:
         raise DraftValidationError("finalize_draft start_date must be on or before end_date")
     travelers = int(arguments.get("travelers") or constraints.travelers or 2)
