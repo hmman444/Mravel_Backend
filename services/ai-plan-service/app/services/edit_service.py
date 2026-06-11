@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from app.agent.edits import EditOperation
 from app.clients.plan_client import PlanClient
 from app.models.session import PlanActivityType
+from app.services.catalog_location import catalog_location_fields
 
 logger = logging.getLogger("ai_plan.edit")
 
@@ -86,6 +87,13 @@ def _card_body(op: EditOperation, *, for_create: bool) -> Dict[str, Any]:
             "coverImageUrl": rec.get("coverImageUrl") or rec.get("cover_image_url"),
             "avgRating": rec.get("avgRating") or rec.get("avg_rating"),
         }
+        # Mirror a manual place pick so the FE modal pre-fills the name + location and
+        # the picker auto-focuses this catalog item (hotelLocation/restaurantLocation/…).
+        activity_data.update(
+            catalog_location_fields(
+                op.activity_type, activity_data["recommendation"], address=op.address
+            )
+        )
 
     body: Dict[str, Any] = {}
     if op.text:
