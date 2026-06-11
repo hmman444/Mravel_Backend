@@ -27,4 +27,8 @@ public interface PlanMemberRepository extends JpaRepository<PlanMember, Long> {
 
     @Query("SELECT pm.userId FROM PlanMember pm WHERE pm.plan.id = :planId")
     Set<Long> findUserIdsByPlanId(@Param("planId") Long planId);
+
+    /** Đếm thành viên theo nhiều plan trong 1 query (tránh N+1). [planId, count] */
+    @Query("SELECT pm.plan.id, count(pm) FROM PlanMember pm WHERE pm.plan.id IN :ids GROUP BY pm.plan.id")
+    List<Object[]> countByPlanIds(@Param("ids") List<Long> ids);
 }
