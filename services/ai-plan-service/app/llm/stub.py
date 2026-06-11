@@ -361,8 +361,12 @@ class StubLLMClient(LLMClient):
 
         if not result.get("destination"):
             dest = _parse_destination(user_message)
-            if dest:
-                result["destination"] = dest
+            # Conservative sanity check (no geocoding): a real place name has at least
+            # two alphanumeric characters. Reject empty/whitespace-only or purely
+            # symbolic garbage ("???", "---") so it can't corrupt the constraints —
+            # mirrors apply_set_constraints in app/agent/tools.py.
+            if dest and len(dest.strip()) >= 2 and sum(c.isalnum() for c in dest) >= 2:
+                result["destination"] = dest.strip()
 
         start, end = _parse_dates(user_message, today)
         if start and end:

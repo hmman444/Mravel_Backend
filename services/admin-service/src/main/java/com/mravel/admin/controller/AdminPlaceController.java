@@ -7,6 +7,7 @@ import com.mravel.admin.client.CatalogClient;
 import com.mravel.admin.dto.place.PlaceAdminDtos.UpsertPlaceRequest;
 import com.mravel.common.response.ApiResponse;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -50,7 +51,7 @@ public class AdminPlaceController {
     @PostMapping
     public ResponseEntity<ApiResponse<?>> create(
             @RequestHeader("Authorization") String authorization,
-            @RequestBody UpsertPlaceRequest req) {
+            @Valid @RequestBody UpsertPlaceRequest req) {
         String bearer = extractBearer(authorization);
         return catalogClient.createPlace(req, bearer);
     }
@@ -59,7 +60,7 @@ public class AdminPlaceController {
     public ResponseEntity<ApiResponse<?>> update(
             @RequestHeader("Authorization") String authorization,
             @PathVariable String id,
-            @RequestBody UpsertPlaceRequest req) {
+            @Valid @RequestBody UpsertPlaceRequest req) {
         String bearer = extractBearer(authorization);
         return catalogClient.updatePlace(id, req, bearer);
     }

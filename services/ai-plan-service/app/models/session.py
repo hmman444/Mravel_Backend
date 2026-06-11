@@ -36,10 +36,12 @@ class Constraints(BaseModel):
     pace: Optional[str] = None  # "relaxed" | "balanced" | "packed"
 
     @model_validator(mode="after")
-    def _normalize_date_range(self) -> "Constraints":
+    def _validate_date_range(self) -> "Constraints":
         # An inverted range (end_date < start_date) yields a negative duration and an
-        # empty itinerary. Rather than crash the planning turn (the agent feeds dates
-        # incrementally), normalise by swapping so end_date >= start_date always holds.
+        # empty itinerary. Normalize by swapping so downstream planning always sees a
+        # valid range — raising here would break mid-conversation constraint updates
+        # (apply_set_constraints / constraint_extractor build Constraints incrementally).
+        # The hard, user-facing validation happens at finalize_draft.
         if (
             self.start_date is not None
             and self.end_date is not None
@@ -96,6 +98,17 @@ class DraftActivity(BaseModel):
     route_hint: Optional[str] = None  # "Home tạm - Quán ăn", "HCM - Đà Nẵng"
     distance_text: Optional[str] = None  # "10.3km", "~30km", "500m"
     transport_mode: Optional[str] = None  # "xe máy", "đi bộ", "taxi", "xe khách"
+
+    @model_validator(mode="after")
+    def _validate_non_negative_cost(self) -> "DraftActivity":
+        # A negative cost is never valid (it would understate the trip total and the
+        # plan-service card). Reject it as a validation error rather than silently
+        # storing a bad figure.
+        if self.estimated_cost_vnd < 0:
+            raise ValueError("estimated_cost_vnd must not be negative")
+        if self.unit_price_vnd is not None and self.unit_price_vnd < 0:
+            raise ValueError("unit_price_vnd must not be negative")
+        return self
 
 
 class DraftDay(BaseModel):

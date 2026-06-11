@@ -73,12 +73,16 @@ public class JwtUtil {
         if (token == null) {
             throw new IllegalArgumentException("Token không hợp lệ");
         }
-        return (String) Jwts.parserBuilder()
+        Object role = Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody()
                 .get("role");
+        if (role == null || role.toString().isBlank()) {
+            return null;
+        }
+        return role.toString();
     }
 
     public Long extractUserId(String token) {

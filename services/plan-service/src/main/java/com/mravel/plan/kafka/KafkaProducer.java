@@ -83,7 +83,11 @@ public class KafkaProducer {
                 .inviterUserId(inviterUserId)
                 .createdAt(Instant.now())
                 .build();
-        kafkaTemplate.send(KafkaTopics.PLAN_SHARED, evt.getEventId(), evt);
+        try {
+            kafkaTemplate.send(KafkaTopics.PLAN_SHARED, evt.getEventId(), evt);
+        } catch (Exception e) {
+            log.warn("Failed to publish ShareEvent planId={}: {}", planId, e.getMessage());
+        }
     }
 
     public void publishBoardEvent(PlanBoardEvent event) {

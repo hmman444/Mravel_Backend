@@ -5,11 +5,14 @@ import com.mravel.admin.enums.amenity.AmenityGroup;
 import com.mravel.admin.enums.amenity.AmenityScope;
 import com.mravel.admin.enums.amenity.AmenitySection;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 public class AmenityUpsertRequest {
     private String code;
+
+    @NotBlank
     private String name;
     private AmenityScope scope;
     private AmenityGroup group;

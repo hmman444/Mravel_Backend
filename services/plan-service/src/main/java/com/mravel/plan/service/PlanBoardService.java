@@ -479,6 +479,9 @@ public class PlanBoardService {
         if (dto.getActualCost() != null && dto.getActualCost() < 0) {
             throw new IllegalArgumentException("Chi phí thực tế không được âm.");
         }
+        if (dto.getBudgetAmount() != null && dto.getBudgetAmount() < 0) {
+            throw new IllegalArgumentException("Ngân sách không được âm.");
+        }
 
         // currency
         if (dto.getCurrencyCode() != null && !dto.getCurrencyCode().isBlank()) {
@@ -501,13 +504,21 @@ public class PlanBoardService {
         // Extra costs
         card.getExtraCosts().clear();
         if (dto.getExtraCosts() != null) {
-            dto.getExtraCosts().forEach(e -> card.getExtraCosts().add(
-                    ExtraCost.builder()
-                            .reason(e.getReason())
-                            .type(e.getType())
-                            .estimatedAmount(e.getEstimatedAmount())
-                            .actualAmount(e.getActualAmount())
-                            .build()));
+            dto.getExtraCosts().forEach(e -> {
+                if (e.getEstimatedAmount() != null && e.getEstimatedAmount() < 0) {
+                    throw new IllegalArgumentException("Chi phí phát sinh dự kiến không được âm.");
+                }
+                if (e.getActualAmount() != null && e.getActualAmount() < 0) {
+                    throw new IllegalArgumentException("Chi phí phát sinh thực tế không được âm.");
+                }
+                card.getExtraCosts().add(
+                        ExtraCost.builder()
+                                .reason(e.getReason())
+                                .type(e.getType())
+                                .estimatedAmount(e.getEstimatedAmount())
+                                .actualAmount(e.getActualAmount())
+                                .build());
+            });
         }
 
         if (dto.getActualCost() != null) {

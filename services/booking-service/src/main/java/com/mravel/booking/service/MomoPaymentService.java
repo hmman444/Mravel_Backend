@@ -13,9 +13,11 @@ import com.mravel.booking.repository.PaymentRepository;
 import com.mravel.booking.repository.RestaurantBookingRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MomoPaymentService {
 
     private final HotelBookingService hotelBookingService;
@@ -33,12 +35,17 @@ public class MomoPaymentService {
      * - rồi gọi mark...PaidAndConfirm(booking.getCode(), amount)
      */
     public void handleIpn(MomoIpnRequest body) {
-        if (body == null)
+        if (body == null) {
+            log.warn("MoMo IPN ignored: empty body");
             return;
+        }
 
         Integer resultCode = body.getResultCode();
         if (resultCode == null || resultCode != 0) {
-            return; // fail/không rõ -> bỏ qua (tuỳ bạn log)
+            // fail/không rõ -> bỏ qua (không mark paid)
+            log.warn("MoMo IPN non-success ignored: orderId={}, resultCode={}, message={}",
+                    body.getOrderId(), resultCode, body.getMessage());
+            return;
         }
 
         String orderId = trim(body.getOrderId());
@@ -87,6 +94,7 @@ public class MomoPaymentService {
             return;
         }
 
+        log.warn("MoMo IPN booking not found for orderId={}", orderId);
         throw new IllegalArgumentException("Không tìm thấy booking theo orderId=" + orderId);
     }
 

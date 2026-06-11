@@ -21,6 +21,7 @@ import com.mravel.booking.payment.PaymentMethodUtils;
 import com.mravel.booking.dto.ResumePaymentDTO;
 import com.mravel.booking.repository.HotelBookingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class HotelBookingService {
 
     private static final int FREE_CANCEL_MINUTES = 30;
@@ -262,35 +264,45 @@ public class HotelBookingService {
         String thumb = (owner != null) ? owner.thumbnailUrl() : null;
 
         if (confirmed.getUserId() != null) {
-            Map<String, Object> data = new HashMap<>();
-            data.put("bookingCode", confirmed.getCode());
-            data.put("bookingType", "HOTEL");
-            data.put("hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "");
-            data.put("deepLink", "/my-bookings");
-            if (thumb != null) data.put("thumbnailUrl", thumb);
-            notificationClient.createNotification(
-                    confirmed.getUserId(), null,
-                    NotificationTypes.BOOKING_CONFIRMED,
-                    "Đặt phòng thành công",
-                    "Booking " + confirmed.getCode() + " (" + confirmed.getHotelName() + ") đã được xác nhận",
-                    data);
+            try {
+                Map<String, Object> data = new HashMap<>();
+                data.put("bookingCode", confirmed.getCode());
+                data.put("bookingType", "HOTEL");
+                data.put("hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "");
+                data.put("deepLink", "/my-bookings");
+                if (thumb != null) data.put("thumbnailUrl", thumb);
+                notificationClient.createNotification(
+                        confirmed.getUserId(), null,
+                        NotificationTypes.BOOKING_CONFIRMED,
+                        "Đặt phòng thành công",
+                        "Booking " + confirmed.getCode() + " (" + confirmed.getHotelName() + ") đã được xác nhận",
+                        data);
+            } catch (Exception ex) {
+                // Notification là phụ - không được rollback booking đã CONFIRMED.
+                log.warn("Failed to notify guest for confirmed booking {}: {}", confirmed.getCode(), ex.getMessage());
+            }
         }
 
         // Notify the hotel owner (partner) of the new confirmed booking.
         if (owner != null && owner.partnerId() != null) {
-            Map<String, Object> pdata = new HashMap<>();
-            pdata.put("bookingCode", confirmed.getCode());
-            pdata.put("bookingType", "HOTEL");
-            pdata.put("hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "");
-            pdata.put("deepLink", "/partner/bookings");
-            if (thumb != null) pdata.put("thumbnailUrl", thumb);
-            notificationClient.createNotification(
-                    owner.partnerId(), confirmed.getUserId(),
-                    NotificationTypes.BOOKING_NEW_FOR_PARTNER,
-                    "Đơn đặt phòng mới",
-                    "Bạn có đơn đặt phòng mới " + confirmed.getCode()
-                            + (confirmed.getHotelName() != null ? " tại " + confirmed.getHotelName() : ""),
-                    pdata);
+            try {
+                Map<String, Object> pdata = new HashMap<>();
+                pdata.put("bookingCode", confirmed.getCode());
+                pdata.put("bookingType", "HOTEL");
+                pdata.put("hotelName", confirmed.getHotelName() != null ? confirmed.getHotelName() : "");
+                pdata.put("deepLink", "/partner/bookings");
+                if (thumb != null) pdata.put("thumbnailUrl", thumb);
+                notificationClient.createNotification(
+                        owner.partnerId(), confirmed.getUserId(),
+                        NotificationTypes.BOOKING_NEW_FOR_PARTNER,
+                        "Đơn đặt phòng mới",
+                        "Bạn có đơn đặt phòng mới " + confirmed.getCode()
+                                + (confirmed.getHotelName() != null ? " tại " + confirmed.getHotelName() : ""),
+                        pdata);
+            } catch (Exception ex) {
+                // Notification là phụ - không được rollback booking đã CONFIRMED.
+                log.warn("Failed to notify partner for confirmed booking {}: {}", confirmed.getCode(), ex.getMessage());
+            }
         }
 
         return confirmed;

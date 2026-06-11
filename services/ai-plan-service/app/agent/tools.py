@@ -713,9 +713,13 @@ def parse_finalize_draft(arguments: Dict[str, Any], constraints: Constraints) ->
             raise DraftValidationError(f"Invalid date value: {value!r}")
         return fallback
 
-    destination = arguments.get("destination") or constraints.destination or ""
+    destination = (arguments.get("destination") or constraints.destination or "").strip()
+    if not destination:
+        raise DraftValidationError("finalize_draft is missing a destination")
     start_date = _date(arguments.get("start_date"), constraints.start_date)
     end_date = _date(arguments.get("end_date"), constraints.end_date)
+    if end_date < start_date:
+        raise DraftValidationError("finalize_draft start_date must be on or before end_date")
     travelers = int(arguments.get("travelers") or constraints.travelers or 2)
 
     days_payload = arguments.get("days") or []
@@ -743,6 +747,10 @@ def parse_finalize_draft(arguments: Dict[str, Any], constraints: Constraints) ->
                     recommendation = None
 
             cost = int(raw_act.get("estimated_cost_vnd") or 0)
+            if cost < 0:
+                raise DraftValidationError(
+                    f"activity '{raw_act.get('title') or '?'}' has a negative cost"
+                )
             total_cost += cost
             activities.append(
                 DraftActivity(

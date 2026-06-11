@@ -9,6 +9,7 @@ import com.mravel.booking.repository.PaymentRepository;
 import com.mravel.booking.repository.RestaurantBookingRepository;
 import com.mravel.booking.repository.HotelBookingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class VnpayPaymentService {
 
   private final VnpayGatewayClient vnpayGatewayClient;
@@ -158,7 +160,8 @@ public class VnpayPaymentService {
       long raw = Long.parseLong(s);
       return BigDecimal.valueOf(raw).divide(BigDecimal.valueOf(100));
     } catch (Exception e) {
-      return null;
+      log.warn("Invalid VNPay amount: {}", vnpAmount);
+      throw new IllegalArgumentException("Invalid VNPay amount: " + vnpAmount);
     }
   }
 

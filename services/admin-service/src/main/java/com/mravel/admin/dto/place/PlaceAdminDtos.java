@@ -11,15 +11,18 @@ import com.mravel.admin.enums.place.PriceLevel;
 import com.mravel.admin.enums.place.TagType;
 import com.mravel.admin.enums.place.VenueType;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
 public class PlaceAdminDtos {
 
         public record UpsertPlaceRequest(
                         Boolean active,
-                        PlaceKind kind,
+                        @NotNull PlaceKind kind,
                         VenueType venueType,
                         String parentSlug,
 
-                        Map<String, String> name,
+                        @NotEmpty Map<String, String> name,
                         String slug,
                         Map<String, String> shortDescription,
                         Map<String, String> description,

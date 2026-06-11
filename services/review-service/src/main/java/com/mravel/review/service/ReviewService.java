@@ -297,14 +297,15 @@ public class ReviewService {
                     .stream()
                     .filter(d -> d.getCode().equalsIgnoreCase(input.getAspectCode()))
                     .findFirst()
-                    .ifPresent(def -> {
+                    .ifPresentOrElse(def -> {
                         ReviewAspect aspect = ReviewAspect.builder()
                                 .review(review)
                                 .definition(def)
                                 .comment(input.getComment())
                                 .build();
                         reviewAspectRepository.save(aspect);
-                    });
+                    }, () -> log.warn("Bỏ qua aspect không xác định: code={} cho category={}",
+                            input.getAspectCode(), review.getTargetType()));
         }
     }
 

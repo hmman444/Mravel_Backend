@@ -26,6 +26,10 @@ public class PlanBoardEventV2Listener {
             PlanBoardEventV2 event = objectMapper.readValue(messageJson, PlanBoardEventV2.class);
 
             Long planId = event.getPlanId();
+            if (planId == null) {
+                log.warn("[PlanBoardEventV2Listener] planId is null, skipping: {}", messageJson);
+                return;
+            }
             String destination = "/topic/plans/" + planId + "/board/v2";
 
             // Measure delivery lag using event timestamp

@@ -9,6 +9,7 @@ per-op (one bad op doesn't abort the rest) and reported back to the user.
 import json
 import logging
 import uuid
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from app.agent.edits import EditOperation
@@ -204,6 +205,15 @@ class EditService:
                 await self._plan.update_plan_title(bearer, plan_id, op.title)
                 done.append("title")
             if op.start_date and op.end_date:
+                # Reject an inverted range before writing — plan-service would store a
+                # negative-duration plan. Parse failures fall through to plan-service.
+                try:
+                    if date.fromisoformat(op.start_date[:10]) > date.fromisoformat(op.end_date[:10]):
+                        raise RuntimeError(
+                            "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc."
+                        )
+                except ValueError:
+                    pass
                 await self._plan.update_plan_dates(bearer, plan_id, op.start_date, op.end_date)
                 done.append("dates")
             if op.budget_total_vnd is not None:

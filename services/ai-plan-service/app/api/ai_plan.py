@@ -517,6 +517,22 @@ async def stream_regenerate(
         raise DomainError(
             "Constraints incomplete — send a planning message first to fill destination and dates"
         )
+    # Nothing to regenerate until a draft exists — regenerate means "try another
+    # variant of the current plan", not "start one".
+    if session.draft is None:
+        raise DomainError(
+            "Chưa có bản nháp để tạo lại. Hãy chat với AI để dựng plan trước."
+        )
+    # Guard a double-click / duplicate consecutive regenerate: if the most recent
+    # turn is an as-yet-unanswered [regenerate] request, one is already in flight —
+    # running a second concurrently would interleave and drop turns in the in-memory
+    # session. Reject the duplicate instead.
+    if (
+        session.messages
+        and session.messages[-1].role == ChatRole.USER
+        and session.messages[-1].content.startswith("[regenerate]")
+    ):
+        raise DomainError("Đang tạo lại bản nháp, vui lòng đợi kết quả trước khi thử lại.")
 
     instruction = (body.instructions or "").strip() or "Hãy thử một phương án khác."
     session.messages.append(
@@ -653,6 +669,9 @@ async def apply_edits(
         raise DomainError("Phiên này không gắn với kế hoạch nào để chỉnh sửa.")
     if not session.pending_edits:
         raise DomainError("Chưa có thay đổi nào để áp dụng. Hãy yêu cầu AI chỉnh sửa trước.")
+    # Snapshot the exact proposal we are about to apply so we only clear THIS set
+    # afterwards — if a newer proposal lands mid-apply we must not clobber it.
+    applied_edits = list(session.pending_edits)
 
     # Re-verify edit permission at write time (role may have been revoked after the
     # session opened). plan-service still enforces per-op, but this fails fast with a
@@ -675,10 +694,15 @@ async def apply_edits(
     if failed:
         summary += f" {len(failed)} thay đổi lỗi — bạn xem lại nhé."
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=summary)
+    # Re-read the session: a concurrent edit-stream may have appended a new proposal
+    # (or messages) while we awaited the apply above. Append onto the freshest copy.
+    session = store.get(session_id, user.id)
     session.messages.append(assistant_msg)
     # Clear pending edits only after the apply succeeded and all post-processing is
-    # done — so a failure on any step above doesn't silently drop the proposed edits.
-    session.pending_edits = []  # consumed
+    # done — and only if they're still the exact set we applied. If a newer proposal
+    # arrived mid-apply, leave it untouched so it isn't silently dropped.
+    if session.pending_edits == applied_edits:
+        session.pending_edits = []  # consumed
     store.save(session)
 
     return ApiResponse.ok(
