@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 
 from app.agent.edits import parse_operations
+from app.agent.links import linkify_catalog_links
 from app.agent.orchestrator import AgentOrchestrator
 from app.api.dependencies import (
     get_agent_orchestrator,
@@ -245,6 +246,7 @@ async def send_message(
     if draft is not None:
         session.draft = draft
 
+    narrative = linkify_catalog_links(narrative)
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=narrative)
     session.messages.append(assistant_msg)
     store.save(session)
@@ -318,7 +320,7 @@ async def _consume_agent_stream(
                     {"draft": json.loads(final_draft.model_dump_json())},
                 )
             elif kind == "assistant_message":
-                final_text = ev.get("text", "") or final_text
+                final_text = linkify_catalog_links(ev.get("text", "")) or final_text
                 yield _sse_event("assistant_message", {"text": final_text})
             elif kind == "constraints_updated":
                 final_constraints = ev.get("constraints") or final_constraints
@@ -395,7 +397,7 @@ async def _consume_edit_stream(
                 operations = ev.get("operations") or []
                 yield _sse_event("edit_proposal", {"operations": operations})
             elif kind == "assistant_message":
-                final_text = ev.get("text", "") or final_text
+                final_text = linkify_catalog_links(ev.get("text", "")) or final_text
                 yield _sse_event("assistant_message", {"text": final_text})
             elif kind == "tool_call":
                 yield _sse_event("tool_call", {"name": ev.get("name"), "arguments": ev.get("arguments")})
@@ -594,6 +596,7 @@ async def regenerate(
     session.constraints = updated_constraints
     if draft is not None:
         session.draft = draft
+    narrative = linkify_catalog_links(narrative)
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=narrative)
     session.messages.append(assistant_msg)
     store.save(session)
