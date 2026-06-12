@@ -46,7 +46,7 @@ class PlanSearchServiceTest {
     void search_withNoFilters_executesWithoutError() {
         PlanFilterRequest filter = PlanFilterRequest.builder().size(10).build();
 
-        SearchHits<PlanDocument> result = service.search(filter, null, List.of(), List.of());
+        SearchHits<PlanDocument> result = service.search(filter, null, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         assertThat(result).isNotNull();
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
@@ -59,7 +59,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -72,7 +72,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -85,7 +85,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -98,7 +98,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -110,7 +110,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -130,7 +130,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 42L, List.of(1L, 2L, 3L), List.of(10L, 11L));
+        service.search(filter, 42L, List.of(1L, 2L, 3L), List.of(10L, 11L), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -139,7 +139,7 @@ class PlanSearchServiceTest {
     void search_withEachSortOption_executesWithoutError() {
         for (String sort : List.of("RELEVANCE", "NEWEST", "MOST_VIEWED", "BUDGET_ASC", "BUDGET_DESC")) {
             PlanFilterRequest filter = PlanFilterRequest.builder().sortBy(sort).size(10).build();
-            service.search(filter, 1L, List.of(), List.of());
+            service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
         }
 
         verify(esOps, times(5)).search(any(NativeQuery.class), eq(PlanDocument.class));
@@ -152,7 +152,7 @@ class PlanSearchServiceTest {
                 .size(10)
                 .build();
 
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -162,7 +162,7 @@ class PlanSearchServiceTest {
         PlanFilterRequest filter = PlanFilterRequest.builder().size(999).build();
 
         // Should not throw — size is clamped to 50 inside the service
-        service.search(filter, 1L, List.of(), List.of());
+        service.search(filter, 1L, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }
@@ -173,7 +173,7 @@ class PlanSearchServiceTest {
 
         // viewerId=null, friendIds=[], memberPlanIds=[] → only PUBLIC clause in
         // visibility gate
-        service.search(filter, null, List.of(), List.of());
+        service.search(filter, null, List.<Long>of(), List.<Long>of(), List.<Long>of(), List.<Long>of());
 
         verify(esOps).search(any(NativeQuery.class), eq(PlanDocument.class));
     }

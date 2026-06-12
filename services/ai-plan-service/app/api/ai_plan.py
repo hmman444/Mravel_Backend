@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 
 from app.agent.edits import parse_operations
+from app.agent.links import linkify_catalog_links
 from app.agent.orchestrator import AgentOrchestrator
 from app.api.dependencies import (
     get_agent_orchestrator,
@@ -155,10 +156,11 @@ def _missing_constraint_fields(constraints) -> list[str]:
     missing: list[str] = []
     if not constraints.destination:
         missing.append("destination")
-    if not constraints.start_date:
-        missing.append("start_date")
-    if not constraints.end_date:
-        missing.append("end_date")
+    # Timing is satisfied by EITHER a trip length (num_days, anchored to today) OR an
+    # explicit date range — we no longer require calendar dates.
+    has_dates = constraints.start_date is not None and constraints.end_date is not None
+    if not constraints.num_days and not has_dates:
+        missing.append("num_days")
     return missing
 
 
@@ -244,6 +246,7 @@ async def send_message(
     if draft is not None:
         session.draft = draft
 
+    narrative = linkify_catalog_links(narrative)
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=narrative)
     session.messages.append(assistant_msg)
     store.save(session)
@@ -317,7 +320,7 @@ async def _consume_agent_stream(
                     {"draft": json.loads(final_draft.model_dump_json())},
                 )
             elif kind == "assistant_message":
-                final_text = ev.get("text", "") or final_text
+                final_text = linkify_catalog_links(ev.get("text", "")) or final_text
                 yield _sse_event("assistant_message", {"text": final_text})
             elif kind == "constraints_updated":
                 final_constraints = ev.get("constraints") or final_constraints
@@ -394,7 +397,7 @@ async def _consume_edit_stream(
                 operations = ev.get("operations") or []
                 yield _sse_event("edit_proposal", {"operations": operations})
             elif kind == "assistant_message":
-                final_text = ev.get("text", "") or final_text
+                final_text = linkify_catalog_links(ev.get("text", "")) or final_text
                 yield _sse_event("assistant_message", {"text": final_text})
             elif kind == "tool_call":
                 yield _sse_event("tool_call", {"name": ev.get("name"), "arguments": ev.get("arguments")})
@@ -517,6 +520,22 @@ async def stream_regenerate(
         raise DomainError(
             "Constraints incomplete — send a planning message first to fill destination and dates"
         )
+    # Nothing to regenerate until a draft exists — regenerate means "try another
+    # variant of the current plan", not "start one".
+    if session.draft is None:
+        raise DomainError(
+            "Chưa có bản nháp để tạo lại. Hãy chat với AI để dựng plan trước."
+        )
+    # Guard a double-click / duplicate consecutive regenerate: if the most recent
+    # turn is an as-yet-unanswered [regenerate] request, one is already in flight —
+    # running a second concurrently would interleave and drop turns in the in-memory
+    # session. Reject the duplicate instead.
+    if (
+        session.messages
+        and session.messages[-1].role == ChatRole.USER
+        and session.messages[-1].content.startswith("[regenerate]")
+    ):
+        raise DomainError("Đang tạo lại bản nháp, vui lòng đợi kết quả trước khi thử lại.")
 
     instruction = (body.instructions or "").strip() or "Hãy thử một phương án khác."
     session.messages.append(
@@ -577,6 +596,7 @@ async def regenerate(
     session.constraints = updated_constraints
     if draft is not None:
         session.draft = draft
+    narrative = linkify_catalog_links(narrative)
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=narrative)
     session.messages.append(assistant_msg)
     store.save(session)
@@ -653,6 +673,9 @@ async def apply_edits(
         raise DomainError("Phiên này không gắn với kế hoạch nào để chỉnh sửa.")
     if not session.pending_edits:
         raise DomainError("Chưa có thay đổi nào để áp dụng. Hãy yêu cầu AI chỉnh sửa trước.")
+    # Snapshot the exact proposal we are about to apply so we only clear THIS set
+    # afterwards — if a newer proposal lands mid-apply we must not clobber it.
+    applied_edits = list(session.pending_edits)
 
     # Re-verify edit permission at write time (role may have been revoked after the
     # session opened). plan-service still enforces per-op, but this fails fast with a
@@ -675,10 +698,15 @@ async def apply_edits(
     if failed:
         summary += f" {len(failed)} thay đổi lỗi — bạn xem lại nhé."
     assistant_msg = ChatMessage(role=ChatRole.ASSISTANT, content=summary)
+    # Re-read the session: a concurrent edit-stream may have appended a new proposal
+    # (or messages) while we awaited the apply above. Append onto the freshest copy.
+    session = store.get(session_id, user.id)
     session.messages.append(assistant_msg)
     # Clear pending edits only after the apply succeeded and all post-processing is
-    # done — so a failure on any step above doesn't silently drop the proposed edits.
-    session.pending_edits = []  # consumed
+    # done — and only if they're still the exact set we applied. If a newer proposal
+    # arrived mid-apply, leave it untouched so it isn't silently dropped.
+    if session.pending_edits == applied_edits:
+        session.pending_edits = []  # consumed
     store.save(session)
 
     return ApiResponse.ok(

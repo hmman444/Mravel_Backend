@@ -46,6 +46,12 @@ public class RestaurantBookingService {
         // 1) validate cơ bản
         if (req == null)
             throw new IllegalArgumentException("req null");
+        if (req.contactName() == null || req.contactName().isBlank())
+            throw new IllegalArgumentException("contactName không được trống");
+        if (req.contactPhone() == null || req.contactPhone().isBlank())
+            throw new IllegalArgumentException("contactPhone không được trống");
+        if (req.contactEmail() == null || req.contactEmail().isBlank())
+            throw new IllegalArgumentException("contactEmail không được trống");
         if (req.restaurantId() == null)
             throw new IllegalArgumentException("Thiếu restaurantId");
         if (req.reservationDate() == null || req.reservationTime() == null)
@@ -233,12 +239,17 @@ public class RestaurantBookingService {
                 data.put("restaurantName", b.getRestaurantName() != null ? b.getRestaurantName() : "");
                 data.put("deepLink", "/my-bookings");
                 if (thumb != null) data.put("thumbnailUrl", thumb);
-                notificationClient.createNotification(
-                        b.getUserId(), null,
-                        NotificationTypes.BOOKING_CONFIRMED,
-                        "Đặt bàn thành công",
-                        "Booking " + b.getCode() + " (" + b.getRestaurantName() + ") đã được xác nhận",
-                        data);
+                try {
+                    notificationClient.createNotification(
+                            b.getUserId(), null,
+                            NotificationTypes.BOOKING_CONFIRMED,
+                            "Đặt bàn thành công",
+                            "Booking " + b.getCode() + " (" + b.getRestaurantName() + ") đã được xác nhận",
+                            data);
+                } catch (Exception ne) {
+                    // Fail-silent: a notification failure must NOT roll back the confirmed booking.
+                    log.warn("[RestaurantBooking] guest notification failed for {}: {}", b.getCode(), ne.getMessage());
+                }
             }
 
             // Notify the restaurant owner (partner) of the new confirmed booking.
@@ -249,13 +260,18 @@ public class RestaurantBookingService {
                 pdata.put("restaurantName", b.getRestaurantName() != null ? b.getRestaurantName() : "");
                 pdata.put("deepLink", "/partner/bookings");
                 if (thumb != null) pdata.put("thumbnailUrl", thumb);
-                notificationClient.createNotification(
-                        owner.partnerId(), b.getUserId(),
-                        NotificationTypes.BOOKING_NEW_FOR_PARTNER,
-                        "Đơn đặt bàn mới",
-                        "Bạn có đơn đặt bàn mới " + b.getCode()
-                                + (b.getRestaurantName() != null ? " tại " + b.getRestaurantName() : ""),
-                        pdata);
+                try {
+                    notificationClient.createNotification(
+                            owner.partnerId(), b.getUserId(),
+                            NotificationTypes.BOOKING_NEW_FOR_PARTNER,
+                            "Đơn đặt bàn mới",
+                            "Bạn có đơn đặt bàn mới " + b.getCode()
+                                    + (b.getRestaurantName() != null ? " tại " + b.getRestaurantName() : ""),
+                            pdata);
+                } catch (Exception ne) {
+                    // Fail-silent: a notification failure must NOT roll back the confirmed booking.
+                    log.warn("[RestaurantBooking] partner notification failed for {}: {}", b.getCode(), ne.getMessage());
+                }
             }
 
         } catch (Exception ex) {

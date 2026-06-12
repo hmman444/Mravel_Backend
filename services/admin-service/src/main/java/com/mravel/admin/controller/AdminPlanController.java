@@ -24,6 +24,37 @@ public class AdminPlanController {
         return planAdminClient.stats(days, extractBearer(authorization));
     }
 
+    /** Tìm kiếm/liệt kê toàn bộ lịch trình (mọi visibility, kể cả đã gỡ). */
+    @GetMapping("/list")
+    public ResponseEntity<ApiResponse<?>> list(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String visibility,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean locked,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        return planAdminClient.listPlans(q, visibility, status, locked, page, size, sort,
+                extractBearer(authorization));
+    }
+
+    /** Chi tiết một lịch trình + báo cáo (xem trước khi gỡ/bật lại). */
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<ApiResponse<?>> detail(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        return planAdminClient.planDetail(id, extractBearer(authorization));
+    }
+
+    /** Bật lại bài đã gỡ. */
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<ApiResponse<?>> restore(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        return planAdminClient.restore(id, extractBearer(authorization));
+    }
+
     @GetMapping("/reports")
     public ResponseEntity<ApiResponse<?>> reports(
             @RequestHeader("Authorization") String authorization,

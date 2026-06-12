@@ -19,6 +19,7 @@ _EXTRACTOR_SYSTEM = (
     "and output a single JSON object that merges them. Schema:\n"
     "{\n"
     '  "destination": string | null,\n'
+    '  "num_days": integer | null,   // trip length, e.g. 3 for "3 ngày 2 đêm"\n'
     '  "start_date": "YYYY-MM-DD" | null,\n'
     '  "end_date": "YYYY-MM-DD" | null,\n'
     '  "travelers": integer (default 2),\n'
@@ -26,8 +27,10 @@ _EXTRACTOR_SYSTEM = (
     '  "interests": [string],\n'
     '  "pace": "relaxed" | "balanced" | "packed" | null\n'
     "}\n"
-    "Rules: preserve prior values unless contradicted; do not invent dates; "
-    "if the user gives a duration in days, anchor start_date 7 days from today if not specified. "
+    "Rules: preserve prior values unless contradicted; do not invent dates. "
+    "For timing, prefer num_days (the number of days the trip lasts). Only fill "
+    "start_date/end_date when the user names an explicit calendar date; otherwise leave "
+    "them null — the planner anchors the start to today. "
     "Output JSON only, no commentary."
 )
 

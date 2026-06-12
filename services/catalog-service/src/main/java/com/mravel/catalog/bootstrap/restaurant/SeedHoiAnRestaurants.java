@@ -44,6 +44,9 @@ import static com.mravel.catalog.utils.RestaurantSeedUtils.*;
 import static com.mravel.catalog.utils.restaurant.Localized.vi;
 import static com.mravel.catalog.utils.restaurant.Localized.of;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Configuration
 @Profile("seed")
 public class SeedHoiAnRestaurants {
@@ -51,21 +54,21 @@ public class SeedHoiAnRestaurants {
     @Bean
     CommandLineRunner seedHoiAnRestaurantsRunner(RestaurantDocRepository repo) {
         return args -> {
-            System.out.println(">>> [SeedHoiAnRestaurants] start");
+            log.info(">>> [SeedHoiAnRestaurants] start");
 
             RestaurantDoc redBean = restaurantRedBeanHoiAn();
             repo.findBySlugAndActiveTrue(redBean.getSlug())
                 .ifPresent(existing -> redBean.setId(existing.getId()));
             repo.save(redBean);
-            System.out.println(">>> upsert: " + redBean.getSlug());
+            log.info(">>> upsert: {}", redBean.getSlug());
 
             RestaurantDoc temple = restaurantTheTempleHoiAn();
             repo.findBySlugAndActiveTrue(temple.getSlug())
                 .ifPresent(existing -> temple.setId(existing.getId()));
             repo.save(temple);
-            System.out.println(">>> upsert: " + temple.getSlug());
+            log.info(">>> upsert: {}", temple.getSlug());
 
-            System.out.println(">>> [SeedHoiAnRestaurants] done");
+            log.info(">>> [SeedHoiAnRestaurants] done");
         };
     }
 

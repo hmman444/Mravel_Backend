@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from app.clients.plan_client import PlanClient
 from app.models.session import DraftActivity, PlanDraft
+from app.services.catalog_location import catalog_location_fields
 
 # Deterministic namespace for idempotency UUID5. Any constant UUID works.
 _IDEM_NAMESPACE = uuid.UUID("8c2a9f55-1d8d-4f4b-9c2a-3f4bbf5d2f01")
@@ -175,6 +176,15 @@ def _activity_to_card_body(activity: DraftActivity, travelers: int = 1) -> Dict[
             "coverImageUrl": rec.cover_image_url,
             "avgRating": rec.avg_rating,
         }
+        # Mirror a manual place pick so the FE modal pre-fills the name + location and
+        # the picker auto-focuses this catalog item (hotelLocation/restaurantLocation/…).
+        activity_data.update(
+            catalog_location_fields(
+                activity.activity_type.value,
+                activity_data["recommendation"],
+                address=activity.address,
+            )
+        )
 
     # Compose a richer human-readable description with address/note when available,
     # so the card body shows useful info even before the frontend renders the JSON.

@@ -19,10 +19,14 @@ public class NotificationEventListener {
     @KafkaListener(topics = "${mravel.topics.notification-events}", groupId = "${spring.kafka.consumer.group-id}")
     public void handle(String messageJson) {
         try {
-            log.info("[NotiKafka] raw={}", messageJson);
+            log.debug("[NotiKafka] raw={}", messageJson);
             NotificationRealtimeEvent event = objectMapper.readValue(messageJson, NotificationRealtimeEvent.class);
 
             Long recipientId = event.getRecipientId();
+            if (recipientId == null) {
+                log.warn("[NotificationEventListener] recipientId is null, skipping: {}", messageJson);
+                return;
+            }
             String destination = "/topic/users/" + recipientId + "/notifications";
 
             messagingTemplate.convertAndSend(destination, event);

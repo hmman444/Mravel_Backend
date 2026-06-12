@@ -1,4 +1,4 @@
-package com.mravel.booking.exception;
+package com.mravel.notification.exception;
 
 import com.mravel.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -7,26 +7,33 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.ResourceAccessException;
 
+/**
+ * Service-local exception advice.
+ * <p>
+ * NotificationServiceApplication only component-scans {@code com.mravel.notification}
+ * (it does NOT include {@code com.mravel.common}), so the shared GlobalExceptionHandler
+ * is inactive here. Without this advice, business/validation errors collapse into the
+ * default Spring 500 ("Đã xảy ra lỗi hệ thống"), hiding the real reason.
+ */
 @Slf4j
 @RestControllerAdvice
-public class BookingGlobalExceptionHandler {
+public class NotificationGlobalExceptionHandler {
 
-    // Xung đột trạng thái nghiệp vụ: hết phòng/bàn, đơn quá hạn, cổng thanh toán từ chối...
+    // Xung đột trạng thái nghiệp vụ.
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalState(IllegalStateException ex) {
-        log.warn("Booking state conflict: {}", ex.getMessage());
+        log.warn("Notification state conflict: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    // Dữ liệu đầu vào không hợp lệ: thiếu trường, ngày sai, payOption sai, giá thiếu...
+    // Dữ liệu đầu vào không hợp lệ: thiếu recipientId, người dùng bị chặn...
     // Trước đây rơi xuống handleOther -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
-        log.warn("Booking bad request: {}", ex.getMessage());
+        log.warn("Notification bad request: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
@@ -35,26 +42,15 @@ public class BookingGlobalExceptionHandler {
     // Body JSON sai định dạng / enum sai / thiếu field bắt buộc khi parse.
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<?>> handleUnreadable(HttpMessageNotReadableException ex) {
-        log.warn("Booking invalid payload: {}", ex.getMessage());
+        log.warn("Notification invalid payload: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
     }
 
-    // Không gọi được service phụ thuộc (catalog kho phòng/bàn hoặc cổng thanh toán):
-    // connection refused / timeout / DNS... -> trước đây thành 500 chung chung.
-    @ExceptionHandler(ResourceAccessException.class)
-    public ResponseEntity<ApiResponse<?>> handleDownstreamUnavailable(ResourceAccessException ex) {
-        log.error("Booking downstream unavailable: {}", ex.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(ApiResponse.error(
-                        "Không kết nối được tới dịch vụ liên quan (kho phòng/bàn hoặc cổng thanh toán). Vui lòng thử lại sau."));
-    }
-
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<ApiResponse<?>> handleSecurity(SecurityException ex) {
-        log.warn("Booking security violation: {}", ex.getMessage());
+        log.warn("Notification security violation: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(ex.getMessage()));
@@ -62,7 +58,7 @@ public class BookingGlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleOther(Exception ex) {
-        log.error("Unexpected booking error", ex);
+        log.error("Unexpected notification error", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Đã xảy ra lỗi hệ thống"));

@@ -4,6 +4,7 @@ import com.mravel.admin.client.CatalogClient;
 import com.mravel.admin.dto.amenity.AmenityUpsertRequest;
 import com.mravel.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;
@@ -17,14 +18,14 @@ public class AdminAmenityController {
     private final CatalogClient catalogClient;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<?>> create(@RequestBody AmenityUpsertRequest req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<?>> create(@Valid @RequestBody AmenityUpsertRequest req, HttpServletRequest request) {
         return catalogClient.createAmenity(req, extractToken(request));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<?>> update(
             @PathVariable String id,
-            @RequestBody AmenityUpsertRequest req,
+            @Valid @RequestBody AmenityUpsertRequest req,
             HttpServletRequest request) {
         return catalogClient.updateAmenity(id, req, extractToken(request));
     }

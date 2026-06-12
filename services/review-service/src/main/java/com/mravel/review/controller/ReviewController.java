@@ -26,10 +26,18 @@ public class ReviewController {
     private final ReviewAspectService reviewAspectService;
     private final CurrentUserService currentUserService;
 
+    private Long requireUserId() {
+        Long userId = currentUserService.getId();
+        if (userId == null) {
+            throw new IllegalArgumentException("Bạn cần đăng nhập để thực hiện thao tác này");
+        }
+        return userId;
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(
             @Valid @RequestBody CreateReviewRequest request) {
-        Long userId = currentUserService.getId();
+        Long userId = requireUserId();
         ReviewResponse review = reviewService.createReview(userId, request);
         return ResponseEntity.ok(ApiResponse.success("Đánh giá thành công", review));
     }
@@ -57,7 +65,7 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<ReviewResponse>> getMyReview(
             @RequestParam TargetType targetType,
             @RequestParam String targetId) {
-        Long userId = currentUserService.getId();
+        Long userId = requireUserId();
         ReviewResponse review = reviewService.getMyReview(userId, targetType, targetId);
         return ResponseEntity.ok(ApiResponse.success("OK", review));
     }
@@ -66,14 +74,14 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<ReviewResponse>> updateReview(
             @PathVariable Long reviewId,
             @Valid @RequestBody UpdateReviewRequest request) {
-        Long userId = currentUserService.getId();
+        Long userId = requireUserId();
         ReviewResponse review = reviewService.updateReview(userId, reviewId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật đánh giá thành công", review));
     }
 
     @DeleteMapping("/{reviewId}")
     public ResponseEntity<ApiResponse<Void>> deleteReview(@PathVariable Long reviewId) {
-        Long userId = currentUserService.getId();
+        Long userId = requireUserId();
         String role = currentUserService.getRole();
         reviewService.deleteReview(userId, role, reviewId);
         return ResponseEntity.ok(ApiResponse.success("Xóa đánh giá thành công", null));
@@ -92,7 +100,7 @@ public class ReviewController {
             @RequestParam String targetId,
             @RequestParam(required = false) String slug,
             @RequestParam(required = false) String name) {
-        Long userId = currentUserService.getId();
+        Long userId = requireUserId();
         boolean eligible = reviewService.canReview(userId, targetType, targetId, slug, name);
         return ResponseEntity.ok(ApiResponse.success("OK", Map.of("eligible", eligible)));
     }

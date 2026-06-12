@@ -1,5 +1,7 @@
 package com.mravel.notification.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.Instant;
@@ -9,9 +11,12 @@ public class NotificationDtos {
     @Getter
     @Setter
     public static class CreateNotificationRequest {
+        @NotNull
         private Long recipientId;
         private Long actorId;
+        @NotBlank
         private String type;
+        @NotBlank
         private String title;
         private String message;
         private Object data; // serialize JSON

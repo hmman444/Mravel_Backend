@@ -290,6 +290,28 @@ def test_stub_path_full_session_flow(stub_client: TestClient) -> None:
     assert fake_plan.renamed
 
 
+def test_stub_path_duration_only_defaults_to_today(stub_client: TestClient) -> None:
+    """User gives a trip length but no calendar date → plan immediately, anchored today
+    (no more 'đi từ ngày nào đến ngày nào' question)."""
+    from datetime import date
+
+    headers = {"Authorization": _bearer()}
+    r = stub_client.post("/api/ai-plan/sessions", json={}, headers=headers)
+    session_id = r.json()["data"]["session_id"]
+
+    r = stub_client.post(
+        f"/api/ai-plan/sessions/{session_id}/messages",
+        json={"content": "Mình muốn đi Đà Nẵng 3 ngày cho 2 người"},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()["data"]
+    assert body["needs_more_info"] is False
+    assert body["constraints"]["num_days"] == 3
+    assert len(body["draft"]["days"]) == 3
+    assert body["draft"]["start_date"] == date.today().isoformat()
+
+
 def test_stub_path_missing_constraints_asks_for_more(stub_client: TestClient) -> None:
     headers = {"Authorization": _bearer()}
     r = stub_client.post("/api/ai-plan/sessions", json={}, headers=headers)

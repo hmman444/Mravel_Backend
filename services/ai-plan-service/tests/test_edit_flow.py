@@ -162,6 +162,12 @@ async def test_edit_card_body_fills_rich_fields():
     assert ad["reason"] == "gần khách sạn"
     assert ad["recommendation"]["slug"] == "banh-canh-nam-pho"
     assert ad["recommendation"]["coverImageUrl"] == "http://x/y.jpg"
+    # A FOOD card with a RESTAURANT recommendation also stores the manual-pick shape so
+    # the picker pre-selects + auto-focuses the catalog restaurant.
+    assert ad["restaurantName"] == "Bánh canh Nam Phổ"
+    assert ad["restaurantLocation"]["type"] == "RESTAURANT"
+    assert ad["restaurantLocation"]["placeId"] == "banh-canh-nam-pho"  # slug fallback
+    assert ad["restaurantLocation"]["fullAddress"].startswith("74 Trưng")
     assert "📍" in body["description"] and "🗺️" in body["description"]
     assert body["startTime"] == "07:30" and body["endTime"] == "08:15"
 

@@ -52,6 +52,39 @@ public class PlanAdminClient {
         }
     }
 
+    /** Tìm kiếm/liệt kê toàn bộ lịch trình cho admin. */
+    public ResponseEntity<ApiResponse<?>> listPlans(String q, String visibility, String status,
+            Boolean locked, int page, int size, String sort, String bearer) {
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + ADMIN_BASE + "/list")
+                .queryParam("page", page).queryParam("size", size);
+        if (q != null && !q.isBlank())
+            b.queryParam("q", q);
+        if (visibility != null && !visibility.isBlank())
+            b.queryParam("visibility", visibility);
+        if (status != null && !status.isBlank())
+            b.queryParam("status", status);
+        if (locked != null)
+            b.queryParam("locked", locked);
+        if (sort != null && !sort.isBlank())
+            b.queryParam("sort", sort);
+        return exchange(b.toUriString(), HttpMethod.GET, null, bearer);
+    }
+
+    /** Chi tiết một lịch trình + báo cáo. */
+    public ResponseEntity<ApiResponse<?>> planDetail(Long id, String bearer) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + ADMIN_BASE + "/plans/" + id).toUriString();
+        return exchange(url, HttpMethod.GET, null, bearer);
+    }
+
+    /** Bật lại bài đã gỡ. */
+    public ResponseEntity<ApiResponse<?>> restore(Long id, String bearer) {
+        String url = UriComponentsBuilder
+                .fromHttpUrl(requireBaseUrl() + ADMIN_BASE + "/plans/" + id + "/restore").toUriString();
+        return exchange(url, HttpMethod.PATCH, null, bearer);
+    }
+
     public ResponseEntity<ApiResponse<?>> listReports(String status, int page, int size, String bearer) {
         UriComponentsBuilder b = UriComponentsBuilder
                 .fromHttpUrl(requireBaseUrl() + ADMIN_BASE + "/reports")

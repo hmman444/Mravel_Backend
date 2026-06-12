@@ -3,6 +3,7 @@ package com.mravel.notification.controller;
 import com.mravel.common.response.ApiResponse;
 import com.mravel.notification.dto.NotificationDtos.*;
 import com.mravel.notification.service.NotificationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +19,7 @@ public class NotificationController {
     /** Internal endpoint — called by other services to persist a notification. */
     @PostMapping
     public ResponseEntity<ApiResponse<NotificationResponse>> create(
-            @RequestBody CreateNotificationRequest req) {
+            @Valid @RequestBody CreateNotificationRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Tạo notification thành công", service.create(req)));
     }
 

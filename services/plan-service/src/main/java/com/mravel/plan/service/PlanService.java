@@ -6,6 +6,7 @@ import com.mravel.plan.client.FriendClient;
 import com.mravel.plan.client.UserProfileClient;
 import com.mravel.plan.document.PlanDocument;
 import com.mravel.plan.dto.CreatePlanRequest;
+import com.mravel.plan.dto.PlanAdminManageDtos;
 import com.mravel.plan.dto.PlanAdminStatsDtos;
 import com.mravel.plan.dto.PlanFeedItem;
 import com.mravel.plan.dto.VisibilityContext;
@@ -22,6 +23,8 @@ import com.mravel.plan.model.PlanComment;
 import com.mravel.plan.model.PlanHidden;
 import com.mravel.plan.model.PlanList;
 import com.mravel.plan.model.PlanListType;
+import com.mravel.plan.model.PlanMember;
+import com.mravel.plan.model.PlanStatus;
 import com.mravel.plan.dto.CommentReactionResponse;
 import com.mravel.plan.model.PlanCommentReaction;
 import com.mravel.plan.model.PlanReaction;
@@ -805,6 +808,22 @@ public class PlanService {
                 planIndexPublisher.publishUpsert(planId);
         }
 
+        /**
+         * Bật lại bài đã gỡ: chỉ MỞ KHÓA (adminLocked=false) + xóa dấu kiểm duyệt.
+         * Quyền hiển thị GIỮ NGUYÊN (vẫn PRIVATE) — chủ bài tự chỉnh công khai lại nếu muốn.
+         */
+        @Transactional
+        public void restorePlan(Long planId, Long adminId) {
+                Plan plan = planRepository.findById(planId)
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
+                plan.setAdminLocked(false);
+                plan.setTakedownBy(null);
+                plan.setTakedownAt(null);
+                plan.setTakedownReason(null);
+                planRepository.save(plan);
+                planIndexPublisher.publishUpsert(planId);
+        }
+
         // ===== Report system =====
 
         @Transactional
@@ -913,6 +932,224 @@ public class PlanService {
                                 planReportRepository.countByStatus(PlanReport.Status.PENDING));
 
                 return new PlanAdminStatsDtos.StatsResponse(overview, byStatus, byVisibility, series, top);
+        }
+
+        // ===== Quản lý lịch trình (admin): tìm kiếm + chi tiết toàn bộ plan =====
+
+        /**
+         * Tìm kiếm/liệt kê TOÀN BỘ plan cho admin (mọi visibility, kể cả đã gỡ).
+         * Trả về thông tin cơ bản + số liệu tổng hợp cho mỗi dòng.
+         */
+        @Transactional
+        public Page<PlanAdminManageDtos.AdminPlanRow> adminSearchPlans(
+                        String q, String visibility, String status, Boolean locked,
+                        int page, int size, String sort) {
+                Visibility vis = parseVisibility(visibility);
+                PlanStatus st = parseStatus(status);
+                Pageable pageable = PageRequest.of(Math.max(0, page - 1),
+                                Math.min(Math.max(size, 1), 100), buildAdminSort(sort));
+                String query = (q == null || q.isBlank()) ? null : q.trim();
+
+                Page<Plan> plans = planRepository.adminSearch(query, vis, st, locked, pageable);
+                List<Long> ids = plans.getContent().stream().map(Plan::getId).toList();
+                List<Long> safe = safeIds(ids);
+
+                Map<Long, Long> reactionCounts = toCountMap(reactionRepository.countByPlanIds(safe));
+                Map<Long, Long> commentCounts = toCountMap(planCommentRepository.countByPlanIds(safe));
+                Map<Long, Long> memberCounts = toCountMap(memberRepository.countByPlanIds(safe));
+                Map<Long, Long> pendingReportCounts = toCountMap(
+                                planReportRepository.countByStatusAndPlanIds(PlanReport.Status.PENDING, safe));
+
+                Set<Long> authorIds = plans.getContent().stream()
+                                .map(Plan::getAuthorId).filter(Objects::nonNull)
+                                .collect(Collectors.toSet());
+                Map<Long, UserProfileResponse> profiles = resolveProfiles(authorIds);
+
+                return plans.map(p -> {
+                        UserProfileResponse author = profiles.get(p.getAuthorId());
+                        return new PlanAdminManageDtos.AdminPlanRow(
+                                        p.getId(),
+                                        p.getTitle(),
+                                        p.getAuthorId(),
+                                        author != null ? author.getFullname() : null,
+                                        author != null ? author.getAvatar() : null,
+                                        p.getVisibility() != null ? p.getVisibility().name() : null,
+                                        p.getStatus() != null ? p.getStatus().name() : null,
+                                        p.getCreatedAt(),
+                                        p.getStartDate(),
+                                        p.getEndDate(),
+                                        p.getDays(),
+                                        p.getViews() == null ? 0L : p.getViews(),
+                                        reactionCounts.getOrDefault(p.getId(), 0L),
+                                        commentCounts.getOrDefault(p.getId(), 0L),
+                                        memberCounts.getOrDefault(p.getId(), 0L),
+                                        pendingReportCounts.getOrDefault(p.getId(), 0L),
+                                        Boolean.TRUE.equals(p.getAdminLocked()),
+                                        p.getTakedownAt(),
+                                        p.getTakedownReason());
+                });
+        }
+
+        /** Chi tiết đầy đủ của một plan + danh sách báo cáo (để admin xem trước khi gỡ/bật lại). */
+        @Transactional
+        public PlanAdminManageDtos.AdminPlanDetail adminPlanDetail(Long id) {
+                Plan p = planRepository.findById(id)
+                                .orElseThrow(() -> new NotFoundException("Plan not found"));
+
+                UserProfileResponse author = null;
+                if (p.getAuthorId() != null) {
+                        try {
+                                author = userProfileClient.getUserById(p.getAuthorId());
+                        } catch (Exception ignore) {
+                        }
+                }
+
+                long reactions = reactionRepository.findByPlanId(id).size();
+                long comments = toCountMap(planCommentRepository.countByPlanIds(List.of(id)))
+                                .getOrDefault(id, 0L);
+
+                List<PlanMember> memberEntities = memberRepository.findByPlanId(id);
+                Set<Long> memberUserIds = memberEntities.stream().map(PlanMember::getUserId)
+                                .filter(Objects::nonNull).collect(Collectors.toSet());
+                Map<Long, UserProfileResponse> memberProfiles = resolveProfiles(memberUserIds);
+                List<PlanAdminManageDtos.AdminPlanMember> members = memberEntities.stream()
+                                .map(m -> {
+                                        UserProfileResponse up = memberProfiles.get(m.getUserId());
+                                        return new PlanAdminManageDtos.AdminPlanMember(
+                                                        m.getUserId(),
+                                                        up != null ? up.getFullname() : null,
+                                                        up != null ? up.getAvatar() : null,
+                                                        m.getRole() != null ? m.getRole().name() : null);
+                                }).toList();
+
+                List<PlanReport> reportEntities = planReportRepository.findByPlanIdOrderByCreatedAtDesc(id);
+                Set<Long> reporterIds = reportEntities.stream().map(PlanReport::getReporterId)
+                                .filter(Objects::nonNull).collect(Collectors.toSet());
+                Map<Long, UserProfileResponse> reporterProfiles = resolveProfiles(reporterIds);
+                List<PlanAdminManageDtos.AdminReportItem> reports = reportEntities.stream()
+                                .map(r -> {
+                                        UserProfileResponse up = reporterProfiles.get(r.getReporterId());
+                                        return new PlanAdminManageDtos.AdminReportItem(
+                                                        r.getId(),
+                                                        r.getReason() != null ? r.getReason().name() : null,
+                                                        r.getDetail(),
+                                                        r.getStatus() != null ? r.getStatus().name() : null,
+                                                        r.getReporterId(),
+                                                        up != null ? up.getFullname() : null,
+                                                        r.getCreatedAt(),
+                                                        r.getResolvedAt(),
+                                                        r.getActionTaken() != null ? r.getActionTaken().name()
+                                                                        : null);
+                                }).toList();
+
+                List<String> destinations = (p.getDestinations() == null) ? List.of()
+                                : p.getDestinations().stream()
+                                                .map(d -> d.getName() != null ? d.getName() : d.getAddress())
+                                                .filter(Objects::nonNull)
+                                                .toList();
+
+                return new PlanAdminManageDtos.AdminPlanDetail(
+                                p.getId(),
+                                p.getTitle(),
+                                p.getDescription(),
+                                p.getAuthorId(),
+                                author != null ? author.getFullname() : null,
+                                author != null ? author.getAvatar() : null,
+                                p.getVisibility() != null ? p.getVisibility().name() : null,
+                                p.getStatus() != null ? p.getStatus().name() : null,
+                                p.getCreatedAt(),
+                                p.getStartDate(),
+                                p.getEndDate(),
+                                p.getDays(),
+                                p.getViews() == null ? 0L : p.getViews(),
+                                reactions,
+                                comments,
+                                destinations,
+                                p.getImages() == null ? List.of() : new ArrayList<>(p.getImages()),
+                                p.getThumbnail(),
+                                p.getBudgetCurrency(),
+                                p.getBudgetTotal(),
+                                p.getBudgetPerPerson(),
+                                p.getTotalEstimatedCost(),
+                                p.getTotalActualCost(),
+                                Boolean.TRUE.equals(p.getAdminLocked()),
+                                p.getTakedownBy(),
+                                p.getTakedownAt(),
+                                p.getTakedownReason(),
+                                members,
+                                reports);
+        }
+
+        // ----- helpers cho quản lý lịch trình (admin) -----
+
+        private List<Long> safeIds(List<Long> ids) {
+                return (ids == null || ids.isEmpty()) ? List.of(-1L) : ids;
+        }
+
+        private Map<Long, Long> toCountMap(List<Object[]> rows) {
+                Map<Long, Long> map = new HashMap<>();
+                if (rows == null)
+                        return map;
+                for (Object[] r : rows) {
+                        if (r == null || r[0] == null)
+                                continue;
+                        map.put(((Number) r[0]).longValue(), ((Number) r[1]).longValue());
+                }
+                return map;
+        }
+
+        private Map<Long, UserProfileResponse> resolveProfiles(Set<Long> ids) {
+                Map<Long, UserProfileResponse> map = new HashMap<>();
+                if (ids == null)
+                        return map;
+                for (Long id : ids) {
+                        if (id == null)
+                                continue;
+                        try {
+                                map.put(id, userProfileClient.getUserById(id));
+                        } catch (Exception ignore) {
+                                map.put(id, null);
+                        }
+                }
+                return map;
+        }
+
+        private Visibility parseVisibility(String v) {
+                if (v == null || v.isBlank())
+                        return null;
+                try {
+                        return Visibility.valueOf(v.trim().toUpperCase());
+                } catch (Exception e) {
+                        return null;
+                }
+        }
+
+        private PlanStatus parseStatus(String s) {
+                if (s == null || s.isBlank())
+                        return null;
+                try {
+                        return PlanStatus.valueOf(s.trim().toUpperCase());
+                } catch (Exception e) {
+                        return null;
+                }
+        }
+
+        /** sort dạng "field,dir" — chỉ chấp nhận các field an toàn. */
+        private Sort buildAdminSort(String sort) {
+                String field = "createdAt";
+                Sort.Direction dir = Sort.Direction.DESC;
+                if (sort != null && !sort.isBlank()) {
+                        String[] parts = sort.split(",");
+                        String f = parts[0].trim();
+                        if (f.equals("createdAt") || f.equals("views") || f.equals("title")
+                                        || f.equals("startDate")) {
+                                field = f;
+                        }
+                        if (parts.length > 1 && parts[1].trim().equalsIgnoreCase("asc")) {
+                                dir = Sort.Direction.ASC;
+                        }
+                }
+                return Sort.by(dir, field);
         }
 
         @Transactional

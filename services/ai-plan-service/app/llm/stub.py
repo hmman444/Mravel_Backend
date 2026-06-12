@@ -361,8 +361,12 @@ class StubLLMClient(LLMClient):
 
         if not result.get("destination"):
             dest = _parse_destination(user_message)
-            if dest:
-                result["destination"] = dest
+            # Conservative sanity check (no geocoding): a real place name has at least
+            # two alphanumeric characters. Reject empty/whitespace-only or purely
+            # symbolic garbage ("???", "---") so it can't corrupt the constraints —
+            # mirrors apply_set_constraints in app/agent/tools.py.
+            if dest and len(dest.strip()) >= 2 and sum(c.isalnum() for c in dest) >= 2:
+                result["destination"] = dest.strip()
 
         start, end = _parse_dates(user_message, today)
         if start and end:
@@ -373,6 +377,12 @@ class StubLLMClient(LLMClient):
             ):
                 result["start_date"] = start.isoformat()
                 result["end_date"] = end.isoformat()
+
+        # Trip length ("3 ngày 2 đêm", "đi 4 ngày"). Captured even without a calendar date
+        # so the planner can anchor the start to today instead of asking "từ ngày nào".
+        duration_match = _DURATION_DAYS_RE.search(user_message)
+        if duration_match:
+            result["num_days"] = max(1, int(duration_match.group(1)))
 
         people = _PEOPLE_RE.search(user_message)
         if people:

@@ -4,6 +4,7 @@ package com.mravel.booking.controller;
 import com.mravel.booking.dto.PaymentReturnResult;
 import com.mravel.booking.service.VnpayPaymentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.Objects;
 @RestController
 @RequestMapping("/api/payment/vnpay")
 @RequiredArgsConstructor
+@Slf4j
 public class VnpayPaymentController {
 
   private final VnpayPaymentService vnpayPaymentService;
@@ -48,6 +50,7 @@ public class VnpayPaymentController {
       PaymentReturnResult result = vnpayPaymentService.handleReturn(params);
       target = buildReturnUrl(result.bookingCode(), result.success() ? "success" : "failed");
     } catch (Exception ex) {
+      log.error("VNPay return failed (vnp_TxnRef={}): {}", params.get("vnp_TxnRef"), ex.getMessage(), ex);
       target = buildReturnUrl(null, "error");
     }
 

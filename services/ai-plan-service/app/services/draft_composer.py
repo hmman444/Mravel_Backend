@@ -206,6 +206,9 @@ class DraftComposer:
         if pace not in _PACE_SLOTS:
             pace = "balanced"
         slots = _PACE_SLOTS[pace]
+        # Resolve concrete dates: when the user gave only a trip length, the start is
+        # anchored to today (resolved_date_range). day_date below counts from start_date.
+        start_date, end_date = constraints.resolved_date_range()
         duration = constraints.duration_days()
         nights = max(1, duration - 1)
 
@@ -238,7 +241,7 @@ class DraftComposer:
         total_cost = 0
 
         for day_index in range(1, duration + 1):
-            day_date = (constraints.start_date or date.today()) + timedelta(days=day_index - 1)
+            day_date = start_date + timedelta(days=day_index - 1)
             cursor = hotel_coords
             cursor_name = hotel_name
             t = DAY_START
@@ -312,8 +315,8 @@ class DraftComposer:
                 f"(nhịp {pace})"
             ),
             destination=destination,
-            start_date=constraints.start_date,  # type: ignore[arg-type]
-            end_date=constraints.end_date,  # type: ignore[arg-type]
+            start_date=start_date,
+            end_date=end_date,
             travelers=travelers,
             estimated_total_cost_vnd=total_cost,
             days=days,

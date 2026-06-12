@@ -31,6 +31,10 @@ public class PlanBoardEventListener {
             PlanBoardEvent event = objectMapper.readValue(messageJson, PlanBoardEvent.class);
 
             Long planId = event.getPlanId();
+            if (planId == null) {
+                log.warn("[PlanBoardEventListener] planId is null, skipping: {}", messageJson);
+                return;
+            }
             String destination = "/topic/plans/" + planId + "/board";
             String destinationV2 = "/topic/plans/" + planId + "/board/v2";
 

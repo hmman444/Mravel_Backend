@@ -46,6 +46,7 @@ public class AuthService {
 
     @Transactional
     public void register(RegisterRequest request) {
+        validateRegisterRequest(request);
         // If an account with the email already exists, allow re-register when not
         // enabled
         userRepository.findByEmail(request.getEmail()).ifPresentOrElse(existing -> {
@@ -458,6 +459,29 @@ public class AuthService {
     private void assertNotLocked(User user) {
         if (user.getStatus() == AccountStatus.LOCKED) {
             throw new RuntimeException("Tài khoản đã bị khóa");
+        }
+    }
+
+    /**
+     * Manual validation for the registration payload. The service does not depend on
+     * spring-boot-starter-validation, so checks are done here throwing
+     * IllegalArgumentException (formatted by GlobalExceptionHandler).
+     */
+    private void validateRegisterRequest(RegisterRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Dữ liệu đăng ký không hợp lệ");
+        }
+        if (request.getFullname() == null || request.getFullname().isBlank()) {
+            throw new IllegalArgumentException("Họ tên không được để trống");
+        }
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new IllegalArgumentException("Email không được để trống");
+        }
+        if (!request.getEmail().matches("^[\\w.+-]+@[\\w-]+\\.[\\w.-]+$")) {
+            throw new IllegalArgumentException("Email không hợp lệ");
+        }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Mật khẩu không được để trống");
         }
     }
 

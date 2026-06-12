@@ -1,6 +1,7 @@
 package com.mravel.plan.repository;
 
 import com.mravel.plan.model.Plan;
+import com.mravel.plan.model.PlanStatus;
 import com.mravel.plan.model.Visibility;
 
 import java.util.List;
@@ -119,6 +120,28 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
    List<Plan> findTop10ByVisibilityOrderByViewsDesc(Visibility visibility);
 
    long countByAdminLockedTrue();
+
+   // ===== Quản lý lịch trình (admin): tìm kiếm TOÀN BỘ plan, mọi visibility =====
+
+   /**
+    * Tìm kiếm plan cho admin với các bộ lọc tùy chọn (null = bỏ qua):
+    * q (tiêu đề/mô tả), visibility, status, locked (đã gỡ?).
+    */
+   @Query("""
+         select p from Plan p
+         where (:q is null or :q = ''
+                or lower(p.title) like lower(concat('%', :q, '%'))
+                or lower(p.description) like lower(concat('%', :q, '%')))
+           and (:visibility is null or p.visibility = :visibility)
+           and (:status is null or p.status = :status)
+           and (:locked is null or p.adminLocked = :locked)
+         """)
+   Page<Plan> adminSearch(
+         @Param("q") String q,
+         @Param("visibility") Visibility visibility,
+         @Param("status") PlanStatus status,
+         @Param("locked") Boolean locked,
+         Pageable pageable);
 
    /** Tăng lượt xem nguyên tử (atomic), an toàn với truy cập đồng thời. */
    @Modifying

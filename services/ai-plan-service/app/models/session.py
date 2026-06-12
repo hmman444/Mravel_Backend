@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -30,16 +30,22 @@ class Constraints(BaseModel):
     destination: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    # Trip length in days when the user only says "đi 3 ngày 2 đêm" without naming a
+    # calendar date. With this set we can plan immediately, anchoring the start to TODAY
+    # (see resolved_date_range) — so we never have to ask "đi từ ngày nào đến ngày nào".
+    num_days: Optional[int] = None
     travelers: int = 2
     budget_total_vnd: Optional[int] = None
     interests: List[str] = Field(default_factory=list)
     pace: Optional[str] = None  # "relaxed" | "balanced" | "packed"
 
     @model_validator(mode="after")
-    def _normalize_date_range(self) -> "Constraints":
+    def _validate_date_range(self) -> "Constraints":
         # An inverted range (end_date < start_date) yields a negative duration and an
-        # empty itinerary. Rather than crash the planning turn (the agent feeds dates
-        # incrementally), normalise by swapping so end_date >= start_date always holds.
+        # empty itinerary. Normalize by swapping so downstream planning always sees a
+        # valid range — raising here would break mid-conversation constraint updates
+        # (apply_set_constraints / constraint_extractor build Constraints incrementally).
+        # The hard, user-facing validation happens at finalize_draft.
         if (
             self.start_date is not None
             and self.end_date is not None
@@ -49,12 +55,26 @@ class Constraints(BaseModel):
         return self
 
     def is_minimally_complete(self) -> bool:
-        return bool(self.destination) and self.start_date is not None and self.end_date is not None
+        # Enough to build an itinerary: a destination plus EITHER an explicit date range
+        # OR a trip length (num_days), since num_days anchors to today by default.
+        has_dates = self.start_date is not None and self.end_date is not None
+        return bool(self.destination) and (has_dates or self.num_days is not None)
 
     def duration_days(self) -> int:
         if self.start_date and self.end_date:
             return max(1, (self.end_date - self.start_date).days + 1)
+        if self.num_days:
+            return max(1, self.num_days)
         return 1
+
+    def resolved_date_range(self) -> tuple[date, date]:
+        """Concrete (start, end) for planning. When the user gave only a trip length
+        (num_days) and no calendar date, anchor the start to TODAY — 'đi 3 ngày' means
+        a 3-day trip starting today. An explicit range is returned unchanged."""
+        if self.start_date is not None and self.end_date is not None:
+            return self.start_date, self.end_date
+        start = self.start_date or date.today()
+        return start, start + timedelta(days=self.duration_days() - 1)
 
 
 class RecommendationRef(BaseModel):
@@ -96,6 +116,17 @@ class DraftActivity(BaseModel):
     route_hint: Optional[str] = None  # "Home tạm - Quán ăn", "HCM - Đà Nẵng"
     distance_text: Optional[str] = None  # "10.3km", "~30km", "500m"
     transport_mode: Optional[str] = None  # "xe máy", "đi bộ", "taxi", "xe khách"
+
+    @model_validator(mode="after")
+    def _validate_non_negative_cost(self) -> "DraftActivity":
+        # A negative cost is never valid (it would understate the trip total and the
+        # plan-service card). Reject it as a validation error rather than silently
+        # storing a bad figure.
+        if self.estimated_cost_vnd < 0:
+            raise ValueError("estimated_cost_vnd must not be negative")
+        if self.unit_price_vnd is not None and self.unit_price_vnd < 0:
+            raise ValueError("unit_price_vnd must not be negative")
+        return self
 
 
 class DraftDay(BaseModel):

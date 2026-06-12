@@ -31,8 +31,17 @@ public class RefreshTokenService {
     }
 
     public boolean validate(String token) {
-        return jwtUtil.validateToken(token) &&
-                refreshTokenRepository.findByToken(token).isPresent();
+        if (!jwtUtil.validateToken(token)) {
+            return false;
+        }
+        RefreshToken stored = refreshTokenRepository.findByToken(token).orElse(null);
+        if (stored == null) {
+            return false;
+        }
+        if (stored.getExpiryDate() == null || stored.getExpiryDate().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Refresh token expired");
+        }
+        return true;
     }
 
     @Transactional

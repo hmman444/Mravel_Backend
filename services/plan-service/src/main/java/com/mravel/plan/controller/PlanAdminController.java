@@ -1,6 +1,7 @@
 package com.mravel.plan.controller;
 
 import com.mravel.common.response.ApiResponse;
+import com.mravel.plan.dto.PlanAdminManageDtos;
 import com.mravel.plan.dto.PlanAdminStatsDtos;
 import com.mravel.plan.model.PlanReport;
 import com.mravel.plan.security.CurrentUserService;
@@ -28,14 +29,44 @@ public class PlanAdminController {
         return ApiResponse.success("OK", planService.getAdminStats(days));
     }
 
-    /** GỠ bài: ép PRIVATE + khóa vĩnh viễn (không thể bật lại). */
+    /**
+     * Tìm kiếm/liệt kê TOÀN BỘ lịch trình cho admin (mọi visibility, kể cả đã gỡ).
+     * Bộ lọc tùy chọn: q (tiêu đề/mô tả), visibility, status, locked (đã gỡ?).
+     */
+    @GetMapping("/list")
+    public ApiResponse<Page<PlanAdminManageDtos.AdminPlanRow>> list(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String visibility,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean locked,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        return ApiResponse.success("OK",
+                planService.adminSearchPlans(q, visibility, status, locked, page, size, sort));
+    }
+
+    /** Chi tiết một lịch trình + danh sách báo cáo (xem trước khi gỡ/bật lại). */
+    @GetMapping("/plans/{id}")
+    public ApiResponse<PlanAdminManageDtos.AdminPlanDetail> detail(@PathVariable Long id) {
+        return ApiResponse.success("OK", planService.adminPlanDetail(id));
+    }
+
+    /** GỠ bài: ép PRIVATE + khóa (có thể bật lại). */
     @PatchMapping("/plans/{id}/takedown")
     public ApiResponse<Void> takedown(
             @PathVariable Long id,
             @RequestParam(required = false) String reason) {
         planService.takedownPlan(id, currentUser.getId(),
                 reason != null ? reason : "Vi phạm tiêu chuẩn cộng đồng");
-        return ApiResponse.success("Đã gỡ bài (ép PRIVATE + khóa vĩnh viễn)", null);
+        return ApiResponse.success("Đã gỡ lịch trình", null);
+    }
+
+    /** BẬT LẠI bài đã gỡ: mở khóa (giữ nguyên PRIVATE). */
+    @PatchMapping("/plans/{id}/restore")
+    public ApiResponse<Void> restore(@PathVariable Long id) {
+        planService.restorePlan(id, currentUser.getId());
+        return ApiResponse.success("Đã bật lại lịch trình", null);
     }
 
     /** Hàng đợi report (lọc theo status: PENDING/REVIEWING/RESOLVED/DISMISSED). */
