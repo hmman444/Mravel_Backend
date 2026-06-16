@@ -157,11 +157,19 @@ public final class RestaurantSeedUtils {
             int closeMinute) {
         return OpeningHour.builder()
                 .dayOfWeek(day)
-                .openTime(LocalTime.of(openHour, openMinute))
-                .closeTime(LocalTime.of(closeHour, closeMinute))
+                .openTime(safeTime(openHour, openMinute))
+                .closeTime(safeTime(closeHour, closeMinute))
                 .open24h(false)
                 .closed(false)
                 .build();
+    }
+
+    /** Chống crash khi seed ghi "24h00": giờ >= 24 quy về 23:59; clamp về khoảng hợp lệ. */
+    private static LocalTime safeTime(int hour, int minute) {
+        if (hour >= 24) return LocalTime.of(23, 59);
+        int h = Math.max(0, Math.min(23, hour));
+        int m = Math.max(0, Math.min(59, minute));
+        return LocalTime.of(h, m);
     }
 
     public static SuitableFor suitable(String code, String label) {

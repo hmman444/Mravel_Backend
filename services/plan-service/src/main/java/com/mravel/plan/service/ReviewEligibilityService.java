@@ -104,6 +104,11 @@ public class ReviewEligibilityService {
     private boolean matches(PlanCard card, String targetId, String normSlug, String normName) {
         String json = card.getActivityDataJson();
         if (json == null || json.isBlank()) return false;
+
+        // Khớp mạnh nhất: id catalog (ObjectId 24-hex, duy nhất) xuất hiện trong JSON card.
+        // Bắt mọi vị trí: recommendation.id (card AI) hoặc hotelLocation/restaurantLocation.placeId (card tay từ board).
+        if (targetId != null && !targetId.isBlank() && json.contains(targetId)) return true;
+
         try {
             JsonNode root = objectMapper.readTree(json);
 

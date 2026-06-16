@@ -1,8 +1,6 @@
 package com.mravel.review.client;
 
-import java.net.URI;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -19,40 +17,34 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Gọi plan-service để biết user (theo token) đã trải nghiệm dịch vụ chưa.
- * Forward nguyên Authorization header để plan-service tự xác thực + lấy userId
- * (tránh giả mạo userId).
+ * Hỏi booking-service: user (theo token) đã trải nghiệm dịch vụ qua BOOKING chưa
+ * (đặt phòng/đặt bàn đã qua mốc sử dụng). Forward Bearer token để booking-service
+ * tự lấy userId từ JWT.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class PlanClient {
+public class BookingClient {
 
     private final RestTemplate restTemplate;
 
-    @Value("${mravel.services.plan.base-url}")
-    private String planBaseUrl;
+    @Value("${mravel.services.booking.base-url}")
+    private String bookingBaseUrl;
 
-    public boolean isExperienced(String targetType, String targetId, String slug, String name) {
+    public boolean hasUsedBooking(String targetType, String targetId) {
         try {
-            // Dùng URI đã encode (giá trị có dấu cách / "&" như "Resort & Villas" không phá query string).
-            // Truyền URI object để RestTemplate KHÔNG encode lại lần nữa (tránh double-encode).
-            URI uri = UriComponentsBuilder
-                    .fromHttpUrl(planBaseUrl + "/api/plans/internal/experienced")
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(bookingBaseUrl + "/api/booking/internal/experienced")
                     .queryParam("targetType", targetType)
                     .queryParam("targetId", targetId)
-                    .queryParamIfPresent("slug", Optional.ofNullable(emptyToNull(slug)))
-                    .queryParamIfPresent("name", Optional.ofNullable(emptyToNull(name)))
-                    .encode()
-                    .build()
-                    .toUri();
+                    .toUriString();
 
             HttpHeaders headers = new HttpHeaders();
             String auth = currentAuthHeader();
             if (auth != null) headers.set(HttpHeaders.AUTHORIZATION, auth);
 
             ResponseEntity<Map> res = restTemplate.exchange(
-                    uri, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
 
             Object data = res.getBody() != null ? res.getBody().get("data") : null;
             if (data instanceof Map<?, ?> m) {
@@ -60,14 +52,10 @@ public class PlanClient {
             }
             return false;
         } catch (Exception ex) {
-            // Fail-closed: không xác minh được thì CHẶN (ưu tiên tính toàn vẹn của đánh giá).
-            log.warn("isExperienced check failed for {} {}: {}", targetType, targetId, ex.getMessage());
+            // Fail-safe: lỗi -> coi như chưa trải nghiệm qua booking (vẫn còn nhánh plan).
+            log.warn("hasUsedBooking check failed for {} {}: {}", targetType, targetId, ex.getMessage());
             return false;
         }
-    }
-
-    private static String emptyToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s;
     }
 
     private String currentAuthHeader() {
