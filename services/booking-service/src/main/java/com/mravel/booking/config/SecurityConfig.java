@@ -38,6 +38,8 @@ public class SecurityConfig {
             // secure account endpoints
             .requestMatchers("/api/booking/my").authenticated()
             .requestMatchers("/api/booking/bookings/claim").authenticated()
+            // internal: review-service hỏi "đã trải nghiệm chưa" — cần JWT để lấy userId
+            .requestMatchers("/api/booking/internal/**").authenticated()
 
             .requestMatchers("/api/booking/**").permitAll()
 

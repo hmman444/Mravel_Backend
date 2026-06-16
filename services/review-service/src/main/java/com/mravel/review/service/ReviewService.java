@@ -3,6 +3,7 @@ package com.mravel.review.service;
 import com.mravel.common.notification.NotificationTypes;
 import com.mravel.common.response.UserProfileResponse;
 import com.mravel.review.client.AdminLookupClient;
+import com.mravel.review.client.BookingClient;
 import com.mravel.review.client.CatalogClient;
 import com.mravel.review.client.NotificationClient;
 import com.mravel.review.client.PlanClient;
@@ -37,6 +38,7 @@ public class ReviewService {
     private final UserProfileClient userProfileClient;
     private final CatalogClient catalogClient;
     private final PlanClient planClient;
+    private final BookingClient bookingClient;
     private final NotificationClient notificationClient;
     private final AdminLookupClient adminLookupClient;
 
@@ -47,8 +49,8 @@ public class ReviewService {
                     throw new IllegalStateException("Bạn đã đánh giá rồi. Hãy chỉnh sửa đánh giá hiện tại.");
                 });
 
-        // Chặn đánh giá ảo: chỉ cho đánh giá dịch vụ đã trải nghiệm trong một lịch trình đã qua.
-        if (!planClient.isExperienced(request.getTargetType().name(), request.getTargetId(),
+        // Chặn đánh giá ảo: chỉ cho đánh giá dịch vụ đã trải nghiệm — qua PLAN (đã đi) HOẶC BOOKING (đã đặt & dùng).
+        if (!hasExperienced(request.getTargetType(), request.getTargetId(),
                 request.getTargetSlug(), request.getTargetName())) {
             throw new IllegalStateException("Bạn chưa trải nghiệm dịch vụ này nên chưa thể đánh giá.");
         }
@@ -285,7 +287,16 @@ public class ReviewService {
         boolean already = reviewRepository
                 .findByUserIdAndTargetTypeAndTargetId(userId, targetType, targetId).isPresent();
         if (already) return true;
-        return planClient.isExperienced(targetType.name(), targetId, slug, name);
+        return hasExperienced(targetType, targetId, slug, name);
+    }
+
+    /**
+     * Đã trải nghiệm dịch vụ chưa = qua PLAN (đã có trong lịch trình đã đi)
+     * HOẶC qua BOOKING (đã đặt phòng/bàn và đã qua mốc sử dụng). Place chỉ có nhánh plan.
+     */
+    private boolean hasExperienced(TargetType targetType, String targetId, String slug, String name) {
+        return planClient.isExperienced(targetType.name(), targetId, slug, name)
+                || bookingClient.hasUsedBooking(targetType.name(), targetId);
     }
 
     private void saveAspects(Review review, List<AspectCommentInput> inputs) {
