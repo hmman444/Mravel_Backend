@@ -1,0 +1,38 @@
+server:
+  port: 8091
+
+spring:
+  application:
+    name: chat-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/mravel_chat?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+mravel:
+  topics:
+    chat-events: chat-events
+  services:
+    user: http://user-service:8082
+  internal:
+    secret: ${MRAVEL_INTERNAL_SECRET:mravel-internal-2026}
+
+logging:
+  level:
+    org.springframework.kafka: INFO
+    com.mravel.chat: INFO
