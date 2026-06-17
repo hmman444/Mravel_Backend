@@ -1,0 +1,44 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: review-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/mravel_review?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&characterEncoding=UTF-8&useUnicode=true}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  jackson:
+    default-property-inclusion: non_null
+
+mravel:
+  services:
+    auth:
+      base-url: http://gateway:8080
+      validate-path: /api/auth/validate
+    user:
+      base-url: http://gateway:8080
+      userProfiles-path: /api/users
+    catalog:
+      base-url: http://gateway:8080
+    plan:
+      base-url: http://gateway:8080
+    notification:
+      base-url: http://gateway:8080
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  level:
+    com.mravel.review: INFO
