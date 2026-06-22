@@ -1,0 +1,17 @@
+# Keep Docker build contexts small & reproducible.
+**/target/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/node_modules/
+**/.git/
+**/.idea/
+**/.vscode/
+**/*.log
+services/ai-plan-service/.data/
+services/ai-plan-service/.pytest_cache/
+services/ai-plan-service/.ruff_cache/
+services/ai-plan-service/*.egg-info/
+# Never ship local secrets into an image
+**/.env
+**/application-example.yml
