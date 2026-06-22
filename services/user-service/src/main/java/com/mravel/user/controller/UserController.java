@@ -262,6 +262,11 @@ public class UserController {
                 .membershipTier(user.getMembershipTier() != null ? user.getMembershipTier().name() : null)
                 .locale(user.getLocale())
                 .timeZone(user.getTimeZone())
+                .username(user.getUsername())
+                .bio(user.getBio())
+                .coverImage(user.getCoverImage())
+                .hometown(user.getHometown())
+                .occupation(user.getOccupation())
                 .build();
     }
 
