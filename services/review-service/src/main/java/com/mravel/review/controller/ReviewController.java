@@ -100,7 +100,10 @@ public class ReviewController {
             @RequestParam String targetId,
             @RequestParam(required = false) String slug,
             @RequestParam(required = false) String name) {
-        Long userId = requireUserId();
+        Long userId = currentUserService.getId();
+        if (userId == null) {
+            return ResponseEntity.ok(ApiResponse.success("OK", Map.of("eligible", false)));
+        }
         boolean eligible = reviewService.canReview(userId, targetType, targetId, slug, name);
         return ResponseEntity.ok(ApiResponse.success("OK", Map.of("eligible", eligible)));
     }

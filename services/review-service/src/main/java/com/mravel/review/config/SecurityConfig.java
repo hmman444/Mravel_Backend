@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/my").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/reviews", "/api/reviews/summary", "/api/reviews/aspects").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews", "/api/reviews/summary", "/api/reviews/aspects", "/api/reviews/can-review").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
