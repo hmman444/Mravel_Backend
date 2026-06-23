@@ -1,11 +1,11 @@
 package com.mravel.notification.controller;
 
 import com.mravel.common.response.ApiResponse;
+import com.mravel.notification.dto.NotificationDtos;
 import com.mravel.notification.dto.NotificationDtos.*;
 import com.mravel.notification.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,7 +29,7 @@ public class NotificationController {
      * Optional {@code category} filter: SOCIAL, BOOKING, ACCOUNT, PARTNER, ADMIN.
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<NotificationResponse>>> list(
+    public ResponseEntity<ApiResponse<NotificationDtos.PagedResult<NotificationResponse>>> list(
             @RequestHeader(value = "X-User-Id", required = false) Long callerId,
             @RequestParam Long recipientId,
             @RequestParam(required = false) String category,
