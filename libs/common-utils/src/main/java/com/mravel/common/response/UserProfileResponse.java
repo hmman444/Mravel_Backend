@@ -33,4 +33,10 @@ public class UserProfileResponse {
     private String membershipTier;
     private String locale;
     private String timeZone;
+
+    private String username;
+    private String bio;
+    private String coverImage;
+    private String hometown;
+    private String occupation;
 }
