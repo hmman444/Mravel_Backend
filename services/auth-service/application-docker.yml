@@ -39,3 +39,6 @@ jwt:
 mravel:
   user:
     url: ${MRAVEL_USER_URL:http://user-service:8082/api/users}
+  services:
+    notification:
+      base-url: ${MRAVEL_NOTIFICATION_URL:http://gateway:8080}
