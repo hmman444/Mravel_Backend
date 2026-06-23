@@ -82,14 +82,13 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserProfileResponse> getCurrentUser(HttpServletRequest request) {
+    public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {
         String token = jwtUtils.resolveToken(request);
-        if (token == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (token == null || !jwtUtils.validateToken(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("JWT expired"));
         }
         String email = jwtUtils.extractEmail(token);
-
-        // Gọi sang user-service để lấy profile
         UserProfileResponse profile = userProfileClient.getUserByEmail(email);
         return ResponseEntity.ok(profile);
     }

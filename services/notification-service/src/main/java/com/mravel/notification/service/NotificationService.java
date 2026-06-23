@@ -92,7 +92,7 @@ public class NotificationService {
         }
     }
 
-    public Page<NotificationResponse> list(Long recipientId, String category, int page, int size) {
+    public NotificationDtos.PagedResult<NotificationResponse> list(Long recipientId, String category, int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         long unread = repo.countByRecipientIdAndReadFalse(recipientId);
 
@@ -117,7 +117,7 @@ public class NotificationService {
         }
 
         final Map<Long, UserMiniResponse> finalActorMap = actorMap;
-        return p.map(n -> toResponse(n, unread, finalActorMap));
+        return NotificationDtos.PagedResult.of(p.map(n -> toResponse(n, unread, finalActorMap)));
     }
 
     @Transactional
