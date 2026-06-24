@@ -62,17 +62,6 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy on VPS over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT || 22 }}
-          script: |
-            cd ${{ secrets.DEPLOY_DIR }}
-            ./scripts/deploy.sh
+  # NOTE: VPS deploy is handled by a cron on the VPS that runs scripts/deploy.sh
+  # (pull + up). GitHub Actions only builds & pushes images — no SSH into the VPS
+  # (the VPS firewall/fail2ban resets inbound SSH from GitHub runners).

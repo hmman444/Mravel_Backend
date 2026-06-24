@@ -18,6 +18,12 @@ mravel:
       base-url: http://gateway:8080
     plan:
       base-url: http://gateway:8080
+    booking:
+      base-url: http://gateway:8080
+    notification:
+      base-url: http://gateway:8080
+    review:
+      base-url: http://gateway:8080
 
 logging:
   level:

@@ -14,12 +14,17 @@ spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
 
+jwt:
+  secret: ${JWT_SECRET:mravel-super-secret-key-should-be-at-least-32-characters}
+
 mravel:
   services:
     auth:
       base-url: http://gateway:8080
       validate-path: /api/auth/validate
     catalog:
+      base-url: http://gateway:8080
+    notification:
       base-url: http://gateway:8080
 
   payment:
