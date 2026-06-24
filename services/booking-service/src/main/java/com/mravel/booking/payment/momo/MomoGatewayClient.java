@@ -31,9 +31,11 @@ public class MomoGatewayClient {
     private static final String SECRET_KEY = "K951B6PE1waDMi640xX08PD3vg6EkVlz";
     private static final String REQUEST_TYPE = "captureWallet";
 
-    // NOTE: nên đưa vào application.yml/env sau
-    private static final String REDIRECT_URL = "http://localhost:8084/api/payment/momo/redirect";
-    private static final String IPN_URL = "http://localhost:8084/api/payment/momo/ipn";
+    // Configurable so production can point at the public domain (through the gateway).
+    @org.springframework.beans.factory.annotation.Value("${mravel.payment.momo.redirect-url:http://localhost:8084/api/payment/momo/redirect}")
+    private String redirectUrl;
+    @org.springframework.beans.factory.annotation.Value("${mravel.payment.momo.ipn-url:http://localhost:8084/api/payment/momo/ipn}")
+    private String ipnUrl;
 
     /**
      * Tạo giao dịch MoMo cho 1 booking và trả về payUrl.
@@ -60,11 +62,11 @@ public class MomoGatewayClient {
         String rawSignature = "accessKey=" + ACCESS_KEY +
                 "&amount=" + amountStr +
                 "&extraData=" + extraData +
-                "&ipnUrl=" + IPN_URL +
+                "&ipnUrl=" + ipnUrl +
                 "&orderId=" + orderId +
                 "&orderInfo=" + orderInfo +
                 "&partnerCode=" + PARTNER_CODE +
-                "&redirectUrl=" + REDIRECT_URL +
+                "&redirectUrl=" + redirectUrl +
                 "&requestId=" + requestId +
                 "&requestType=" + REQUEST_TYPE;
 
@@ -79,8 +81,8 @@ public class MomoGatewayClient {
         body.put("amount", amountLong);
         body.put("orderId", orderId);
         body.put("orderInfo", orderInfo);
-        body.put("redirectUrl", REDIRECT_URL);
-        body.put("ipnUrl", IPN_URL);
+        body.put("redirectUrl", redirectUrl);
+        body.put("ipnUrl", ipnUrl);
         body.put("lang", "vi");
         body.put("requestType", REQUEST_TYPE);
         body.put("autoCapture", true);

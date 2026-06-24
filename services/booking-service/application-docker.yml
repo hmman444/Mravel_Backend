@@ -27,11 +27,18 @@ mravel:
     notification:
       base-url: http://gateway:8080
 
+  frontend:
+    base-url: ${MRAVEL_FRONTEND_BASE_URL:https://mravel.info.vn}
+
   payment:
     vnpay:
       base-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
       tmn-code: ${VNPAY_TMN_CODE:YM8LV0DC}
       hash-secret: ${VNPAY_HASH_SECRET:}
 
-      return-url: "http://gateway:8080/api/booking/payment/vnpay/return"
-      ipn-url: "http://gateway:8080/api/booking/payment/vnpay/ipn"
+      return-url: ${MRAVEL_PAYMENT_VNPAY_RETURN_URL:https://mravel.info.vn/api/payment/vnpay/return}
+      ipn-url: ${MRAVEL_PAYMENT_VNPAY_IPN_URL:https://mravel.info.vn/api/payment/vnpay/ipn}
+
+    momo:
+      redirect-url: ${MRAVEL_PAYMENT_MOMO_REDIRECT_URL:https://mravel.info.vn/api/payment/momo/redirect}
+      ipn-url: ${MRAVEL_PAYMENT_MOMO_IPN_URL:https://mravel.info.vn/api/payment/momo/ipn}
