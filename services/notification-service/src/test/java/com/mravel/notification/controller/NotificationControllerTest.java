@@ -1,6 +1,7 @@
 package com.mravel.notification.controller;
 
 import com.mravel.notification.client.UserClient;
+import com.mravel.notification.dto.NotificationDtos;
 import com.mravel.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +47,7 @@ class NotificationControllerTest {
     @Test
     void list_noCallerId_returns200() throws Exception {
         when(service.list(eq(1L), isNull(), eq(1), eq(20)))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(NotificationDtos.PagedResult.of(new PageImpl<>(List.of())));
 
         mvc.perform(get(BASE).param("recipientId", "1"))
                 .andExpect(status().isOk())
@@ -56,7 +57,7 @@ class NotificationControllerTest {
     @Test
     void list_callerMatchesRecipient_returns200() throws Exception {
         when(service.list(eq(1L), isNull(), eq(1), eq(20)))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(NotificationDtos.PagedResult.of(new PageImpl<>(List.of())));
 
         mvc.perform(get(BASE)
                         .header("X-User-Id", "1")
@@ -77,7 +78,7 @@ class NotificationControllerTest {
     @Test
     void list_withCategory_filters() throws Exception {
         when(service.list(eq(1L), eq("BOOKING"), eq(1), eq(20)))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(NotificationDtos.PagedResult.of(new PageImpl<>(List.of())));
 
         mvc.perform(get(BASE)
                         .param("recipientId", "1")
