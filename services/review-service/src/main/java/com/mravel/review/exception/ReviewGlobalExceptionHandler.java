@@ -39,7 +39,6 @@ public class ReviewGlobalExceptionHandler {
     }
 
     // Dữ liệu đầu vào không hợp lệ: thiếu trường, rating sai phạm vi, targetType sai...
-    // Trước đây rơi xuống mặc định của Spring -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Review bad request: {}", ex.getMessage());
@@ -57,8 +56,7 @@ public class ReviewGlobalExceptionHandler {
                 .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
     }
 
-    // Không gọi được service phụ thuộc (catalog/plan/user-profile/notification...):
-    // connection refused / timeout / DNS... -> trước đây thành 500 chung chung.
+    // Không gọi được service phụ thuộc (catalog/plan/user-profile/notification...).
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<ApiResponse<?>> handleDownstreamUnavailable(ResourceAccessException ex) {
         log.error("Review downstream unavailable: {}", ex.getMessage());
@@ -67,7 +65,6 @@ public class ReviewGlobalExceptionHandler {
                 .body(ApiResponse.error("Không kết nối được tới dịch vụ liên quan. Vui lòng thử lại sau."));
     }
 
-    // Fallback cuối cùng cho lỗi không lường trước.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleOther(Exception ex) {
         log.error("Unexpected review error", ex);

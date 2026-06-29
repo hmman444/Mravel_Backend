@@ -1,13 +1,8 @@
-"""Hybrid constraint extraction.
+"""Trích xuất ràng buộc theo 2 bước.
 
-Step 1: always run the deterministic regex stub. Cheap, free, robust against
-        weak models that ignore JSON-mode prompts. Catches the obvious
-        Vietnamese/English patterns: destination, duration, people, budget.
-Step 2: if a real LLM is configured, let it refine the baseline. Useful for
-        ambiguous phrasing or for filling fields the regex missed.
-
-If the LLM call fails or returns garbage, the regex baseline still wins —
-the user never sees a blank constraint set due to LLM failure.
+Bước 1: chạy regex để bắt các mẫu cơ bản (điểm đến, số ngày, số người, ngân sách).
+Bước 2: nếu có cấu hình LLM thì dùng LLM tinh chỉnh kết quả.
+Nếu LLM lỗi, kết quả regex được giữ lại.
 """
 
 from datetime import date

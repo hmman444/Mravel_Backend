@@ -23,7 +23,6 @@ public class UserGlobalExceptionHandler {
     }
 
     // Dữ liệu đầu vào không hợp lệ: tự chặn chính mình, id thiếu/sai, trường bắt buộc rỗng...
-    // Trước đây rơi xuống handleOther -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("User bad request: {}", ex.getMessage());
@@ -41,8 +40,7 @@ public class UserGlobalExceptionHandler {
                 .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
     }
 
-    // Không gọi được service phụ thuộc (notification-service qua RestTemplate):
-    // connection refused / timeout / DNS... -> trước đây thành 500 chung chung.
+    // Không gọi được service phụ thuộc (notification-service qua RestTemplate).
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<ApiResponse<?>> handleDownstreamUnavailable(ResourceAccessException ex) {
         log.error("User downstream unavailable: {}", ex.getMessage());

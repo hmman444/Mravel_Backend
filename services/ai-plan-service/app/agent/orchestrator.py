@@ -470,12 +470,10 @@ class AgentOrchestrator:
     async def _deterministic_fallback(
         self, constraints: Constraints
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Safety net when the model produces no usable narrative/draft.
+        """Dự phòng khi model không tạo được narrative/draft dùng được.
 
-        Crucially this looks at what we ALREADY know: if the trip is minimally
-        complete we build a real draft instead of re-asking; otherwise we ask
-        only for the specific missing field — never the generic "give me
-        everything" prompt that made the agent loop on known facts.
+        Nếu trip đã đủ tối thiểu thì dựng draft; nếu thiếu thì chỉ hỏi đúng
+        trường còn thiếu thay vì hỏi lại toàn bộ.
         """
         if constraints.is_minimally_complete():
             try:
