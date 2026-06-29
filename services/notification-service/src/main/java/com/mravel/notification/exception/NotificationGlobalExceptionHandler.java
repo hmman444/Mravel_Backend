@@ -8,14 +8,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Service-local exception advice.
- * <p>
- * NotificationServiceApplication only component-scans {@code com.mravel.notification}
- * (it does NOT include {@code com.mravel.common}), so the shared GlobalExceptionHandler
- * is inactive here. Without this advice, business/validation errors collapse into the
- * default Spring 500 ("Đã xảy ra lỗi hệ thống"), hiding the real reason.
- */
+// Advice riêng vì application chỉ scan com.mravel.notification, không gồm com.mravel.common.
 @Slf4j
 @RestControllerAdvice
 public class NotificationGlobalExceptionHandler {
@@ -30,7 +23,6 @@ public class NotificationGlobalExceptionHandler {
     }
 
     // Dữ liệu đầu vào không hợp lệ: thiếu recipientId, người dùng bị chặn...
-    // Trước đây rơi xuống handleOther -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Notification bad request: {}", ex.getMessage());

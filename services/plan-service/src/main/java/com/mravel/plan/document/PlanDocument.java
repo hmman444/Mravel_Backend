@@ -8,11 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Elasticsearch document that mirrors search-relevant fields from the Plan
- * entity.
- * Synced from MySQL via Kafka (plan.v1.index-events topic).
- */
+// Document Elasticsearch cho các trường tìm kiếm của Plan; đồng bộ từ MySQL qua Kafka.
 @Document(indexName = "plans")
 @Setting(settingPath = "/es/plans-settings.json")
 @Getter

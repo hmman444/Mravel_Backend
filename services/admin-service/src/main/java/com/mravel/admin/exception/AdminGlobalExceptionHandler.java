@@ -9,16 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.ResourceAccessException;
 
-/**
- * Bộ xử lý ngoại lệ cho admin-service.
- *
- * Lý do tồn tại: @SpringBootApplication ở com.mravel.admin KHÔNG component-scan
- * com.mravel.common nên GlobalExceptionHandler dùng chung không hoạt động, và
- * service cũng chưa có advice riêng. Hệ quả: lỗi nghiệp vụ/validation
- * (IllegalArgumentException) và các RuntimeException khác rơi xuống cách xử lý
- * mặc định của Spring và trả về 500 chung chung "Đã xảy ra lỗi hệ thống",
- * giấu mất lý do thật. Advice này mirror booking-service để trả thông điệp cụ thể.
- */
+// Advice riêng vì application chỉ scan com.mravel.admin, không gồm com.mravel.common.
 @Slf4j
 @RestControllerAdvice
 public class AdminGlobalExceptionHandler {
@@ -33,7 +24,6 @@ public class AdminGlobalExceptionHandler {
     }
 
     // Dữ liệu đầu vào không hợp lệ: thiếu trường, tham số sai, lý do rỗng...
-    // Trước đây rơi xuống handleOther -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Admin bad request: {}", ex.getMessage());
@@ -51,8 +41,7 @@ public class AdminGlobalExceptionHandler {
                 .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
     }
 
-    // Không gọi được service phụ thuộc (catalog/auth/booking/plan/review/notification) qua RestTemplate:
-    // connection refused / timeout / DNS... -> trước đây thành 500 chung chung.
+    // Không gọi được service phụ thuộc (catalog/auth/booking/plan/review/notification) qua RestTemplate.
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<ApiResponse<?>> handleDownstreamUnavailable(ResourceAccessException ex) {
         log.error("Admin downstream unavailable: {}", ex.getMessage());

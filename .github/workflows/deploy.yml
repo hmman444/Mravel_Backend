@@ -62,6 +62,4 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # NOTE: VPS deploy is handled by a cron on the VPS that runs scripts/deploy.sh
-  # (pull + up). GitHub Actions only builds & pushes images — no SSH into the VPS
-  # (the VPS firewall/fail2ban resets inbound SSH from GitHub runners).
+  # CI chỉ build và push image lên GHCR. Trên VPS chạy scripts/deploy.sh (pull + up) để cập nhật.

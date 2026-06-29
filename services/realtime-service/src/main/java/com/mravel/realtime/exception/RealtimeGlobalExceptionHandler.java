@@ -23,7 +23,6 @@ public class RealtimeGlobalExceptionHandler {
     }
 
     // Dữ liệu đầu vào không hợp lệ: userIds sai, tham số thiếu/sai kiểu...
-    // Trước đây rơi xuống handleOther -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Realtime bad request: {}", ex.getMessage());
@@ -41,8 +40,7 @@ public class RealtimeGlobalExceptionHandler {
                 .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
     }
 
-    // Không gọi được service phụ thuộc qua RestTemplate (auth/block-check...):
-    // connection refused / timeout / DNS... -> trước đây thành 500 chung chung.
+    // Không gọi được service phụ thuộc qua RestTemplate (auth/block-check...).
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<ApiResponse<?>> handleDownstreamUnavailable(ResourceAccessException ex) {
         log.error("Realtime downstream unavailable: {}", ex.getMessage());

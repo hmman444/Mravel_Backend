@@ -1,12 +1,7 @@
-"""Web search fallback — used only when the catalog lacks an item or a price.
+"""Web search dùng khi catalog thiếu mục hoặc thiếu giá.
 
-Provider: Tavily (https://tavily.com) — clean JSON, generous free tier, good for
-extracting current prices ("giá thuê xe máy Đà Nẵng", "vé Bà Nà Hills 2025").
-9Router exposes no web-grounded model over the OpenAI Chat Completions API, so a
-dedicated search API is the reliable option.
-
-Degrades gracefully: with no `WEB_SEARCH_API_KEY` configured, `enabled` is False and
-callers fall back to heuristic pricing — the agent is told so it can be honest.
+Provider: Tavily. Nếu không cấu hình WEB_SEARCH_API_KEY thì enabled=False và
+phía gọi dùng giá ước lượng.
 """
 
 from __future__ import annotations
