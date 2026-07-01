@@ -142,6 +142,41 @@ def _card_body(op: EditOperation, *, for_create: bool) -> Dict[str, Any]:
     return body
 
 
+def _ordered_day_list_ids(board: Dict[str, Any]) -> List[int]:
+    """DAY list ids in day order (by position, then dayDate) — index 0 = Ngày 1."""
+    lists = [
+        x for x in (board.get("lists") or [])
+        if isinstance(x, dict) and x.get("type") == "DAY"
+    ]
+    lists.sort(
+        key=lambda x: (
+            x.get("position") if x.get("position") is not None else 9999,
+            str(x.get("dayDate") or ""),
+        )
+    )
+    return [x.get("id") for x in lists if x.get("id") is not None]
+
+
+def _nth_day(day_list_ids: List[int], day_index: Optional[int]) -> Optional[int]:
+    if not day_index or day_index < 1 or day_index > len(day_list_ids):
+        return None
+    return day_list_ids[day_index - 1]
+
+
+def _resolve_day_targets(op: EditOperation, day_list_ids: List[int]) -> EditOperation:
+    """Turn a 1-based day_index/target_day_index into a concrete list_id (resolving days
+    added earlier in the batch). Leaves an explicit list_id untouched."""
+    if op.op == "create_card" and op.list_id is None and op.day_index is not None:
+        lid = _nth_day(day_list_ids, op.day_index)
+        if lid is not None:
+            return op.model_copy(update={"list_id": lid})
+    if op.op == "move_card" and op.target_list_id is None and op.target_day_index is not None:
+        lid = _nth_day(day_list_ids, op.target_day_index)
+        if lid is not None:
+            return op.model_copy(update={"target_list_id": lid})
+    return op
+
+
 class EditService:
     def __init__(self, plan_client: PlanClient) -> None:
         self._plan = plan_client
@@ -155,11 +190,32 @@ class EditService:
         # exact same proposal (double-click) dedups; a different proposal gets fresh
         # keys and applies — index alone would wrongly collide across proposals.
         batch_seed = _batch_seed(plan_id, operations)
+        # Snapshot day lists so a `day_index`/`target_day_index` target resolves to a REAL
+        # list id — including a day added earlier in THIS batch (its list_id was unknown
+        # when the agent proposed). Without this, "chuyển card sang Ngày 2" where Ngày 2 is
+        # new silently no-ops because the agent had to guess a list_id.
+        try:
+            board = await self._plan.get_board(bearer_token, plan_id)
+            day_list_ids = _ordered_day_list_ids(board)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("apply: could not preload day lists: %s", exc)
+            day_list_ids = []
+
         for i, op in enumerate(operations):
             try:
+                op = _resolve_day_targets(op, day_list_ids)
                 detail = await self._apply_one(plan_id, op, bearer_token, i, batch_seed)
                 applied += 1
                 results.append({"op": op.op, "ok": True, "summary": op.summary, "detail": detail})
+                # A new day changes the day→list_id mapping; re-read so later ops that
+                # target it by index resolve correctly.
+                if op.op == "add_day":
+                    try:
+                        board = await self._plan.get_board(bearer_token, plan_id)
+                        day_list_ids = _ordered_day_list_ids(board)
+                    except Exception:  # noqa: BLE001
+                        if isinstance(detail, dict) and detail.get("new_list_id"):
+                            day_list_ids.append(detail["new_list_id"])
             except Exception as exc:  # noqa: BLE001 — collect, don't abort the batch
                 logger.warning("apply op %s failed: %s", op.op, exc)
                 results.append({"op": op.op, "ok": False, "summary": op.summary, "error": str(exc)})
@@ -173,6 +229,11 @@ class EditService:
                 bearer, plan_id, op.list_id, op.card_id, _card_body(op, for_create=False)
             )
         if op.op == "create_card":
+            if op.list_id is None:
+                raise RuntimeError(
+                    f"Không thêm được hoạt động: không xác định được ngày đích "
+                    f"(day_index={op.day_index})."
+                )
             return await self._plan.create_card(
                 bearer, plan_id, op.list_id, _card_body(op, for_create=True),
                 idempotency_key=_idem(f"{seed}:{idx}:create"),
@@ -180,6 +241,11 @@ class EditService:
         if op.op == "delete_card":
             return await self._plan.delete_card(bearer, plan_id, op.list_id, op.card_id)
         if op.op == "move_card":
+            if op.target_list_id is None:
+                raise RuntimeError(
+                    f"Không chuyển được hoạt động: không xác định được ngày đích "
+                    f"(target_day_index={op.target_day_index})."
+                )
             resp = await self._plan.move_card(
                 bearer, plan_id, op.card_id, op.target_list_id, op.target_position,
                 idempotency_key=_idem(f"{seed}:{idx}:move"),

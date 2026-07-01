@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # origin (the SPA) so they work in-app without extra config.
     public_web_base_url: str = ""
 
+    # Public origin used specifically for SHAREABLE plan links (the "Đã tạo kế hoạch …"
+    # confirmation after approval). This is the deployed domain so the link stays valid
+    # after deploy and when shared. Set to "" to fall back to a relative "/plans/<id>"
+    # (in-app clickable on localhost too).
+    app_public_base_url: str = "https://mravel.info.vn"
+
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
     http_timeout_seconds: float = 30.0
 
