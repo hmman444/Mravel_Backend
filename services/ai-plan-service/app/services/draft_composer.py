@@ -20,7 +20,7 @@ module guarantees a good baseline without one.
 """
 
 import logging
-from datetime import date, time, timedelta
+from datetime import time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.clients.catalog_client import CatalogClient
@@ -148,6 +148,71 @@ def _short_name(name: Optional[str]) -> str:
     return (name or "điểm đến").strip()
 
 
+# A single day's activities must stay inside ONE city. The seeded catalog is patchy,
+# so a search for city X can leak a venue from city Y (e.g. a Hội An homestay in a
+# "Hồ Chí Minh" hotel search) — chaining real travel to it then produces absurd 500km+
+# legs that shove every later start time to 23:59. We defend on two fronts:
+#   1. drop venues whose (known) city differs from the destination, and
+#   2. clamp the travel time used for scheduling to a sane intra-city maximum.
+_MAX_INTRADAY_TRAVEL_MIN = 90
+
+
+def _canonical_city(text: str) -> Optional[str]:
+    """Map free text (a venue's name+address or the destination) to a canonical VN
+    city via the whitelist, or None when no known city is present."""
+    from app.llm.stub import _VN_DESTINATIONS
+
+    low = (text or "").lower()
+    for canonical, surfaces in _VN_DESTINATIONS:
+        if any(s in low for s in surfaces):
+            return canonical
+    return None
+
+
+def _venue_city_text(item: Dict[str, Any]) -> str:
+    parts = [
+        item.get("name"),
+        item.get("addressLine"),
+        item.get("wardName"),
+        item.get("districtName"),
+        item.get("cityName"),
+        item.get("provinceName"),
+    ]
+    return " ".join(str(p) for p in parts if p)
+
+
+def _same_city(items: List[Dict[str, Any]], dest_canonical: Optional[str]) -> List[Dict[str, Any]]:
+    """Keep only venues in the destination city. A venue with an UNKNOWN city is kept
+    (we can't prove it's elsewhere); one with a known DIFFERENT city is dropped."""
+    if not dest_canonical:
+        return items
+    kept: List[Dict[str, Any]] = []
+    for it in items:
+        vc = _canonical_city(_venue_city_text(it))
+        if vc is None or vc == dest_canonical:
+            kept.append(it)
+    return kept
+
+
+def _intraday_minutes(leg: Optional[Any]) -> int:
+    """Travel minutes for chaining start times — clamped so a stray cross-city leg
+    can't cascade every activity to 23:59."""
+    if leg is None:
+        return 15
+    return min(leg.minutes, _MAX_INTRADAY_TRAVEL_MIN)
+
+
+def _hotel_price_key(item: Dict[str, Any]) -> float:
+    """Sort key = nightly price; missing price sorts last (treated as expensive)."""
+    val = pricing._num(item.get("min_nightly_price_vnd") or item.get("minNightlyPrice"))
+    return val if val else float("inf")
+
+
+def _restaurant_price_key(item: Dict[str, Any]) -> float:
+    val = pricing._num(item.get("min_price_per_person_vnd") or item.get("minPricePerPerson"))
+    return val if val else float("inf")
+
+
 class _Picker:
     """Round-robin picker that prefers the nearest unused item to a moving cursor.
     Resets `used` when the pool is exhausted so long trips keep filling slots."""
@@ -220,6 +285,25 @@ class DraftComposer:
         restaurants = await self._catalog.search_restaurants(loc, page=0, size=30)
         cafes = await self._catalog.search_restaurants(loc, page=0, size=20, cuisine="cafe")
         places = await self._catalog.search_places(destination, page=0, size=30)
+
+        # Keep only venues actually in the destination city — the catalog search can
+        # leak venues from other cities (empty/loose location filter), and mixing e.g. a
+        # Hội An hotel into an HCM trip yields 500km+ legs and 23:59 times. Venues whose
+        # city we can't identify are kept (benefit of the doubt).
+        dest_city = _canonical_city(destination)
+        hotels = _same_city(hotels, dest_city)
+        restaurants = _same_city(restaurants, dest_city)
+        cafes = _same_city(cafes, dest_city)
+        places = _same_city(places, dest_city)
+
+        # Budget-aware selection: when the user set a budget, favour the CHEAPEST
+        # venues (by nightly / per-person price) so the estimate respects it, instead
+        # of always taking the first (often priciest) catalog hit.
+        budget = constraints.budget_total_vnd
+        if budget:
+            hotels = sorted(hotels, key=_hotel_price_key)
+            restaurants = sorted(restaurants, key=_restaurant_price_key)
+            cafes = sorted(cafes, key=_restaurant_price_key)
 
         hotel = hotels[0] if hotels else None
         hotel_coords = _coords(hotel)
@@ -354,7 +438,7 @@ class DraftComposer:
         # --- Rest / sleep: travel back to the hotel. ---
         if category in ("rest", "sleep"):
             leg = leg_between(cursor, hotel_coords)
-            travel = leg.minutes if leg else 15
+            travel = _intraday_minutes(leg)
             start = _clamp_anchor(_add_minutes(t, travel), anchor)
             quantity = 1
             unit = 0
@@ -422,7 +506,7 @@ class DraftComposer:
                 return act, cost, cursor, cursor_name, _add_minutes(start, duration)
             alt = picker.peek_alternative(_coords(item))
             leg = leg_between(cursor, _coords(item))
-            travel = leg.minutes if leg else 12
+            travel = _intraday_minutes(leg) if leg else 12
             start = _clamp_anchor(_add_minutes(t, travel), anchor)
             per_person = pricing.meal_cost_per_person(item, category)
             cost = pricing.total_for(per_person, travelers)
@@ -471,7 +555,7 @@ class DraftComposer:
                 )
                 return act, 0, cursor, cursor_name, _add_minutes(start, duration)
             leg = leg_between(cursor, _coords(item))
-            travel = leg.minutes if leg else 15
+            travel = _intraday_minutes(leg) if leg else 15
             start = _clamp_anchor(_add_minutes(t, travel), anchor)
             per_person = pricing.place_cost_per_person(item)
             cost = pricing.total_for(per_person, travelers) if per_person else 0

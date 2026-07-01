@@ -111,6 +111,21 @@ async def _one_shot_assistant_stream(
     )
 
 
+def _approval_message(plan_id: int, draft) -> str:
+    """Confirmation shown after a draft becomes a real plan — a named, clickable link
+    to the plan page (valid after deploy via app_public_base_url) instead of a bare id."""
+    from app.agent.tools import plan_web_url
+    from app.config import get_settings
+
+    title = (getattr(draft, "summary", None) or f"Kế hoạch #{plan_id}").strip()
+    base = get_settings().app_public_base_url.strip()
+    url = plan_web_url(plan_id, base) or f"/plans/{plan_id}"
+    return (
+        f"Đã tạo kế hoạch **[{title}]({url})**. "
+        "Bạn mở đường dẫn để xem chi tiết, hoặc nhắn mình chỉnh sửa tiếp nhé."
+    )
+
+
 def _to_view(session: PlanSession) -> SessionView:
     return SessionView(
         session_id=session.session_id,
@@ -462,6 +477,18 @@ async def stream_message(
         session.plan_id = detected_plan_id
         store.save(session)
 
+    # After the user approved a draft, the create-session is APPROVED and would otherwise
+    # dead-end ("Session is no longer in DRAFTING"). Let them keep chatting by binding to
+    # the plan they just created — further messages edit that plan (e.g. "làm rẻ hơn",
+    # "thêm ngày 2"). They can always start a fresh conversation via "Hội thoại mới".
+    if (
+        session.plan_id is None
+        and session.status == SessionStatus.APPROVED
+        and session.approved_plan_id is not None
+    ):
+        session.plan_id = session.approved_plan_id
+        store.save(session)
+
     # Edit mode: chat is bound to an existing plan → propose edits, don't generate a draft.
     if session.plan_id is not None:
         return StreamingResponse(
@@ -645,7 +672,7 @@ async def approve_session(
     session.messages.append(
         ChatMessage(
             role=ChatRole.ASSISTANT,
-            content=f"Đã tạo plan #{result['plan_id']} từ bản nháp. Bạn có thể mở trên board.",
+            content=_approval_message(result["plan_id"], session.draft),
         )
     )
     store.save(session)

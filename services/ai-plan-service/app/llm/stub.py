@@ -113,6 +113,17 @@ def _parse_interests(text: str) -> list[str]:
     return found
 
 
+# Meta / platform / question words that betray a NON-trip phrase ("thông tin về nền
+# tảng này", "trang web này là gì"). A free-text capture containing any of these is not
+# a place name — reject it so general questions don't corrupt the destination.
+_NON_PLACE_WORDS = {
+    "nền", "tảng", "nền tảng", "trang", "web", "website", "hệ", "thống", "hệ thống",
+    "app", "ứng", "dụng", "ứng dụng", "thông", "tin", "thông tin", "gì", "làm",
+    "chức", "năng", "tính", "này", "kia", "đó", "nào", "mravel", "hôm", "nay", "ngày",
+    "bạn", "mình", "tôi",
+}
+
+
 def _clean_destination(raw: str) -> str | None:
     """Trim fillers and reject stopwords / junk captures."""
     dest = re.sub(r"\s+(trong|for|từ|on|với|with)\b.*$", "", raw, flags=re.IGNORECASE).strip()
@@ -123,6 +134,14 @@ def _clean_destination(raw: str) -> str | None:
         return None
     # A single short token that's a stopword-ish particle, or pure digits, is junk.
     if dest.isdigit() or len(dest) < 2:
+        return None
+    # Free-text captures are only trustworthy when short and place-like. A real VN
+    # destination is ≤3 words; anything longer, or containing a meta/platform/question
+    # word, is a mis-capture from ordinary conversation ("về nền tảng này").
+    words = dest.lower().split()
+    if len(words) > 3:
+        return None
+    if any(w in _NON_PLACE_WORDS for w in words):
         return None
     return dest
 
