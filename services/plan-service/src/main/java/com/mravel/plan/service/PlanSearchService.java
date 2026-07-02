@@ -289,6 +289,12 @@ public class PlanSearchService {
                     SortOptions.of(s -> s.field(f -> f.field("views").order(SortOrder.Desc))),
                     SortOptions.of(s -> s.field(f -> f.field("createdAt").order(SortOrder.Desc))),
                     idTieBreaker);
+            case "MOST_REACTED" -> List.of(
+                    // Docs missing reactionCount (e.g. indexed before this field existed)
+                    // sort last by ES's default missing=_last behaviour.
+                    SortOptions.of(s -> s.field(f -> f.field("reactionCount").order(SortOrder.Desc))),
+                    SortOptions.of(s -> s.field(f -> f.field("createdAt").order(SortOrder.Desc))),
+                    idTieBreaker);
             case "BUDGET_ASC" -> List.of(
                     SortOptions.of(s -> s.field(f -> f.field("budgetTotal").order(SortOrder.Asc))),
                     idTieBreaker);

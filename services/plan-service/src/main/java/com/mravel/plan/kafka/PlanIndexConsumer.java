@@ -82,6 +82,7 @@ public class PlanIndexConsumer {
                 .visibility(plan.getVisibility() != null ? plan.getVisibility().name() : "PRIVATE")
                 .authorId(plan.getAuthorId())
                 .views(plan.getViews() != null ? plan.getViews() : 0L)
+                .reactionCount(plan.getReactions() != null ? (long) plan.getReactions().size() : 0L)
                 .startDate(plan.getStartDate())
                 .endDate(plan.getEndDate())
                 .days(plan.getDays())

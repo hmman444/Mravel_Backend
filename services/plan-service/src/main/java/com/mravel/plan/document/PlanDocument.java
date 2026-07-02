@@ -43,6 +43,10 @@ public class PlanDocument {
     @Field(type = FieldType.Long)
     private Long views;
 
+    /** Tổng số lượt react của plan — dùng cho sắp xếp MOST_REACTED. */
+    @Field(type = FieldType.Long)
+    private Long reactionCount;
+
     @Field(type = FieldType.Date, format = DateFormat.date)
     private LocalDate startDate;
 
