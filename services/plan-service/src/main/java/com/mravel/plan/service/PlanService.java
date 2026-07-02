@@ -647,7 +647,11 @@ public class PlanService {
                 }
 
                 try {
-                        planViewService.recordView(planId, viewerId, plan.getAuthorId());
+                        boolean counted = planViewService.recordView(planId, viewerId, plan.getAuthorId());
+                        // Đồng bộ lại số views sang Elasticsearch để sort MOST_VIEWED khớp số hiển thị.
+                        if (counted) {
+                                planIndexPublisher.publishUpsert(planId);
+                        }
                 } catch (Exception ignored) {
                 }
         }
