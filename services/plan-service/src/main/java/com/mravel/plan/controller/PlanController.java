@@ -38,7 +38,7 @@ public class PlanController {
          *   daysMin/Max   – trip duration range
          *   startDateFrom/To – ISO-8601 date range (yyyy-MM-dd)
          *   destinations  – repeated param for destination names
-         *   sortBy        – RELEVANCE | NEWEST | MOST_VIEWED | BUDGET_ASC | BUDGET_DESC
+         *   sortBy        – RELEVANCE | NEWEST | MOST_VIEWED | MOST_REACTED | BUDGET_ASC | BUDGET_DESC
          *   cursor        – opaque pagination cursor from previous response (null = first page)
          *   size          – page size (default 10, max 50)
          *   userLimit     – max user results returned alongside plan results
