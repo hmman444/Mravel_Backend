@@ -3,6 +3,7 @@ package com.mravel.plan.service;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.mapping.FieldType;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import co.elastic.clients.json.JsonData;
 import com.mravel.plan.document.PlanDocument;
@@ -287,6 +288,15 @@ public class PlanSearchService {
                     idTieBreaker);
             case "MOST_VIEWED" -> List.of(
                     SortOptions.of(s -> s.field(f -> f.field("views").order(SortOrder.Desc))),
+                    SortOptions.of(s -> s.field(f -> f.field("createdAt").order(SortOrder.Desc))),
+                    idTieBreaker);
+            case "MOST_REACTED" -> List.of(
+                    // unmappedType=long: nếu index cũ CHƯA có field reactionCount thì ES vẫn
+                    // sort được (coi như long, giá trị thiếu xếp cuối) thay vì báo lỗi -> tránh
+                    // tình trạng "lúc lọc được lúc không".
+                    SortOptions.of(s -> s.field(f -> f.field("reactionCount")
+                            .order(SortOrder.Desc)
+                            .unmappedType(FieldType.Long))),
                     SortOptions.of(s -> s.field(f -> f.field("createdAt").order(SortOrder.Desc))),
                     idTieBreaker);
             case "BUDGET_ASC" -> List.of(

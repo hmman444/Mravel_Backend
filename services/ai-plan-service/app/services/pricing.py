@@ -72,6 +72,14 @@ def _band_value(category: str, level: Optional[Any]) -> int:
 
 def meal_cost_per_person(item: Optional[Dict[str, Any]], meal_type: str) -> int:
     """Resolve a per-person meal price. meal_type ∈ breakfast|cafe|lunch|dinner|streetfood|seafood."""
+    if meal_type == "cafe":
+        # A cafe stop is a drink/snack, NOT a full meal. When the catalog has no
+        # dedicated cafe we fall back to a restaurant venue — but pricing it at the
+        # restaurant's full per-head bill inflated cafe slots to 400k-700k/người
+        # (e.g. "Cafe · 2,100,000đ" for 3 people). Always price a cafe with the cafe
+        # band, scaled by the venue's price level but capped at the cafe high band.
+        level = (item.get("price_level") or item.get("priceLevel")) if item else None
+        return min(_band_value("cafe", level), _BANDS["cafe"][2])
     if item:
         lo = _num(item.get("min_price_per_person_vnd") or item.get("minPricePerPerson"))
         hi = _num(item.get("max_price_per_person_vnd") or item.get("maxPricePerPerson"))

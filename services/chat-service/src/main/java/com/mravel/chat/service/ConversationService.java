@@ -13,11 +13,15 @@ import com.mravel.common.event.ChatMessageEvent.MessagePayload;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,9 +37,16 @@ public class ConversationService {
     private final UserClient userClient;
     private final BlockGuard blockGuard;
 
+    /** Tự tham chiếu (qua proxy) để gọi phương thức @Transactional bên trong khối synchronized. */
+    @Lazy
+    @Autowired
+    private ConversationService self;
+
+    /** Khóa theo từng cặp người dùng để chống tạo trùng DM khi có request đồng thời. */
+    private static final ConcurrentMap<String, Object> PRIVATE_LOCKS = new ConcurrentHashMap<>();
+
     // ─── Create ──────────────────────────────────────────────────────────────
 
-    @Transactional
     public ConversationResponse findOrCreatePrivate(Long userId, Long recipientId) {
         if (userId.equals(recipientId)) {
             throw new IllegalArgumentException("Không thể tạo cuộc trò chuyện với chính mình");
@@ -44,6 +55,18 @@ public class ConversationService {
         if (blockGuard.isBlocked(userId, recipientId)) {
             throw new IllegalArgumentException("Không thể nhắn tin do quan hệ đã bị chặn");
         }
+        // Serialize theo cặp người dùng: 2 request đồng thời (double-click) sẽ chạy tuần tự,
+        // request sau nhìn thấy DM mà request trước đã commit -> không tạo trùng.
+        String pairKey = Math.min(userId, recipientId) + ":" + Math.max(userId, recipientId);
+        Object lock = PRIVATE_LOCKS.computeIfAbsent(pairKey, k -> new Object());
+        synchronized (lock) {
+            return self.findOrCreatePrivateTx(userId, recipientId);
+        }
+    }
+
+    /** Tìm hoặc tạo DM trong 1 transaction; luôn được gọi trong khối synchronized ở trên. */
+    @Transactional
+    public ConversationResponse findOrCreatePrivateTx(Long userId, Long recipientId) {
         Optional<Long> existingId = conversationRepo.findPrivateConversationId(userId, recipientId);
         if (existingId.isPresent()) {
             return buildResponse(conversationRepo.findById(existingId.get()).orElseThrow(), userId);

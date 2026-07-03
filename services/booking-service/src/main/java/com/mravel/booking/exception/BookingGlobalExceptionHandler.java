@@ -23,7 +23,6 @@ public class BookingGlobalExceptionHandler {
     }
 
     // Dữ liệu đầu vào không hợp lệ: thiếu trường, ngày sai, payOption sai, giá thiếu...
-    // Trước đây rơi xuống handleOther -> 500 "Đã xảy ra lỗi hệ thống" (giấu mất lý do thật).
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Booking bad request: {}", ex.getMessage());
@@ -41,8 +40,7 @@ public class BookingGlobalExceptionHandler {
                 .body(ApiResponse.error("Dữ liệu gửi lên không hợp lệ"));
     }
 
-    // Không gọi được service phụ thuộc (catalog kho phòng/bàn hoặc cổng thanh toán):
-    // connection refused / timeout / DNS... -> trước đây thành 500 chung chung.
+    // Không gọi được service phụ thuộc (catalog kho phòng/bàn hoặc cổng thanh toán).
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<ApiResponse<?>> handleDownstreamUnavailable(ResourceAccessException ex) {
         log.error("Booking downstream unavailable: {}", ex.getMessage());

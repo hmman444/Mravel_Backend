@@ -38,7 +38,7 @@ public class PlanFilterRequest {
 
     /**
      * Sort strategy.
-     * Accepted values: RELEVANCE (default), NEWEST, MOST_VIEWED, BUDGET_ASC, BUDGET_DESC.
+     * Accepted values: RELEVANCE (default), NEWEST, MOST_VIEWED, MOST_REACTED, BUDGET_ASC, BUDGET_DESC.
      */
     private String sortBy;
 

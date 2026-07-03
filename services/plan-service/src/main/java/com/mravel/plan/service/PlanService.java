@@ -550,6 +550,9 @@ public class PlanService {
                         planNotificationService.notifyPlanReact(userId, ownerId, planId, key);
                 }
 
+                // Đồng bộ lại số lượt react sang Elasticsearch để sắp xếp MOST_REACTED chính xác.
+                planIndexPublisher.publishUpsert(planId);
+
                 return planMapper.toFeedItem(plan);
         }
 
@@ -644,7 +647,11 @@ public class PlanService {
                 }
 
                 try {
-                        planViewService.recordView(planId, viewerId, plan.getAuthorId());
+                        boolean counted = planViewService.recordView(planId, viewerId, plan.getAuthorId());
+                        // Đồng bộ lại số views sang Elasticsearch để sort MOST_VIEWED khớp số hiển thị.
+                        if (counted) {
+                                planIndexPublisher.publishUpsert(planId);
+                        }
                 } catch (Exception ignored) {
                 }
         }
@@ -1273,6 +1280,7 @@ public class PlanService {
                                                         : "PRIVATE")
                                         .authorId(plan.getAuthorId())
                                         .views(plan.getViews() != null ? plan.getViews() : 0L)
+                                        .reactionCount(plan.getReactions() != null ? (long) plan.getReactions().size() : 0L)
                                         .startDate(plan.getStartDate())
                                         .endDate(plan.getEndDate())
                                         .days(plan.getDays())

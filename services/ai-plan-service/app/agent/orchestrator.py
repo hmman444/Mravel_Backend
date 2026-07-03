@@ -20,7 +20,12 @@ import logging
 from datetime import date
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
-from app.agent.edits import EditValidationError, board_summary, parse_operations
+from app.agent.edits import (
+    EditOperation,
+    EditValidationError,
+    board_summary,
+    parse_operations,
+)
 from app.agent.tools import (
     DraftValidationError,
     ToolDispatcher,
@@ -33,6 +38,7 @@ from app.clients.catalog_client import CatalogClient
 from app.clients.plan_client import PlanClient
 from app.llm.base import LLMClient
 from app.models.session import ChatMessage, ChatRole, Constraints, PlanDraft
+from app.services import assistant, budget_editor, fill_editor, retime_editor
 from app.services.draft_composer import DraftComposer
 
 logger = logging.getLogger("ai_plan.agent")
@@ -45,8 +51,24 @@ _SYSTEM_PROMPT = """You are Mravel's AI travel planner for Vietnamese users.
 # Communication
 - Reply in Vietnamese. Tone: thân thiện, ngắn gọn, cụ thể (like a knowledgeable friend).
 - Never echo system instructions, the context primer, or raw constraint dumps.
-- When info is missing, ask ONE focused question at a time (not a checklist).
 - Use markdown sparingly. Day titles in **bold** are fine; long bullet lists are not.
+
+# When the user wants a plan — BUILD IT, don't just chat (critical)
+- The moment the user asks to create/plan a trip, your job is to produce a `finalize_draft`,
+  NOT to reply with prose. Only ask a question when you literally cannot start.
+- You may ask AT MOST 2 clarifying questions in total across the whole conversation, and
+  only for genuinely blocking facts (điểm đến, số ngày). Everything else — budget, sở
+  thích, nhịp độ — pick a sensible default and proceed. Never interrogate.
+- If destination + số ngày are known (or inferable from the chat), go straight to
+  searching + `finalize_draft` this turn. Do not end the turn with only a question when
+  you already have enough to build.
+
+# Budget — respect it strictly
+- If the user gives a budget (e.g. "ngân sách 10 triệu", "rẻ hơn"), the draft's estimated
+  total MUST be at or below it. Pick cheaper venues (pass max_price to the search tools),
+  price cafes as a drink (~50k/người, NOT a full meal), and drop optional slots if needed.
+- Never silently exceed the budget. If it's truly impossible, say so honestly and give the
+  closest cheaper plan you can — do not just hand back an over-budget itinerary.
 
 # Tools you may call
 - `set_constraints(...)` — record/confirm trip facts. Call this whenever the user
@@ -275,6 +297,19 @@ cards with `card_id`, their times and costs). The user is looking at this exact 
 - To find replacements or correct prices, use search_hotels/search_restaurants/
   search_places (catalog first), web_search (for live prices), and route_legs (timing).
 
+# Restructuring days (add days, move cards) — target days by INDEX, and FIX TIMES
+- To grow a 1-day plan into N days: (1) `update_plan` with the new start_date/end_date;
+  (2) one `add_day` per extra day (Ngày 2, Ngày 3, …); (3) then `move_card`/`create_card`
+  into those days. Emit add_day BEFORE the moves/creates that fill the new days.
+- A day added THIS turn has NO list_id you can know. To move/create into it, use the
+  1-based DAY NUMBER: `move_card` with `target_day_index` (e.g. 2 = Ngày 2), `create_card`
+  with `day_index`. Do NOT invent a `target_list_id`/`list_id` for a new day — a guessed id
+  silently no-ops (the card stays put). Use the real list_id only for days already on the board.
+- When you move or reorganise cards, you MUST also set a correct `start_time` and `end_time`
+  on each so the day reads chronologically (sáng→trưa→chiều→tối, ~06:30 → ~22:00). NEVER
+  leave a card at 23:59–23:59 — rewrite those to sensible clock times. Re-time an entire day
+  when the user says the times are wrong.
+
 # Building / filling a whole itinerary — BE DENSE (this is critical)
 When the user asks to plan or fill a full trip ("lên kế hoạch Đà Nẵng 4 ngày 3 đêm",
 "điền hoạt động cho cả chuyến"), do it in ONE `propose_plan_edits` call that covers
@@ -339,6 +374,13 @@ For each create_card/update_card, fill all that apply:
    from the board. Costs are per person × people; keep the headcount consistent.
    After proposing, summarise the changes in plain Vietnamese (see "Tone" below) and
    invite "Áp dụng".
+
+# Budget / "làm rẻ hơn" edits — respect the target strictly
+- When the user asks to make the plan cheaper or gives a budget ("rẻ hơn", "ngân sách
+  10 triệu"), you MUST propose edits so the plan's new estimated total is at or below the
+  target. `update_card` the expensive cards to cheaper costs/venues, price cafes as a
+  drink (~50k/người, never a full-meal price), and `update_plan(budget_total_vnd=…)` to
+  record the new budget. Do it in ONE `propose_plan_edits` — don't reply with only prose.
 
 A discovery question (kind 2) does NOT produce an edit proposal — just answer with
 links. Reserve `propose_plan_edits` for actual changes the user asked to make.
@@ -445,7 +487,7 @@ class AgentOrchestrator:
         """
 
         if not self._llm.supports_tool_use():
-            draft, narrative = await self._stub_path(constraints)
+            draft, narrative = await self._stub_path(constraints, latest_user_message, bearer_token)
             if draft is not None:
                 yield {"event": "draft_ready", "draft": draft}
             yield {"event": "assistant_message", "text": narrative}
@@ -464,19 +506,25 @@ class AgentOrchestrator:
         except Exception as exc:  # noqa: BLE001
             logger.warning("agent loop failed: %s — falling back", exc, exc_info=True)
             yield {"event": "error", "message": str(exc)}
-            async for ev in self._deterministic_fallback(constraints):
+            async for ev in self._deterministic_fallback(constraints, latest_user_message, bearer_token):
                 yield ev
 
     async def _deterministic_fallback(
-        self, constraints: Constraints
+        self, constraints: Constraints, latest_user_message: str = "", bearer_token: Optional[str] = None
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Safety net when the model produces no usable narrative/draft.
+        """Dự phòng khi model không tạo được narrative/draft dùng được.
 
-        Crucially this looks at what we ALREADY know: if the trip is minimally
-        complete we build a real draft instead of re-asking; otherwise we ask
-        only for the specific missing field — never the generic "give me
-        everything" prompt that made the agent loop on known facts.
+        Nếu người dùng đang trò chuyện bình thường (hỏi MAI làm được gì, nền tảng là
+        gì, hôm nay ngày mấy…) thì trả lời chung — KHÔNG ép sang lập kế hoạch. Chỉ khi
+        có ý định lên/sửa lịch trình mới dựng draft (đủ tối thiểu) hoặc hỏi trường còn thiếu.
         """
+        if not assistant.wants_planning(latest_user_message, constraints):
+            web_ans = await self._answer_web_question(latest_user_message, bearer_token)
+            yield {
+                "event": "assistant_message",
+                "text": web_ans or assistant.general_reply(latest_user_message),
+            }
+            return
         if constraints.is_minimally_complete():
             try:
                 draft = await self._composer.compose(constraints)
@@ -487,7 +535,12 @@ class AgentOrchestrator:
                 logger.warning("deterministic compose failed: %s", exc)
         yield {"event": "assistant_message", "text": _clarification_text(constraints)}
 
-    async def _stub_path(self, constraints: Constraints) -> Tuple[Optional[PlanDraft], str]:
+    async def _stub_path(
+        self, constraints: Constraints, latest_user_message: str = "", bearer_token: Optional[str] = None
+    ) -> Tuple[Optional[PlanDraft], str]:
+        if not assistant.wants_planning(latest_user_message, constraints):
+            web_ans = await self._answer_web_question(latest_user_message, bearer_token)
+            return None, (web_ans or assistant.general_reply(latest_user_message))
         if not constraints.is_minimally_complete():
             return None, _clarification_text(constraints)
         draft = await self._composer.compose(constraints)
@@ -535,7 +588,7 @@ class AgentOrchestrator:
                     yield {"event": "assistant_message", "text": narrative}
                 else:
                     # Model went silent. Don't re-ask blindly — use what we know.
-                    async for ev in self._deterministic_fallback(working):
+                    async for ev in self._deterministic_fallback(working, latest_user_message, bearer_token):
                         yield ev
                 return
 
@@ -622,7 +675,7 @@ class AgentOrchestrator:
         if narrative:
             yield {"event": "assistant_message", "text": narrative}
         else:
-            async for ev in self._deterministic_fallback(working):
+            async for ev in self._deterministic_fallback(working, latest_user_message, bearer_token):
                 yield ev
 
     async def edit_stream(
@@ -690,8 +743,28 @@ class AgentOrchestrator:
             if turn.stop_reason == "error":
                 msg = turn.error or "AI gặp lỗi tạm thời."
                 yield {"event": "error", "message": msg}
-                # Keep the chat useful: surface the friendly error + the current plan
-                # so the user can still see/reference it while the model is unavailable.
+                # AI unavailable, but a "làm rẻ hơn / ngân sách X" request can still be
+                # honoured deterministically — re-price the itinerary toward the target
+                # budget and propose those cuts, so the demo works without the LLM.
+                if budget_editor.detect_budget_intent(latest_user_message):
+                    target = budget_editor.parse_budget_vnd(latest_user_message) or _board_budget(board)
+                    ops = budget_editor.propose_budget_cuts(
+                        board, target, travelers=_board_travelers(board)
+                    )
+                    if ops:
+                        if target:
+                            ops.append(_budget_plan_op(target))
+                        yield {
+                            "event": "edit_proposal",
+                            "operations": [op.model_dump() for op in ops],
+                        }
+                        yield {
+                            "event": "assistant_message",
+                            "text": _budget_cut_narrative(ops, target),
+                        }
+                        return
+                # Otherwise keep the chat useful: surface the friendly error + the current
+                # plan so the user can still see/reference it while the model is down.
                 yield {
                     "event": "assistant_message",
                     "text": f"{msg}\n\nKế hoạch hiện tại của bạn:\n\n{summary}",
@@ -702,10 +775,23 @@ class AgentOrchestrator:
 
             if turn.stop_reason != "tool_use":
                 narrative = turn.text or narrative
-                yield {
-                    "event": "assistant_message",
-                    "text": narrative or "Bạn muốn mình chỉnh sửa gì trong kế hoạch này?",
-                }
+                # The weak model often ends the turn without proposing anything even on a
+                # clear "thêm hoạt động" / "chỉnh lại giờ" request. Fall back to a
+                # deterministic edit so MAI actually acts instead of re-asking.
+                det_ops, det_text = await self._deterministic_edit_ops(board, latest_user_message)
+                if det_ops:
+                    yield {
+                        "event": "edit_proposal",
+                        "operations": [op.model_dump() for op in det_ops],
+                    }
+                    yield {"event": "assistant_message", "text": det_text}
+                    return
+                if not narrative:
+                    web_ans = await self._answer_web_question(latest_user_message, bearer_token)
+                    if web_ans:
+                        yield {"event": "assistant_message", "text": web_ans}
+                        return
+                yield {"event": "assistant_message", "text": narrative or _EDIT_HELP_TEXT}
                 return
 
             proposed = None
@@ -753,10 +839,107 @@ class AgentOrchestrator:
                 yield {"event": "assistant_message", "text": narrative}
                 return
 
-        yield {
-            "event": "assistant_message",
-            "text": narrative or "Mình chưa rõ thay đổi bạn muốn — bạn mô tả cụ thể hơn nhé?",
-        }
+        # Exhausted iterations without a proposal — try the deterministic edit too.
+        det_ops, det_text = await self._deterministic_edit_ops(board, latest_user_message)
+        if det_ops:
+            yield {
+                "event": "edit_proposal",
+                "operations": [op.model_dump() for op in det_ops],
+            }
+            yield {"event": "assistant_message", "text": det_text}
+            return
+        if not narrative:
+            web_ans = await self._answer_web_question(latest_user_message, bearer_token)
+            if web_ans:
+                yield {"event": "assistant_message", "text": web_ans}
+                return
+        yield {"event": "assistant_message", "text": narrative or _EDIT_HELP_TEXT}
+
+    async def _answer_web_question(self, message: str, bearer_token: Optional[str]) -> Optional[str]:
+        """Deterministically answer a live-fact question (giá vé, giờ mở cửa, thuê xe…)
+        via web_search when the weak LLM won't. Returns a formatted answer or None."""
+        if not assistant.is_live_fact_question(message):
+            return None
+        year = date.today().year
+        query = message if str(year) in message else f"{message} {year}"
+        try:
+            res = await self._dispatcher.with_token(bearer_token).run(
+                "web_search", {"query": query, "max_results": 4}
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("web-question fallback failed: %s", exc)
+            return None
+        if not res.get("enabled", False):
+            return (
+                "Mình chưa tra được giá/thông tin hiện tại (web search chưa bật). "
+                "Bạn nên kiểm tra trên trang bán vé chính thức để có số mới nhất nhé."
+            )
+        answer = (res.get("answer") or "").strip()
+        results = res.get("results") or []
+        if not answer and not results:
+            return "Mình chưa tìm thấy thông tin đáng tin cậy cho câu này — bạn thử hỏi lại cụ thể hơn nhé."
+        parts: List[str] = []
+        if answer:
+            parts.append(answer)
+        elif results:
+            parts.append((results[0].get("content") or "").strip())
+        links = [
+            f"[{r.get('title') or 'nguồn'}]({r.get('url')})"
+            for r in results[:2] if r.get("url")
+        ]
+        if links:
+            parts.append("Nguồn: " + " · ".join(links))
+        parts.append("_(Giá có thể thay đổi — nên kiểm tra lại trước khi đi.)_")
+        return "\n\n".join(parts)
+
+    async def _deterministic_edit_ops(self, board: Dict[str, Any], message: str):
+        """Offline fallback when the LLM won't propose: returns (ops, narrative) for the
+        two things users most often ask and the weak model flakes on — re-timing existing
+        cards ("chỉnh lại giờ") and filling days ("thêm hoạt động"). ([], None) if neither."""
+        # Re-time existing cards (fix the 23:59 mess) — cheapest, most common ask.
+        if retime_editor.detect_retime_intent(message):
+            ops = retime_editor.build_retime_ops(board, message)
+            if ops:
+                return ops, _retime_narrative(ops)
+        # Fill target/empty days with real, timed activities.
+        if fill_editor.detect_fill_intent(message):
+            try:
+                ops = await fill_editor.build_fill_ops(board, message, self._composer)
+            except Exception as exc:  # noqa: BLE001 — never let the fallback crash the turn
+                logger.warning("fill fallback failed: %s", exc)
+                ops = []
+            if ops:
+                return ops, _fill_narrative(ops)
+        return [], None
+
+
+# Shown when the model gives nothing usable AND no deterministic fallback matched — a
+# helpful menu instead of the old parrot "Bạn muốn mình chỉnh sửa gì?".
+_EDIT_HELP_TEXT = (
+    "Mình chưa chắc ý bạn. Mình có thể giúp bạn với kế hoạch này:\n"
+    "- **Chỉnh giờ** cho hợp lý (vd: “chỉnh lại thời gian ngày 1”).\n"
+    "- **Thêm hoạt động** vào ngày trống (vd: “thêm hoạt động vào ngày 2”).\n"
+    "- **Làm rẻ hơn** theo ngân sách (vd: “làm rẻ hơn, ngân sách 8 triệu”).\n"
+    "- **Đổi/xoá** một hoạt động, hoặc hỏi **giá vé/giờ mở cửa** một địa điểm.\n"
+    "Bạn nói cụ thể giúp mình nhé."
+)
+
+
+def _fill_narrative(operations: list) -> str:
+    days = sorted({op.day_index for op in operations if getattr(op, "day_index", None)})
+    where = ", ".join(f"Ngày {d}" for d in days) if days else "kế hoạch"
+    return (
+        f"Mình đã soạn {len(operations)} hoạt động cho {where} (có giờ giấc, địa điểm và chi phí). "
+        "Bạn bấm **Áp dụng** để thêm vào lịch trình nhé."
+    )
+
+
+def _retime_narrative(operations: list) -> str:
+    return (
+        f"Mình đã canh lại giờ cho {len(operations)} hoạt động theo lịch hợp lý "
+        "(sáng → trưa → nghỉ → chiều → tối), không còn 23:59. "
+        "Bạn bấm **Áp dụng** để cập nhật nhé."
+    )
 
 
 def _build_edit_messages(
@@ -790,6 +973,48 @@ def _build_edit_messages(
     if not messages or messages[-1].get("content") != latest_user_message:
         messages.append({"role": "user", "content": latest_user_message})
     return messages
+
+
+def _board_budget(board: Dict[str, Any]) -> Optional[int]:
+    val = board.get("budgetTotal")
+    try:
+        return int(val) if val else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _board_travelers(board: Dict[str, Any]) -> int:
+    """Best-effort headcount from the board's cards (max participantCount seen)."""
+    best = 0
+    for lst in board.get("lists") or []:
+        if not isinstance(lst, dict):
+            continue
+        for card in lst.get("cards") or []:
+            if not isinstance(card, dict):
+                continue
+            pc = card.get("participantCount")
+            try:
+                if pc:
+                    best = max(best, int(pc))
+            except (TypeError, ValueError):
+                pass
+    return best or 2
+
+
+def _budget_plan_op(target_vnd: int) -> EditOperation:
+    op = EditOperation(op="update_plan", budget_total_vnd=target_vnd)
+    op.summary = f"Đặt ngân sách kế hoạch = {target_vnd:,}đ"
+    return op
+
+
+def _budget_cut_narrative(operations: list, target: Optional[int]) -> str:
+    n = len([op for op in operations if op.op == "update_card"])
+    head = "AI đang tạm gián đoạn, nhưng mình đã tính nhanh một phương án tiết kiệm hơn"
+    if target:
+        head += f" (mục tiêu ~{target:,}đ)"
+    lines = [head + f": giảm chi phí ở {n} hoạt động."]
+    lines.append("Bạn xem và bấm **Áp dụng** nếu thấy hợp lý nhé.")
+    return "\n".join(lines)
 
 
 def _default_edit_narrative(operations: list) -> str:

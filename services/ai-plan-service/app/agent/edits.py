@@ -35,6 +35,11 @@ class EditOperation(BaseModel):
     card_id: Optional[int] = None
     target_list_id: Optional[int] = None
     target_position: Optional[int] = None
+    # Day targeting by 1-based index (Ngày 1, Ngày 2, …) — used when the concrete
+    # list_id isn't known yet, e.g. moving/creating a card INTO a day added in the same
+    # batch. Resolved to a real list_id at apply time (EditService).
+    day_index: Optional[int] = None  # create_card: which day to add the card to
+    target_day_index: Optional[int] = None  # move_card: which day to move the card to
 
     # Card / activity fields
     text: Optional[str] = None  # card title
@@ -123,13 +128,19 @@ def _board_ids(board: Optional[Dict[str, Any]]) -> tuple:
 
 
 def _ids_exist(op: EditOperation, list_ids: set, card_ids: set) -> bool:
-    """Whether the ids an op references actually exist on the board."""
+    """Whether the ids an op references actually exist on the board.
+
+    A day targeted by `day_index`/`target_day_index` is NOT validated here — it may be
+    a day added earlier in the same batch (not on the current board); it's resolved to
+    a real list_id at apply time (EditService)."""
     if op.op in ("update_card", "delete_card"):
         return op.card_id in card_ids and op.list_id in list_ids
     if op.op == "create_card":
-        return op.list_id in list_ids
+        return True if op.day_index is not None else op.list_id in list_ids
     if op.op == "move_card":
-        return op.card_id in card_ids and op.target_list_id in list_ids
+        if op.card_id not in card_ids:
+            return False
+        return True if op.target_day_index is not None else op.target_list_id in list_ids
     if op.op in ("rename_list", "delete_list"):
         return op.list_id in list_ids
     return True  # add_day / update_plan don't reference existing ids
@@ -141,9 +152,11 @@ def _has_required_targets(op: EditOperation) -> bool:
     if op.op == "delete_card":
         return op.list_id is not None and op.card_id is not None
     if op.op == "create_card":
-        return op.list_id is not None and bool(op.text)
+        return (op.list_id is not None or op.day_index is not None) and bool(op.text)
     if op.op == "move_card":
-        return op.card_id is not None and op.target_list_id is not None
+        return op.card_id is not None and (
+            op.target_list_id is not None or op.target_day_index is not None
+        )
     if op.op == "rename_list":
         return op.list_id is not None and bool(op.title)
     if op.op == "delete_list":
@@ -172,12 +185,15 @@ def operation_summary(op: EditOperation) -> str:
         detail = ", ".join(bits) or "cập nhật"
         return f"Cập nhật hoạt động: {detail}"
     if op.op == "create_card":
-        return f"Thêm hoạt động “{op.text}”" + (
+        where = f" vào Ngày {op.day_index}" if op.day_index else ""
+        return f"Thêm hoạt động “{op.text}”{where}" + (
             f" lúc {op.start_time}" if op.start_time else ""
         )
     if op.op == "delete_card":
         return "Xoá một hoạt động"
     if op.op == "move_card":
+        if op.target_day_index:
+            return f"Chuyển hoạt động sang Ngày {op.target_day_index}"
         return "Chuyển hoạt động sang ngày khác"
     if op.op == "rename_list":
         return f"Đổi tên ngày → “{op.title}”"
@@ -256,8 +272,24 @@ def propose_tool_schema() -> Dict[str, Any]:
                 },
                 "list_id": {"type": "integer", "description": "Target day/list id (from the board)."},
                 "card_id": {"type": "integer", "description": "Target card/activity id (from the board)."},
-                "target_list_id": {"type": "integer", "description": "Destination list for move_card."},
+                "target_list_id": {"type": "integer", "description": "Destination list id for move_card (from the board)."},
                 "target_position": {"type": "integer"},
+                "day_index": {
+                    "type": "integer",
+                    "description": (
+                        "create_card: 1-based day number to add the card to (Ngày 1 = 1). "
+                        "USE THIS instead of list_id when the day was just added via add_day "
+                        "in this same batch (its list_id doesn't exist yet)."
+                    ),
+                },
+                "target_day_index": {
+                    "type": "integer",
+                    "description": (
+                        "move_card: 1-based day number to move the card to (Ngày 2 = 2). "
+                        "USE THIS instead of target_list_id when moving into a day added in "
+                        "this same batch."
+                    ),
+                },
                 "text": {"type": "string", "description": "Card title (create_card/update_card)."},
                 "description": {"type": "string"},
                 "start_time": {"type": "string", "description": "HH:MM"},

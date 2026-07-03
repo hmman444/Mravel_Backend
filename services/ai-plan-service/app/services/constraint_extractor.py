@@ -1,13 +1,8 @@
-"""Hybrid constraint extraction.
+"""Trích xuất ràng buộc theo 2 bước.
 
-Step 1: always run the deterministic regex stub. Cheap, free, robust against
-        weak models that ignore JSON-mode prompts. Catches the obvious
-        Vietnamese/English patterns: destination, duration, people, budget.
-Step 2: if a real LLM is configured, let it refine the baseline. Useful for
-        ambiguous phrasing or for filling fields the regex missed.
-
-If the LLM call fails or returns garbage, the regex baseline still wins —
-the user never sees a blank constraint set due to LLM failure.
+Bước 1: chạy regex để bắt các mẫu cơ bản (điểm đến, số ngày, số người, ngân sách).
+Bước 2: nếu có cấu hình LLM thì dùng LLM tinh chỉnh kết quả.
+Nếu LLM lỗi, kết quả regex được giữ lại.
 """
 
 from datetime import date
@@ -84,13 +79,21 @@ def _normalize(data: Dict[str, Any], prior: Constraints) -> Constraints:
     except (TypeError, ValueError):
         travelers = prior.travelers
 
-    budget_raw = data.get("budget_total_vnd", prior.budget_total_vnd)
+    # A refinement pass must not WIPE a value the regex baseline already found: the
+    # LLM extractor often returns an explicit null for num_days/budget even when the
+    # user clearly said "3 ngày 2 đêm" / "10 triệu". Treat null (not just an absent
+    # key) as "keep the prior value" — otherwise the plan collapses to 1 day / no budget.
+    budget_raw = data.get("budget_total_vnd")
+    if budget_raw is None:
+        budget_raw = prior.budget_total_vnd
     try:
         budget = int(budget_raw) if budget_raw is not None else None
     except (TypeError, ValueError):
         budget = prior.budget_total_vnd
 
-    num_days_raw = data.get("num_days", prior.num_days)
+    num_days_raw = data.get("num_days")
+    if num_days_raw is None:
+        num_days_raw = prior.num_days
     try:
         num_days = max(1, int(num_days_raw)) if num_days_raw is not None else None
     except (TypeError, ValueError):

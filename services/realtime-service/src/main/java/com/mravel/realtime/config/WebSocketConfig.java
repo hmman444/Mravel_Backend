@@ -50,8 +50,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
         registration.interceptors(stompAuthChannelInterceptor);
-        // Larger pool handles concurrent CONNECT/SUBSCRIBE during traffic bursts.
-        // Each SUBSCRIBE can block briefly on the HTTP access-check (2s timeout).
         registration.taskExecutor()
                 .corePoolSize(8)
                 .maxPoolSize(32)
@@ -61,7 +59,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureWebSocketTransport(@NonNull WebSocketTransportRegistration registry) {
-        // Raise transport limits to tolerate large board payload bursts.
         registry.setMessageSizeLimit(4 * 1024 * 1024);
         registry.setSendBufferSizeLimit(8 * 1024 * 1024);
         registry.setSendTimeLimit(30_000);
