@@ -117,7 +117,7 @@ public class NotificationService {
         }
 
         final Map<Long, UserMiniResponse> finalActorMap = actorMap;
-        return NotificationDtos.PagedResult.of(p.map(n -> toResponse(n, unread, finalActorMap)));
+        return NotificationDtos.PagedResult.of(p.map(n -> toResponse(n, unread, finalActorMap)), unread);
     }
 
     @Transactional

@@ -62,23 +62,30 @@ public class NotificationDtos {
         private final int totalPages;
         private final int size;
         private final int number;
+        private final Long unreadCount;
 
         public static <T> PagedResult<T> of(Page<T> page) {
+            return of(page, null);
+        }
+
+        public static <T> PagedResult<T> of(Page<T> page, Long unreadCount) {
             return new PagedResult<>(
                     page.getContent(),
                     page.getTotalElements(),
                     page.getTotalPages(),
                     page.getSize(),
-                    page.getNumber()
+                    page.getNumber(),
+                    unreadCount
             );
         }
 
-        private PagedResult(List<T> content, long totalElements, int totalPages, int size, int number) {
+        private PagedResult(List<T> content, long totalElements, int totalPages, int size, int number, Long unreadCount) {
             this.content = content;
             this.totalElements = totalElements;
             this.totalPages = totalPages;
             this.size = size;
             this.number = number;
+            this.unreadCount = unreadCount;
         }
     }
 
