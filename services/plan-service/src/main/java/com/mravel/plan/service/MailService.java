@@ -4,8 +4,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/**
+ * Gửi email là tác dụng phụ, không thuộc nghiệp vụ chính (mời/duyệt/từ chối).
+ * Mọi phương thức đều {@code @Async} + bọc try/catch: lỗi SMTP chạy ở thread nền,
+ * KHÔNG làm treo request, KHÔNG rollback giao dịch, KHÔNG trả 500. Cấu hình SMTP
+ * đọc từ biến môi trường (xem application.yml) và có timeout để fail-fast khi cổng
+ * bị chặn thay vì treo.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -14,6 +22,7 @@ public class MailService {
     private final JavaMailSender mailSender;
 
     // mail mời tham gia kế hoạch
+    @Async
     public void sendInviteEmail(String email, String planTitle, String joinUrl) {
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
@@ -24,11 +33,12 @@ public class MailService {
 
             mailSender.send(msg);
         } catch (Exception ex) {
-            log.error("[MAIL] Cannot send invite email: {}", ex.getMessage());
+            log.error("[MAIL] Cannot send invite email to {}: {}", email, ex.getMessage(), ex);
         }
     }
 
     // mail yêu cầu truy cập kế hoạch
+    @Async
     public void sendRequestEmailToOwner(String ownerEmail, String planTitle,
             String requesterName, String requesterEmail,
             String requestType) {
@@ -48,32 +58,43 @@ public class MailService {
     }
 
     // gửi mail khi yêu cầu được chấp nhận
+    @Async
     public void sendApproveEmail(String targetEmail, String planTitle, String role) {
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setTo(targetEmail);
-        msg.setSubject("Mravel - Yêu cầu truy cập được chấp nhận");
+        try {
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setTo(targetEmail);
+            msg.setSubject("Mravel - Yêu cầu truy cập được chấp nhận");
 
-        msg.setText(
-                "Yêu cầu truy cập vào kế hoạch \"" + planTitle + "\" đã được chấp nhận.\n\n" +
-                        "Bạn được cấp quyền: " + role + "\n" +
-                        "Bạn có thể truy cập plan ngay bây giờ.\n\n" +
-                        "Mravel Team");
+            msg.setText(
+                    "Yêu cầu truy cập vào kế hoạch \"" + planTitle + "\" đã được chấp nhận.\n\n" +
+                            "Bạn được cấp quyền: " + role + "\n" +
+                            "Bạn có thể truy cập plan ngay bây giờ.\n\n" +
+                            "Mravel Team");
 
-        mailSender.send(msg);
+            mailSender.send(msg);
+        } catch (Exception ex) {
+            // Gửi mail là tác dụng phụ: không được làm hỏng việc duyệt yêu cầu (tránh
+            // rollback + 500 khi SMTP lỗi). Chỉ log để chẩn đoán cấu hình mail.
+            log.error("[MAIL] Cannot send approve email to {}: {}", targetEmail, ex.getMessage(), ex);
+        }
     }
 
     // gửi mail khi yêu cầu bị từ chối
+    @Async
     public void sendRejectEmail(String targetEmail, String planTitle) {
+        try {
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setTo(targetEmail);
+            msg.setSubject("Mravel - Yêu cầu truy cập bị từ chối");
 
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setTo(targetEmail);
-        msg.setSubject("Mravel - Yêu cầu truy cập bị từ chối");
+            msg.setText(
+                    "Yêu cầu truy cập vào kế hoạch \"" + planTitle + "\" đã bị từ chối.\n\n" +
+                            "Nếu bạn nghĩ đây là nhầm lẫn, vui lòng liên hệ chủ sở hữu kế hoạch.\n" +
+                            "Mravel Team");
 
-        msg.setText(
-                "Yêu cầu truy cập vào kế hoạch \"" + planTitle + "\" đã bị từ chối.\n\n" +
-                        "Nếu bạn nghĩ đây là nhầm lẫn, vui lòng liên hệ chủ sở hữu kế hoạch.\n" +
-                        "Mravel Team");
-
-        mailSender.send(msg);
+            mailSender.send(msg);
+        } catch (Exception ex) {
+            log.error("[MAIL] Cannot send reject email to {}: {}", targetEmail, ex.getMessage(), ex);
+        }
     }
 }
