@@ -2,6 +2,7 @@ package com.mravel.plan.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -21,11 +22,26 @@ public class MailService {
 
     private final JavaMailSender mailSender;
 
+    /**
+     * Địa chỉ người gửi. BẮT BUỘC set From khi gửi qua Gmail: nếu bỏ trống,
+     * JavaMail suy ra người gửi từ địa chỉ local (vd {@code root@<hostname-container>})
+     * và Gmail TỪ CHỐI (5xx) → mail "gửi mà không tới". auth-service gửi được vì
+     * notification-core luôn set From = spring.mail.username; ở đây làm giống hệt.
+     */
+    @Value("${spring.mail.username:}")
+    private String mailFrom;
+
+    /** From an toàn: dùng username SMTP; fallback địa chỉ trung tính nếu chưa cấu hình. */
+    private String resolveFrom() {
+        return (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "no-reply@mravel.local";
+    }
+
     // mail mời tham gia kế hoạch
     @Async
     public void sendInviteEmail(String email, String planTitle, String joinUrl) {
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(resolveFrom());
             msg.setTo(email);
             msg.setSubject("Mravel - Lời mời tham gia kế hoạch: " + planTitle);
             msg.setText("Bạn được mời tham gia vào kế hoạch: " + planTitle + "\n\n" + "Nhấn vào link để tham gia:\n"
@@ -45,6 +61,7 @@ public class MailService {
 
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(resolveFrom());
             msg.setTo(ownerEmail);
             msg.setSubject("Mravel - Yêu cầu truy cập mới");
             msg.setText("Người dùng: " + requesterName + " (" + requesterEmail + ")\n"
@@ -62,6 +79,7 @@ public class MailService {
     public void sendApproveEmail(String targetEmail, String planTitle, String role) {
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(resolveFrom());
             msg.setTo(targetEmail);
             msg.setSubject("Mravel - Yêu cầu truy cập được chấp nhận");
 
@@ -84,6 +102,7 @@ public class MailService {
     public void sendRejectEmail(String targetEmail, String planTitle) {
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(resolveFrom());
             msg.setTo(targetEmail);
             msg.setSubject("Mravel - Yêu cầu truy cập bị từ chối");
 
